@@ -1,0 +1,167 @@
+﻿[BotLevelBrackets]
+#
+# Module: Bot Level Brackets for Turtle WoW (VMaNGOS)
+#
+
+#
+# BotLevelBrackets.Enabled
+# Enables or disables the Bot Level Brackets module.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.Enabled = 1
+
+#
+# BotLevelBrackets.FullDebugMode
+# Enables full debug logging in the server console/logs.
+# Default: 0 (Disabled)
+#
+BotLevelBrackets.FullDebugMode = 0
+
+#
+# BotLevelBrackets.LiteDebugMode
+# Enables lite debug logging (summary only).
+# Default: 0 (Disabled)
+#
+BotLevelBrackets.LiteDebugMode = 0
+
+#
+# BotLevelBrackets.CheckFrequency
+# Frequency (in seconds) at which the bot level distribution check is performed.
+# Default: 300 (5 minutes)
+#
+BotLevelBrackets.CheckFrequency = 300
+
+#
+# BotLevelBrackets.CheckFlaggedFrequency
+# Frequency (in seconds) at which level resets are processed for flagged bots.
+# Default: 15 (15 seconds)
+#
+BotLevelBrackets.CheckFlaggedFrequency = 15
+
+#
+# BotLevelBrackets.FlaggedProcessLimit
+# Maximum number of flagged bots to process per pending reset step (0 = unlimited).
+# Default: 5
+#
+BotLevelBrackets.FlaggedProcessLimit = 5
+
+#
+# BotLevelBrackets.Dynamic.UseDynamicDistribution
+# Dynamically adjusts bracket distribution percentages based on real player level clusters.
+# Default: 0 (Disabled)
+#
+BotLevelBrackets.Dynamic.UseDynamicDistribution = 0
+
+#
+# BotLevelBrackets.Dynamic.RealPlayerWeight
+# Controls how strongly bots follow real player concentrations.
+# Default: 1.0
+#
+BotLevelBrackets.Dynamic.RealPlayerWeight = 1.0
+
+#
+# BotLevelBrackets.Dynamic.SyncFactions
+# Synchronizes real player influence and bracket logic across Alliance and Horde.
+# Default: 0 (Disabled)
+#
+BotLevelBrackets.Dynamic.SyncFactions = 0
+
+#
+# BotLevelBrackets.IgnoreFriendListed
+# Excludes bots that are on human-account characters' friends lists from bracket adjustments.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.IgnoreFriendListed = 1
+
+#
+# BotLevelBrackets.IgnoreGuildBotsWithRealPlayers
+# Excludes bots in a guild containing at least one human-account character,
+# including while that character is offline. `.blb cleanup` removes tracker
+# entries only after the guild no longer contains any human-account character.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.IgnoreGuildBotsWithRealPlayers = 1
+
+#
+# BotLevelBrackets.GuildTrackerUpdateFrequency
+# Frequency (in seconds) at which the persistent guild tracker table is refreshed.
+# Default: 600 (10 minutes)
+#
+BotLevelBrackets.GuildTrackerUpdateFrequency = 600
+
+#
+# BotLevelBrackets.NumRanges
+# Number of level brackets configured. Default for Vanilla (1-60) is 7 ranges.
+# Default: 7
+#
+BotLevelBrackets.NumRanges = 7
+
+#
+# BotLevelBrackets.ExcludeNames
+# Comma-separated list of case-insensitive bot names to exclude from adjustments.
+# Example: "Botone,Bottwo"
+# Default: ""
+#
+BotLevelBrackets.ExcludeNames = ""
+
+# -----------------------------------------------------------------------------
+# Alliance Level Brackets Configuration (Percentages must sum to 100)
+# -----------------------------------------------------------------------------
+BotLevelBrackets.Alliance.Range1.Lower = 1
+BotLevelBrackets.Alliance.Range1.Upper = 9
+BotLevelBrackets.Alliance.Range1.Pct   = 16
+
+BotLevelBrackets.Alliance.Range2.Lower = 10
+BotLevelBrackets.Alliance.Range2.Upper = 19
+BotLevelBrackets.Alliance.Range2.Pct   = 14
+
+BotLevelBrackets.Alliance.Range3.Lower = 20
+BotLevelBrackets.Alliance.Range3.Upper = 29
+BotLevelBrackets.Alliance.Range3.Pct   = 14
+
+BotLevelBrackets.Alliance.Range4.Lower = 30
+BotLevelBrackets.Alliance.Range4.Upper = 39
+BotLevelBrackets.Alliance.Range4.Pct   = 14
+
+BotLevelBrackets.Alliance.Range5.Lower = 40
+BotLevelBrackets.Alliance.Range5.Upper = 49
+BotLevelBrackets.Alliance.Range5.Pct   = 14
+
+BotLevelBrackets.Alliance.Range6.Lower = 50
+BotLevelBrackets.Alliance.Range6.Upper = 59
+BotLevelBrackets.Alliance.Range6.Pct   = 14
+
+BotLevelBrackets.Alliance.Range7.Lower = 60
+BotLevelBrackets.Alliance.Range7.Upper = 60
+BotLevelBrackets.Alliance.Range7.Pct   = 14
+
+# -----------------------------------------------------------------------------
+# Horde Level Brackets Configuration (Percentages must sum to 100)
+# -----------------------------------------------------------------------------
+BotLevelBrackets.Horde.Range1.Lower = 1
+BotLevelBrackets.Horde.Range1.Upper = 9
+BotLevelBrackets.Horde.Range1.Pct   = 16
+
+BotLevelBrackets.Horde.Range2.Lower = 10
+BotLevelBrackets.Horde.Range2.Upper = 19
+BotLevelBrackets.Horde.Range2.Pct   = 14
+
+BotLevelBrackets.Horde.Range3.Lower = 20
+BotLevelBrackets.Horde.Range3.Upper = 29
+BotLevelBrackets.Horde.Range3.Pct   = 14
+
+BotLevelBrackets.Horde.Range4.Lower = 30
+BotLevelBrackets.Horde.Range4.Upper = 39
+BotLevelBrackets.Horde.Range4.Pct   = 14
+
+BotLevelBrackets.Horde.Range5.Lower = 40
+BotLevelBrackets.Horde.Range5.Upper = 49
+BotLevelBrackets.Horde.Range5.Pct   = 14
+
+BotLevelBrackets.Horde.Range6.Lower = 50
+BotLevelBrackets.Horde.Range6.Upper = 59
+BotLevelBrackets.Horde.Range6.Pct   = 14
+
+BotLevelBrackets.Horde.Range7.Lower = 60
+BotLevelBrackets.Horde.Range7.Upper = 60
+BotLevelBrackets.Horde.Range7.Pct   = 14
