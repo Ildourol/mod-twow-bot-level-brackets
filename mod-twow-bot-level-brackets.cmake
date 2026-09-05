@@ -1,4 +1,4 @@
-﻿# CMake configuration hook for mod-twow-bot-level-brackets
+# CMake configuration hook for mod-twow-bot-level-brackets
 
 if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
   find_package(Boost 1.70 REQUIRED)
@@ -29,6 +29,5 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
     MANGOSBOT_ZERO
     ENABLE_PLAYERBOTS)
 
-  target_link_libraries(${BLB_MODULE_TARGET} PUBLIC playerbots)
   unset(BLB_MODULE_TARGET)
 endif()
