@@ -65,7 +65,7 @@ mysql -u root -p tw_char < modules/mod-twow-bot-level-brackets/data/sql/characte
 mysql -u root -p tw_char < modules/mod-twow-bot-level-brackets/data/sql/character/2026_10_22_bot_level_brackets_pending_resets.sql
 ```
 
-*(Optional: If command table registration is desired, apply `data/sql/world/2026_10_22_bot_level_brackets_commands.sql` to `tw_world`)*
+*(Note: Turtle WoW / vMaNGOS implements commands natively in C++ via `AllCommandScript`, so no world database tables or SQL imports are required for `.blb` commands).*
 
 ### 4. Configuration
 Copy the configuration template to your server's module configuration directory:
