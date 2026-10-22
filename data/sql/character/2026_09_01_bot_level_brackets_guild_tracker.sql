@@ -1,4 +1,4 @@
-﻿-- Bot Level Brackets Guild Tracker Table for Turtle WoW (VMaNGOS)
+-- Bot Level Brackets Guild Tracker Table for Turtle WoW (VMaNGOS)
 -- Tracks guilds that have real (non-bot) players to prevent bot level changes
 -- when real players are in the guild, even when they are offline.
 

@@ -1,0 +1,21 @@
+# Workspace and internal architecture documentation (local only)
+AGENTS.md
+.agents/
+tests/
+docs/ARCHITECTURE.md
+docs/CORE_PORTABILITY_GUIDE.md
+docs/FEATURE_PORT_REPORT.md
+docs/TORTOISEBOTS_ADAPTER_SPEC.md
+
+# Build artifacts and editor directories
+build/
+bin/
+*.obj
+*.lib
+*.dll
+*.exe
+*.pdb
+*.log
+.vs/
+.vscode/
+*.user

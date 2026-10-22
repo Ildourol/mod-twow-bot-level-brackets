@@ -1,7 +1,6 @@
 # CMake configuration hook for mod-twow-bot-level-brackets
 
 if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
-  find_package(Boost 1.70 REQUIRED)
 
   if(TORTOISE_CURRENT_MODULE_LINKAGE STREQUAL "dynamic")
     GetModuleProjectName("${TORTOISE_CURRENT_MODULE}" BLB_MODULE_TARGET)
@@ -9,25 +8,87 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
     set(BLB_MODULE_TARGET modules)
   endif()
 
-  target_include_directories(${BLB_MODULE_TARGET}
-    PUBLIC
-      ${CMAKE_SOURCE_DIR}/src/modules/PlayerBots
-      ${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot
-      ${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/strategy
-      ${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/strategy/actions
-      ${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/strategy/triggers
-      ${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/strategy/values
-      ${CMAKE_SOURCE_DIR}/src/game/MapNodes
-      ${Boost_INCLUDE_DIRS}
-      ${CMAKE_CURRENT_LIST_DIR}/src
+  # ---------------------------------------------------------------------------
+  # 1. Check for TortoiseBots (Native Modular Companion Engine for tortoise-wow)
+  # ---------------------------------------------------------------------------
+  set(TORTOISEBOTS_FOUND FALSE)
+  set(TORTOISEBOTS_SEARCH_PATHS
+    "${CMAKE_SOURCE_DIR}/modules/TortoiseBots"
+    "${CMAKE_SOURCE_DIR}/../TortoiseBots"
+    "${CMAKE_CURRENT_LIST_DIR}/../TortoiseBots"
   )
+  foreach(SEARCH_PATH ${TORTOISEBOTS_SEARCH_PATHS})
+    if(EXISTS "${SEARCH_PATH}/runtime/BotManager.h")
+      set(TORTOISEBOTS_ROOT "${SEARCH_PATH}")
+      set(TORTOISEBOTS_FOUND TRUE)
+      break()
+    endif()
+  endforeach()
 
-  # These feature gates are PRIVATE on the vendored playerbots target, so a
-  # consuming module must compile its own translation units with them too.
-  target_compile_definitions(${BLB_MODULE_TARGET} PRIVATE
-    CMANGOS
-    MANGOSBOT_ZERO
-    ENABLE_PLAYERBOTS)
+  # ---------------------------------------------------------------------------
+  # 2. Check for Legacy PlayerBots (vendored in older cores like tortoise-wow-mantech-turtle)
+  # ---------------------------------------------------------------------------
+  set(LEGACY_PLAYERBOTS_FOUND FALSE)
+  if(EXISTS "${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/RandomPlayerbotMgr.h")
+    set(LEGACY_PLAYERBOTS_ROOT "${CMAKE_SOURCE_DIR}/src/modules/PlayerBots")
+    set(LEGACY_PLAYERBOTS_FOUND TRUE)
+  endif()
+
+  # ---------------------------------------------------------------------------
+  # 3. Configure includes and preprocessor definitions based on discovered engine
+  # ---------------------------------------------------------------------------
+  if(TORTOISEBOTS_FOUND)
+    message(STATUS "mod-twow-bot-level-brackets: Discovered TortoiseBots at ${TORTOISEBOTS_ROOT}")
+    target_compile_definitions(${BLB_MODULE_TARGET} PRIVATE
+      HAVE_TORTOISEBOTS=1
+      MANGOSBOT_ZERO=1
+      CMANGOS=1
+    )
+    target_include_directories(${BLB_MODULE_TARGET}
+      PUBLIC
+        "${TORTOISEBOTS_ROOT}"
+        "${TORTOISEBOTS_ROOT}/ai"
+        "${TORTOISEBOTS_ROOT}/ai/playerbot"
+        "${TORTOISEBOTS_ROOT}/ai/playerbot/strategy"
+        "${TORTOISEBOTS_ROOT}/ai/playerbot/strategy/actions"
+        "${TORTOISEBOTS_ROOT}/ai/playerbot/strategy/triggers"
+        "${TORTOISEBOTS_ROOT}/ai/playerbot/strategy/values"
+        "${TORTOISEBOTS_ROOT}/host"
+        "${TORTOISEBOTS_ROOT}/runtime"
+        "${CMAKE_SOURCE_DIR}/src/game/MapNodes"
+        "${CMAKE_CURRENT_LIST_DIR}/src"
+    )
+  elseif(LEGACY_PLAYERBOTS_FOUND)
+    message(STATUS "mod-twow-bot-level-brackets: Discovered Legacy PlayerBots at ${LEGACY_PLAYERBOTS_ROOT}")
+    find_package(Boost 1.70 REQUIRED)
+    target_compile_definitions(${BLB_MODULE_TARGET} PRIVATE
+      HAVE_LEGACY_PLAYERBOTS=1
+      CMANGOS=1
+      MANGOSBOT_ZERO=1
+      ENABLE_PLAYERBOTS=1
+    )
+    target_include_directories(${BLB_MODULE_TARGET}
+      PUBLIC
+        "${LEGACY_PLAYERBOTS_ROOT}"
+        "${LEGACY_PLAYERBOTS_ROOT}/playerbot"
+        "${LEGACY_PLAYERBOTS_ROOT}/playerbot/strategy"
+        "${LEGACY_PLAYERBOTS_ROOT}/playerbot/strategy/actions"
+        "${LEGACY_PLAYERBOTS_ROOT}/playerbot/strategy/triggers"
+        "${LEGACY_PLAYERBOTS_ROOT}/playerbot/strategy/values"
+        "${CMAKE_SOURCE_DIR}/src/game/MapNodes"
+        ${Boost_INCLUDE_DIRS}
+        "${CMAKE_CURRENT_LIST_DIR}/src"
+    )
+  else()
+    message(STATUS "mod-twow-bot-level-brackets: No PlayerBots engine found; enabling Generic Headless Session Mode.")
+    target_compile_definitions(${BLB_MODULE_TARGET} PRIVATE
+      HAVE_GENERIC_HEADLESS_BOTS=1
+    )
+    target_include_directories(${BLB_MODULE_TARGET}
+      PUBLIC
+        "${CMAKE_CURRENT_LIST_DIR}/src"
+    )
+  endif()
 
   unset(BLB_MODULE_TARGET)
 endif()

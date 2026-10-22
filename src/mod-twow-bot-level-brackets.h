@@ -1,4 +1,4 @@
-﻿#ifndef MOD_TWOW_BOT_LEVEL_BRACKETS_H
+#ifndef MOD_TWOW_BOT_LEVEL_BRACKETS_H
 #define MOD_TWOW_BOT_LEVEL_BRACKETS_H
 
 // Registers the Bot Level Brackets module scripts in Turtle WoW (VMaNGOS).

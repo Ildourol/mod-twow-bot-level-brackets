@@ -1,6 +1,7 @@
 [BotLevelBrackets]
 #
 # Module: Bot Level Brackets for Turtle WoW (VMaNGOS)
+# Comprehensive Autonomous Bot Level Distribution, Capital Hub Gathering & Dispersal
 #
 
 #
@@ -46,6 +47,131 @@ BotLevelBrackets.CheckFlaggedFrequency = 15
 BotLevelBrackets.FlaggedProcessLimit = 5
 
 #
+# BotLevelBrackets.MaxPendingQueueSize
+# Maximum number of bots that can be in the pending level reset queue at once.
+# When the limit is reached, new bots are not enqueued until slots become available.
+# 0 = unlimited (no cap on queue size).
+# Default: 0
+#
+BotLevelBrackets.MaxPendingQueueSize = 0
+
+#
+# BotLevelBrackets.PendingQueueTTL
+# Maximum time (in seconds) a bot can remain in the pending level reset queue.
+# If a bot has not been processed within this time, its entry is dropped from the queue.
+# 0 = no TTL (entries remain indefinitely until processed or the bot logs out).
+# Default: 0
+#
+BotLevelBrackets.PendingQueueTTL = 0
+
+#
+# BotLevelBrackets.MinBracketChangeThreshold
+# Minimum number of surplus bots a bracket must have before redistribution moves
+# any bots out of it. Prevents constant churn in near-balanced brackets where surplus
+# is only 1-2 bots.
+# 0 = disabled (always redistribute, even for a surplus of 1).
+# Default: 0
+#
+BotLevelBrackets.MinBracketChangeThreshold = 0
+
+#
+# BotLevelBrackets.SocialListRefreshFrequency
+# Frequency (in seconds) at which human-player friends lists are refreshed from the database.
+# Runs independently of the main distribution check frequency.
+# Default: 300 (5 minutes)
+#
+BotLevelBrackets.SocialListRefreshFrequency = 300
+
+#
+# BotLevelBrackets.IgnoreFriendListed
+# Excludes bots that are on human-account characters' friends lists from bracket adjustments.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.IgnoreFriendListed = 1
+
+#
+# BotLevelBrackets.IgnoreGuildBotsWithRealPlayers
+# Excludes bots in a guild containing at least one human-account character,
+# including while that character is offline. `.blb cleanup` removes tracker
+# entries only after the guild no longer contains any human-account character.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.IgnoreGuildBotsWithRealPlayers = 1
+
+#
+# BotLevelBrackets.IgnoreArenaTeamBots
+# Excludes bots participating in Arenas (Blood Ring Map 26, Gurubashi Arena),
+# Battlegrounds (WSG, AB, AV, Sunnyglade Valley), or active PvP queues from bracket adjustments.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.IgnoreArenaTeamBots = 1
+
+#
+# BotLevelBrackets.GuildTrackerUpdateFrequency
+# Frequency (in seconds) at which the persistent guild tracker table is refreshed.
+# Default: 600 (10 minutes)
+#
+BotLevelBrackets.GuildTrackerUpdateFrequency = 600
+
+#
+# BotLevelBrackets.TeleportOnLevelChange
+# When enabled, bots are safely dismounted and teleported to an appropriate leveling zone
+# or capital hub after their level is adjusted. Level 1-9 bots are routed to their native
+# racial starter zones (including Thalassian Highlands for High Elves and Blackstone Island for Goblins).
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.TeleportOnLevelChange = 1
+
+#
+# BotLevelBrackets.HubDisperse.Enabled
+# When enabled, capital city ambiance gatherings and starting-zone dispersals are active.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.HubDisperse.Enabled = 1
+
+#
+# BotLevelBrackets.HubDisperse.BotsPerCycle
+# Maximum number of bots to process per cycle for any teleport scheduler.
+# Default: 50
+#
+BotLevelBrackets.HubDisperse.BotsPerCycle = 50
+
+#
+# BotLevelBrackets.HubDisperse.MaxBotsPerHub
+# Target ambiance population for each capital city hub (Stormwind, Ironforge, Darnassus,
+# Alah'Thalas [High Elf], Orgrimmar, Undercity, Thunder Bluff, Sparkwater Port [Goblin]).
+# Hubs below quota are populated with idle bots from the wild; hubs exceeding quota have excess
+# bots dispersed to leveling zones.
+# Default: 50
+#
+BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
+
+#
+# BotLevelBrackets.HubPopulate.Frequency
+# Frequency (in seconds) at which capital city hub population and dispersal runs.
+# Default: 30
+#
+BotLevelBrackets.HubPopulate.Frequency = 30
+
+#
+# BotLevelBrackets.StartingZoneDisperse.Frequency
+# Frequency (in seconds) at which over-leveled bots are dispersed from starting areas
+# (Northshire, Coldridge, Shadowglen, Thalassian Highlands [High Elf], Valley of Trials,
+# Red Cloud Mesa, Deathknell, Blackstone Island [Goblin]).
+# Default: 15
+#
+BotLevelBrackets.StartingZoneDisperse.Frequency = 15
+BotLevelBrackets.StartingZoneDisperse.Frequency = 15
+
+#
+# BotLevelBrackets.WrongMapDisperse.Frequency
+# Frequency (in seconds) at which bots stranded on invalid or non-continental maps
+# are dispersed to their appropriate leveling zones.
+# Default: 60
+#
+BotLevelBrackets.WrongMapDisperse.Frequency = 60
+
+#
 # BotLevelBrackets.Dynamic.UseDynamicDistribution
 # Dynamically adjusts bracket distribution percentages based on real player level clusters.
 # Default: 0 (Disabled)
@@ -65,29 +191,6 @@ BotLevelBrackets.Dynamic.RealPlayerWeight = 1.0
 # Default: 0 (Disabled)
 #
 BotLevelBrackets.Dynamic.SyncFactions = 0
-
-#
-# BotLevelBrackets.IgnoreFriendListed
-# Excludes bots that are on human-account characters' friends lists from bracket adjustments.
-# Default: 1 (Enabled)
-#
-BotLevelBrackets.IgnoreFriendListed = 1
-
-#
-# BotLevelBrackets.IgnoreGuildBotsWithRealPlayers
-# Excludes bots in a guild containing at least one human-account character,
-# including while that character is offline. `.blb cleanup` removes tracker
-# entries only after the guild no longer contains any human-account character.
-# Default: 1 (Enabled)
-#
-BotLevelBrackets.IgnoreGuildBotsWithRealPlayers = 1
-
-#
-# BotLevelBrackets.GuildTrackerUpdateFrequency
-# Frequency (in seconds) at which the persistent guild tracker table is refreshed.
-# Default: 600 (10 minutes)
-#
-BotLevelBrackets.GuildTrackerUpdateFrequency = 600
 
 #
 # BotLevelBrackets.NumRanges
