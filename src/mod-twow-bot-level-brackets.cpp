@@ -112,11 +112,14 @@ static bool   g_SyncFactions                     = false;
 static bool   g_TeleportOnLevelChange            = true;
 
 static bool   g_HubDisperseEnabled               = true;
+static uint32 g_HubDisperseQuotaMode             = 2;  // 1 = Total Number (MaxBotsPerHub), 2 = Percentage (HubBotPct / per-city)
 static uint32 g_HubDisperseBotsPerCycle          = 50;
 static uint32 g_HubDisperseMaxBotsPerHub         = 50;
+static uint32 g_HubDisperseDefaultPct            = 5;
 static uint32 g_HubPopulateFrequency             = 30;
 static uint32 g_StartingZoneDisperseFrequency    = 15;
 static uint32 g_WrongMapDisperseFrequency        = 60;
+static int32  g_HubCityPcts[8]                   = { 7, 5, 4, 4, 7, 5, 4, 4 };
 
 // Configured level ranges
 static std::vector<LevelRangeConfig> g_AllianceLevelRanges;
@@ -375,6 +378,69 @@ static bool IsBotSafeForLevelReset(Player* bot)
     return true;
 }
 
+static bool IsBotSafeForTeleport(Player* bot)
+{
+    if (!bot || !bot->GetSession() || bot->GetSession()->isLogingOut())
+        return false;
+
+    if (!bot->IsInWorld() || !bot->IsAlive())
+        return false;
+
+    if (bot->IsInCombat())
+        return false;
+
+    if (BotInArena(bot))
+        return false;
+
+    if (bot->IsTaxiFlying())
+        return false;
+
+    if (bot->IsBeingTeleported())
+        return false;
+
+    if (bot->GetTrader() || !bot->GetLootGuid().IsEmpty())
+        return false;
+
+    if (bot->GetCurrentSpell(CURRENT_GENERIC_SPELL) || bot->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+        return false;
+
+    if (Group* group = bot->GetGroup())
+    {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+        {
+            Player* member = ref->GetSource();
+            if (member && member->IsInWorld() && !IsPlayerBot(member))
+                return false;
+        }
+    }
+
+    if (BotHasRealPlayerMaster(bot))
+        return false;
+
+    return true;
+}
+
+static uint32 GetHubQuota(size_t hubIdx, uint32 factionTotal)
+{
+    if (g_HubDisperseQuotaMode == 1) // Mode 1: Total number (absolute headcount)
+    {
+        return g_HubDisperseMaxBotsPerHub;
+    }
+
+    // Mode 2: Percentage of total faction bots
+    if (hubIdx >= s_NumHubAreas || factionTotal == 0)
+        return 0;
+
+    int32 configuredPct = g_HubCityPcts[hubIdx];
+    uint32 pct = (configuredPct >= 0) ? static_cast<uint32>(configuredPct) : g_HubDisperseDefaultPct;
+    if (pct == 0)
+        return 0;
+
+    // Standard rounding: (factionTotal * pct + 50) / 100
+    uint32 quota = (factionTotal * pct + 50) / 100;
+    return std::min<uint32>(quota, factionTotal);
+}
+
 static bool ShouldExcludeBot(Player* bot)
 {
     if (!bot || !bot->IsInWorld())
@@ -421,8 +487,31 @@ static void LoadBotLevelBracketsConfig()
     g_TeleportOnLevelChange            = sConfig.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true);
 
     g_HubDisperseEnabled               = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.Enabled", true);
+    g_HubDisperseQuotaMode             = ReadBoundedUInt("BotLevelBrackets.HubDisperse.QuotaMode", 2, 1, 2);
     g_HubDisperseBotsPerCycle          = ReadBoundedUInt("BotLevelBrackets.HubDisperse.BotsPerCycle", 50, 1, 500);
     g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500);
+    g_HubDisperseDefaultPct            = ReadBoundedUInt("BotLevelBrackets.HubDisperse.HubBotPct", 5, 0, 100);
+
+    int32 swPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.StormwindPct", 7);
+    int32 ifPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.IronforgePct", 5);
+    int32 daPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.DarnassusPct", 4);
+    int32 atPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.AlahThalasPct", 4);
+
+    int32 orPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.OrgrimmarPct", 7);
+    int32 ucPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.UndercityPct", 5);
+    int32 tbPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.ThunderBluffPct", 4);
+    int32 spPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.SparkwaterPct", 4);
+
+    g_HubCityPcts[0] = (swPct >= 0) ? std::min(swPct, 100) : -1;
+    g_HubCityPcts[1] = (ifPct >= 0) ? std::min(ifPct, 100) : -1;
+    g_HubCityPcts[2] = (daPct >= 0) ? std::min(daPct, 100) : -1;
+    g_HubCityPcts[3] = (atPct >= 0) ? std::min(atPct, 100) : -1;
+
+    g_HubCityPcts[4] = (orPct >= 0) ? std::min(orPct, 100) : -1;
+    g_HubCityPcts[5] = (ucPct >= 0) ? std::min(ucPct, 100) : -1;
+    g_HubCityPcts[6] = (tbPct >= 0) ? std::min(tbPct, 100) : -1;
+    g_HubCityPcts[7] = (spPct >= 0) ? std::min(spPct, 100) : -1;
+
     g_HubPopulateFrequency             = ReadBoundedUInt("BotLevelBrackets.HubPopulate.Frequency", 30, 1, 86400);
     g_StartingZoneDisperseFrequency    = ReadBoundedUInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 15, 1, 86400);
     g_WrongMapDisperseFrequency        = ReadBoundedUInt("BotLevelBrackets.WrongMapDisperse.Frequency", 60, 1, 86400);
@@ -842,7 +931,7 @@ static void ProcessPendingTeleports()
                 continue;
             }
 
-            if (!IsBotSafeForLevelReset(bot))
+            if (!IsBotSafeForTeleport(bot))
             {
                 if (g_PendingQueueTTL > 0 && (now - it->second.enqueuedAt) > g_PendingQueueTTL)
                 {
@@ -988,6 +1077,19 @@ static void ProcessHubPopulate()
     if (allBots.empty())
         return;
 
+    uint32 totalAllianceBots = 0;
+    uint32 totalHordeBots    = 0;
+    for (const auto& itr : players)
+    {
+        Player* p = itr.second;
+        if (!p || !p->IsInWorld() || !IsPlayerBot(p) || !IsPlayerRandomBot(p) || IsBotExcluded(p))
+            continue;
+        if (p->GetTeamId() == TEAM_ALLIANCE)
+            ++totalAllianceBots;
+        else if (p->GetTeamId() == TEAM_HORDE)
+            ++totalHordeBots;
+    }
+
     std::unordered_set<ObjectGuid> alreadyProcessed;
 
     // Part A: Disperse wrong-level and excess bots from hubs
@@ -1023,7 +1125,7 @@ static void ProcessHubPopulate()
             if (!wrongLevel)
                 continue;
 
-            if (!IsBotSafeForLevelReset(info->bot))
+            if (!IsBotSafeForTeleport(info->bot))
                 continue;
 
             EnqueuePendingTeleport(info->bot, level, info->bot->GetTeamId());
@@ -1031,7 +1133,8 @@ static void ProcessHubPopulate()
             ++processed;
         }
 
-        uint32 quota = g_HubDisperseMaxBotsPerHub;
+        uint32 factionTotal = (hub.teamId == TEAM_ALLIANCE) ? totalAllianceBots : totalHordeBots;
+        uint32 quota = GetHubQuota(hubIdx, factionTotal);
         uint32 remaining = 0;
         for (const BotInfo* info : botsInHub)
         {
@@ -1050,7 +1153,7 @@ static void ProcessHubPopulate()
             if (alreadyProcessed.count(info->bot->GetObjectGuid()) > 0)
                 continue;
 
-            if (!IsBotSafeForLevelReset(info->bot))
+            if (!IsBotSafeForTeleport(info->bot))
                 continue;
 
             EnqueuePendingTeleport(info->bot, info->bot->GetLevel(), info->bot->GetTeamId());
@@ -1065,7 +1168,8 @@ static void ProcessHubPopulate()
     {
         const HubArea& hub = s_HubAreas[hubIdx];
         uint32 currentCount = hubCounts[hubIdx];
-        uint32 quota = g_HubDisperseMaxBotsPerHub;
+        uint32 factionTotal = (hub.teamId == TEAM_ALLIANCE) ? totalAllianceBots : totalHordeBots;
+        uint32 quota = GetHubQuota(hubIdx, factionTotal);
         if (currentCount >= quota)
             continue;
 
@@ -1088,7 +1192,7 @@ static void ProcessHubPopulate()
             if (hub.maxLevel > 0 && level > hub.maxLevel)
                 continue;
 
-            if (!IsBotSafeForLevelReset(info.bot))
+            if (!IsBotSafeForTeleport(info.bot))
                 continue;
 
             float angle  = static_cast<float>(rand_norm()) * 2.0f * static_cast<float>(M_PI);
@@ -1105,7 +1209,8 @@ static void ProcessHubPopulate()
 
     if (processed > 0 && g_BotDistFullDebugMode)
     {
-        sLog.outString("[BotLevelBrackets] HubPopulate: processed %u bots this cycle.", processed);
+        sLog.outString("[BotLevelBrackets] HubPopulate: processed %u bots this cycle (Mode: %s).",
+            processed, (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"));
     }
 }
 
@@ -1141,7 +1246,7 @@ static void ProcessStartingZoneDisperse()
             if (level <= s_StartingAreas[i].maxLevel)
                 break;
 
-            if (!IsBotSafeForLevelReset(bot))
+            if (!IsBotSafeForTeleport(bot))
                 break;
 
             EnqueuePendingTeleport(bot, level, bot->GetTeamId());
@@ -1189,7 +1294,7 @@ static void ProcessWrongMapDisperse()
         if (isInstanceOrBg || mapId == 0 || mapId == 1 || mapId == 369 || mapId == 815 || mapId == 816 || mapId == 813 || mapId == 26 || mapId == 27)
             continue;
 
-        if (!IsBotSafeForLevelReset(bot))
+        if (!IsBotSafeForTeleport(bot))
             continue;
 
         EnqueuePendingTeleport(bot, bot->GetLevel(), bot->GetTeamId());
@@ -2344,6 +2449,10 @@ public:
             }
             handler->PSendSysMessage("[BotBrackets] Pending Resets: %u, Pending Teleports: %u",
                 (uint32)pendingResets, (uint32)pendingTeleports);
+            handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
+                (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
+                GetHubQuota(0, totalAlliance), GetHubQuota(1, totalAlliance), GetHubQuota(2, totalAlliance), GetHubQuota(3, totalAlliance),
+                GetHubQuota(4, totalHorde), GetHubQuota(5, totalHorde), GetHubQuota(6, totalHorde), GetHubQuota(7, totalHorde));
         }
         else if (subcommand == "pending")
         {

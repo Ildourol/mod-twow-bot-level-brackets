@@ -105,7 +105,8 @@ BotLevelBrackets.IgnoreArenaTeamBots = 1
 # Teleportation & World Presences
 BotLevelBrackets.TeleportOnLevelChange = 1
 BotLevelBrackets.HubDisperse.Enabled = 1
-BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
+BotLevelBrackets.HubDisperse.QuotaMode = 2
+BotLevelBrackets.HubDisperse.HubBotPct = 5
 ```
 
 📖 **For an exhaustive, setting-by-setting reference and tuning examples, read the [Operator & Configuration Guide](docs/GUIDE.md).**

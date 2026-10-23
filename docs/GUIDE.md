@@ -62,21 +62,25 @@ Turtle WoW features a custom **Blood Ring Arena** on Map 26 alongside the classi
 
 ### 2.3 Capital Hub Ambiance & Dispersal (`HubPopulate`)
 
-To keep major cities lively without causing crowd congestion, the module enforces an ambiance quota (`HubDisperse.MaxBotsPerHub = 50`) across all **8 Turtle WoW racial capitals**:
+To keep major cities lively without draining the open world, the module supports **two quota calculation modes**:
+* **Mode 1 (Total number):** Absolute headcount per city (`HubDisperse.MaxBotsPerHub`).
+* **Mode 2 (Percentage - Default):** Percentage of total online faction bots per city (`HubDisperse.QuotaMode = 2`).
 
-| Faction | Capital City | Map | Coordinates $(X, Y, Z)$ | Radius |
-| :--- | :--- | :---: | :--- | :---: |
-| **Alliance** | Stormwind City | 0 | `-8810.0, 640.0, 94.0` | 200m |
-| **Alliance** | Ironforge | 0 | `-4980.0, -940.0, 501.0` | 150m |
-| **Alliance** | Darnassus | 1 | `9950.0, 2330.0, 1330.0` | 150m |
-| **Alliance** | **Alah'Thalas (High Elf)** | 0 | `3212.6, -2501.4, 111.7` | 180m |
-| **Horde** | Orgrimmar | 1 | `1570.0, -4400.0, 8.0` | 200m |
-| **Horde** | Undercity | 0 | `1620.0, 240.0, 60.0` | 150m |
-| **Horde** | Thunder Bluff | 1 | `-1290.0, 150.0, 130.0` | 150m |
-| **Horde** | **Sparkwater Port (Goblin)** | 1 | `840.0, -5060.0, 6.0` | 180m |
+In **Mode 2 (Default)**, quotas scale dynamically with server population. For a typical faction of 100 bots, the default distribution keeps **20% of bots in capital cities** and **80% actively questing across the world**:
+
+| Faction | Capital City | Map | Coordinates $(X, Y, Z)$ | Radius | Default % | For 100 Bots |
+| :--- | :--- | :---: | :--- | :---: | :---: | :---: |
+| **Alliance** | Stormwind City | 0 | `-8810.0, 640.0, 94.0` | 200m | **7%** | ~7 bots |
+| **Alliance** | Ironforge | 0 | `-4980.0, -940.0, 501.0` | 150m | **5%** | ~5 bots |
+| **Alliance** | Darnassus | 1 | `9950.0, 2330.0, 1330.0` | 150m | **4%** | ~4 bots |
+| **Alliance** | **Alah'Thalas (High Elf)** | 0 | `3212.6, -2501.4, 111.7` | 180m | **4%** | ~4 bots |
+| **Horde** | Orgrimmar | 1 | `1570.0, -4400.0, 8.0` | 200m | **7%** | ~7 bots |
+| **Horde** | Undercity | 0 | `1620.0, 240.0, 60.0` | 150m | **5%** | ~5 bots |
+| **Horde** | Thunder Bluff | 1 | `-1290.0, 150.0, 130.0` | 150m | **4%** | ~4 bots |
+| **Horde** | **Sparkwater Port (Goblin)** | 1 | `840.0, -5060.0, 6.0` | 180m | **4%** | ~4 bots |
 
 * **Under Quota:** Idle, safe bots wandering in the open world are pulled into under-populated cities using randomized polar coordinates ($\Delta x = r \cos \theta, \Delta y = r \sin \theta$).
-* **Over Quota:** Excess bots in capital cities are gently dispersed back to open-world leveling zones.
+* **Over Quota:** Excess bots in capital cities are gently dispersed back to open-world leveling zones. Safe teleport verification ensures bots inside cities are not permanently locked in sanctuary status.
 
 ---
 
@@ -159,8 +163,18 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | :--- | :---: | :---: | :--- |
 | `BotLevelBrackets.TeleportOnLevelChange` | Boolean | `1` | Safely dismounts and transports bots to an appropriate leveling zone upon level adjustment. |
 | `BotLevelBrackets.HubDisperse.Enabled` | Boolean | `1` | Master toggle for capital city gatherings and starting-zone dispersals. |
+| `BotLevelBrackets.HubDisperse.QuotaMode` | Integer | `2` | Quota mode for capital hubs (`1` = Absolute headcount `MaxBotsPerHub`, `2` = Percentage `HubBotPct`/per-city). |
 | `BotLevelBrackets.HubDisperse.BotsPerCycle` | Integer | `50` | Maximum number of bots moved per world scheduler cycle. |
-| `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | Integer | `50` | Target ambiance population for each of the 8 racial capital city hubs. |
+| `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | Integer | `50` | Target ambiance population for each capital city hub when `QuotaMode = 1`. |
+| `BotLevelBrackets.HubDisperse.HubBotPct` | Integer | `5` | Default target percentage of total faction bots per capital city hub when `QuotaMode = 2`. |
+| `BotLevelBrackets.HubDisperse.StormwindPct` | Integer | `7` | Target percentage for Stormwind City (Alliance primary trade capital). |
+| `BotLevelBrackets.HubDisperse.IronforgePct` | Integer | `5` | Target percentage for Ironforge (Alliance mountain capital). |
+| `BotLevelBrackets.HubDisperse.DarnassusPct` | Integer | `4` | Target percentage for Darnassus (Alliance classic capital). |
+| `BotLevelBrackets.HubDisperse.AlahThalasPct` | Integer | `4` | Target percentage for Alah'Thalas (Alliance High Elf sanctuary). |
+| `BotLevelBrackets.HubDisperse.OrgrimmarPct` | Integer | `7` | Target percentage for Orgrimmar (Horde primary trade capital). |
+| `BotLevelBrackets.HubDisperse.UndercityPct` | Integer | `5` | Target percentage for Undercity (Horde classic capital). |
+| `BotLevelBrackets.HubDisperse.ThunderBluffPct` | Integer | `4` | Target percentage for Thunder Bluff (Horde classic capital). |
+| `BotLevelBrackets.HubDisperse.SparkwaterPct` | Integer | `4` | Target percentage for Sparkwater Port (Horde Goblin port). |
 | `BotLevelBrackets.HubPopulate.Frequency` | Integer | `30` | Frequency in seconds at which capital city hub population and dispersal runs. |
 | `BotLevelBrackets.StartingZoneDisperse.Frequency` | Integer | `15` | Frequency in seconds at which over-leveled bots (> Lvl 9) are dispersed from starter valleys. |
 | `BotLevelBrackets.WrongMapDisperse.Frequency` | Integer | `60` | Frequency in seconds at which bots stranded on invalid maps are evacuated to leveling zones. |

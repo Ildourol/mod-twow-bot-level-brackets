@@ -130,6 +130,15 @@ BotLevelBrackets.TeleportOnLevelChange = 1
 BotLevelBrackets.HubDisperse.Enabled = 1
 
 #
+# BotLevelBrackets.HubDisperse.QuotaMode
+# Quota calculation mode for capital city hub ambiance populations:
+#   1 = Total number (Absolute headcount per city hub, defined by HubDisperse.MaxBotsPerHub)
+#   2 = Percentage (Percentage of total online faction bots per city hub)
+# Default: 2 (Percentage mode)
+#
+BotLevelBrackets.HubDisperse.QuotaMode = 2
+
+#
 # BotLevelBrackets.HubDisperse.BotsPerCycle
 # Maximum number of bots to process per cycle for any teleport scheduler.
 # Default: 50
@@ -138,13 +147,38 @@ BotLevelBrackets.HubDisperse.BotsPerCycle = 50
 
 #
 # BotLevelBrackets.HubDisperse.MaxBotsPerHub
-# Target ambiance population for each capital city hub (Stormwind, Ironforge, Darnassus,
-# Alah'Thalas [High Elf], Orgrimmar, Undercity, Thunder Bluff, Sparkwater Port [Goblin]).
-# Hubs below quota are populated with idle bots from the wild; hubs exceeding quota have excess
-# bots dispersed to leveling zones.
+# Target ambiance population for each capital city hub when QuotaMode = 1 (Total number mode).
 # Default: 50
 #
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
+
+#
+# BotLevelBrackets.HubDisperse.HubBotPct
+# Default target ambiance percentage of total faction bots for capital city hubs when QuotaMode = 2.
+# Example: For 100 bots in a faction, a value of 5 means ~5 bots in that city hub.
+# Range: 0 - 100
+# Default: 5
+#
+BotLevelBrackets.HubDisperse.HubBotPct = 5
+
+#
+# Per-City Target Percentages (when QuotaMode = 2):
+# Specifies the exact percentage of total faction bots that should populate each capital city.
+# Defaults are balanced for a 100-bot faction (~20% across all 4 cities, leaving 80% out leveling in the world):
+#   - Primary trade capitals (Stormwind, Orgrimmar): 7% (~7 bots per 100 bots)
+#   - Secondary capitals (Ironforge, Undercity): 5% (~5 bots per 100 bots)
+#   - Regional & custom capitals (Darnassus, Alah'Thalas, Thunder Bluff, Sparkwater Port): 4% (~4 bots per 100 bots)
+# Set to -1 to use the global HubDisperse.HubBotPct fallback value instead.
+#
+BotLevelBrackets.HubDisperse.StormwindPct     = 7
+BotLevelBrackets.HubDisperse.IronforgePct     = 5
+BotLevelBrackets.HubDisperse.DarnassusPct     = 4
+BotLevelBrackets.HubDisperse.AlahThalasPct    = 4
+
+BotLevelBrackets.HubDisperse.OrgrimmarPct     = 7
+BotLevelBrackets.HubDisperse.UndercityPct     = 5
+BotLevelBrackets.HubDisperse.ThunderBluffPct  = 4
+BotLevelBrackets.HubDisperse.SparkwaterPct    = 4
 
 #
 # BotLevelBrackets.HubPopulate.Frequency
@@ -160,7 +194,6 @@ BotLevelBrackets.HubPopulate.Frequency = 30
 # Red Cloud Mesa, Deathknell, Blackstone Island [Goblin]).
 # Default: 15
 #
-BotLevelBrackets.StartingZoneDisperse.Frequency = 15
 BotLevelBrackets.StartingZoneDisperse.Frequency = 15
 
 #
