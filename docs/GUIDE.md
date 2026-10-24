@@ -63,10 +63,12 @@ Turtle WoW features a custom **Blood Ring Arena** on Map 26 alongside the classi
 ### 2.3 Capital Hub Ambiance & Dispersal (`HubPopulate`)
 
 To keep major cities lively without draining the open world, the module supports **two quota calculation modes**:
-* **Mode 1 (Total number):** Per-city population band. Refill toward `MinBotsPerHub` below the lower threshold and disperse toward `MaxBotsPerHub` above the upper threshold. `MinBotsPerHub = 0` uses the maximum as the refill target, preserving the original headcount behavior.
-* **Mode 2 (Percentage - Default):** Calculate the rounded percentage of online faction bots, then bound the target by `MinBotsPerHub` and `MaxBotsPerHub` and the online faction total. A city percentage of `0` still disables that city.
+* **Mode 1 (Total number):** Each city's existing `*Pct` setting is an absolute bot count (0–500). For example, `StormwindPct = 20` targets 20 bots.
+* **Mode 2 (Percentage - Default):** Each city setting is a percentage (0–100) of online faction bots, rounded to the nearest bot.
 
-For example, mode 1 with Min `30`, Max `50`, and hysteresis `2` refills toward `30` below `28` and disperses toward `50` above `52`. Mode 2 with `1000` faction bots and a city percentage of `7` calculates `70`, capped at the default Max of `50`. These are gradual balancing targets: stability, cooldown, pending inbound accounting, cycle limits, eligibility and city level restrictions still apply. No bots are spawned; insufficient eligible bots can leave a city below its minimum. Limits count all brackets together, with no per-bracket population quotas.
+`PopulationLimitsEnabled = 1` (default) bounds each nonzero city target between `MinBotsPerHub` and `MaxBotsPerHub` in both modes. Min `0` means no minimum; Max is never substituted as the refill goal. With Min `10`, Max `50`, a target of `20` stays `20`, `5` becomes `10`, and `70` becomes `50`. Set the toggle to `0` to ignore both bounds. A city setting of `0` remains disabled. With limits enabled, Max `0` targets empty hubs; Min above Max is clamped with a warning.
+
+Both modes refill and disperse toward the resulting city target, subject to hysteresis, stability, cooldown, pending inbound accounting, cycle limits, eligibility and city level restrictions. Targets cannot exceed online faction bots. No bots are spawned; insufficient eligible bots can leave a city below its target. Limits count all brackets together.
 
 In **Mode 2 (Default)**, quotas scale dynamically with server population up to the configured ceiling. For a typical faction of 100 bots, the default distribution keeps **20% of bots in capital cities** and **80% actively questing across the world**:
 
@@ -165,18 +167,16 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | :--- | :---: | :---: | :--- |
 | `BotLevelBrackets.TeleportOnLevelChange` | Boolean | `1` | Safely dismounts and transports bots to an appropriate leveling zone upon level adjustment. |
 | `BotLevelBrackets.HubDisperse.Enabled` | Boolean | `1` | Master toggle for capital city gatherings and starting-zone dispersals. |
-| `BotLevelBrackets.HubDisperse.QuotaMode` | Integer | `2` | Quota mode for capital hubs (`1` = Min/Max headcount band, `2` = Percentage per-city bounded by Min/Max). |
+| `BotLevelBrackets.HubDisperse.QuotaMode` | Integer | `2` | Quota mode for capital hubs (`1` = per-city absolute counts, `2` = per-city percentages; optional Min/Max bounds apply to both). |
 | `BotLevelBrackets.HubDisperse.BotsPerCycle` | Integer | `50` | Maximum number of bots moved per world scheduler cycle. |
-| `BotLevelBrackets.HubDisperse.MinBotsPerHub` | Integer | `0` | Per-city refill threshold in mode 1 (`0` = refill to Max); percentage target floor in mode 2 (`0` = no floor). Range `0–500`; clamped to Max with a warning if larger. |
-| `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | Integer | `50` | Per-city upper threshold in mode 1; percentage target ceiling in mode 2. Range `0–500`; `0` empties managed hubs, not unlimited. |
-| `BotLevelBrackets.HubDisperse.StormwindPct` | Integer | `7` | Target percentage for Stormwind City (Alliance primary trade capital). |
-| `BotLevelBrackets.HubDisperse.IronforgePct` | Integer | `5` | Target percentage for Ironforge (Alliance mountain capital). |
-| `BotLevelBrackets.HubDisperse.DarnassusPct` | Integer | `4` | Target percentage for Darnassus (Alliance classic capital). |
-| `BotLevelBrackets.HubDisperse.AlahThalasPct` | Integer | `4` | Target percentage for Alah'Thalas (Alliance High Elf sanctuary). |
-| `BotLevelBrackets.HubDisperse.OrgrimmarPct` | Integer | `7` | Target percentage for Orgrimmar (Horde primary trade capital). |
-| `BotLevelBrackets.HubDisperse.UndercityPct` | Integer | `5` | Target percentage for Undercity (Horde classic capital). |
-| `BotLevelBrackets.HubDisperse.ThunderBluffPct` | Integer | `4` | Target percentage for Thunder Bluff (Horde classic capital). |
-| `BotLevelBrackets.HubDisperse.SparkwaterPct` | Integer | `4` | Target percentage for Sparkwater Port (Horde Goblin port). |
+| `BotLevelBrackets.HubDisperse.StormwindPct` | Integer | `7` | Mode 1 bot count / mode 2 percentage for Stormwind City (Alliance primary trade capital). |
+| `BotLevelBrackets.HubDisperse.IronforgePct` | Integer | `5` | Mode 1 bot count / mode 2 percentage for Ironforge (Alliance mountain capital). |
+| `BotLevelBrackets.HubDisperse.DarnassusPct` | Integer | `4` | Mode 1 bot count / mode 2 percentage for Darnassus (Alliance classic capital). |
+| `BotLevelBrackets.HubDisperse.AlahThalasPct` | Integer | `4` | Mode 1 bot count / mode 2 percentage for Alah'Thalas (Alliance High Elf sanctuary). |
+| `BotLevelBrackets.HubDisperse.OrgrimmarPct` | Integer | `7` | Mode 1 bot count / mode 2 percentage for Orgrimmar (Horde primary trade capital). |
+| `BotLevelBrackets.HubDisperse.UndercityPct` | Integer | `5` | Mode 1 bot count / mode 2 percentage for Undercity (Horde classic capital). |
+| `BotLevelBrackets.HubDisperse.ThunderBluffPct` | Integer | `4` | Mode 1 bot count / mode 2 percentage for Thunder Bluff (Horde classic capital). |
+| `BotLevelBrackets.HubDisperse.SparkwaterPct` | Integer | `4` | Mode 1 bot count / mode 2 percentage for Sparkwater Port (Horde Goblin port). |
 | `BotLevelBrackets.HubPopulate.Frequency` | Integer | `90` (template; code fallback: `30`) | Frequency in seconds at which capital city hub population and dispersal runs. |
 | `BotLevelBrackets.StartingZoneDisperse.Frequency` | Integer | `120` (template; code fallback: `15`) | Frequency in seconds at which over-leveled bots (> Lvl 9) are dispersed from starter valleys. |
 | `BotLevelBrackets.WrongMapDisperse.Frequency` | Integer | `180` (template; code fallback: `60`) | Frequency in seconds at which bots stranded on invalid maps are evacuated to leveling zones. |
@@ -246,3 +246,12 @@ The module utilizes two non-intrusive tables in the character database (`tw_char
 2. **`bot_level_brackets_pending_resets`**:
    Persists queued level adjustments (`bot_guid`, `target_range`, `is_alliance`, `enqueued_at`). Ensures that if a server reboot or crash occurs while hundreds of bots are awaiting redistribution, the queue is restored seamlessly on startup via `LoadPendingResetsFromDB()`.
 
+
+
+### Hub population target bounds
+
+| Setting | Default | Behavior |
+| :--- | :---: | :--- |
+| `BotLevelBrackets.HubDisperse.PopulationLimitsEnabled` | `1` | Apply both target bounds in either quota mode; `0` ignores both. |
+| `BotLevelBrackets.HubDisperse.MinBotsPerHub` | `0` | Lower target bound, 0–500; `0` means no floor. |
+| `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | `50` | Upper target bound, 0–500; `0` targets empty hubs when bounds are enabled. |
