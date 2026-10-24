@@ -107,6 +107,15 @@ BotLevelBrackets.TeleportOnLevelChange = 1
 BotLevelBrackets.HubDisperse.Enabled = 1
 BotLevelBrackets.HubDisperse.QuotaMode = 2
 BotLevelBrackets.HubDisperse.HubBotPct = 5
+BotLevelBrackets.HubDisperse.HysteresisBots = 2
+BotLevelBrackets.HubDisperse.StabilitySeconds = 60
+BotLevelBrackets.HubDisperse.CooldownSeconds = 180
+
+# Capital City Ambiance & Open-World Strategy Management
+BotLevelBrackets.HubDisperse.ManageCityStrategies = 1
+BotLevelBrackets.HubDisperse.CityStrategies = "+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say"
+BotLevelBrackets.HubDisperse.CityStripStrategies = "-grind,-wander,-loot,-tfish"
+BotLevelBrackets.WorldTeleport.ResetStrategies = 1
 ```
 
 📖 **For an exhaustive, setting-by-setting reference and tuning examples, read the [Operator & Configuration Guide](docs/GUIDE.md).**
@@ -119,12 +128,13 @@ Game Masters and Administrators can manage the module using `.blb <command>` or 
 
 | Command | Security | Description |
 | :--- | :---: | :--- |
-| `.blb status` | Moderator (1) | Shows active engine name, running status, and detailed tabular bracket allocations (actual vs desired) per faction. |
-| `.blb reload` | Administrator (3) | Hot-reloads configuration files and recomputes target quotas without server restart. |
+| `.blb status` | Moderator (1) | Shows active engine name, running status, hub quotas, safeguard settings, and detailed tabular bracket allocations. |
+| `.blb reload` | Administrator (3) | Hot-reloads configuration files, resets stability timers, and recomputes target quotas without server restart. |
 | `.blb force` | Administrator (3) | Immediately triggers a full distribution cycle across all online bots. |
 | `.blb pending` | Moderator (1) | Displays current pending reset and teleport queue depths, TTL parameters, and entry ages. |
 | `.blb cleanup` | Administrator (3) | Purges guilds from the persistent tracker that no longer contain human players. |
-| `.blb stats` | Moderator (1) | Displays cumulative counters since boot: cycles run, bots adjusted, bots teleported, bots skipped. |
+| `.blb stats` | Moderator (1) | Displays cumulative counters since boot: cycles run, bots adjusted, teleports, skips, and cooldown skips. |
+| `.blb hubs` | Moderator (1) | Displays real-time capital hub diagnostics: targets, effective counts, imbalance states, stability durations, and action status. |
 
 ---
 

@@ -181,6 +181,73 @@ BotLevelBrackets.HubDisperse.ThunderBluffPct  = 4
 BotLevelBrackets.HubDisperse.SparkwaterPct    = 4
 
 #
+# BotLevelBrackets.HubDisperse.HysteresisBots
+# Defines the population deadband (+/- bots) around a hub's calculated quota.
+# Hub relocation will only trigger if the deviation strictly exceeds this threshold.
+# Example: Target 30, Hysteresis 2 -> Populations 28 to 32 trigger no movement.
+# 0 = React immediately to any nonzero deviation (disables hysteresis).
+# Range: 0 - 100
+# Default: 2
+#
+BotLevelBrackets.HubDisperse.HysteresisBots = 2
+
+#
+# BotLevelBrackets.HubDisperse.StabilitySeconds
+# Number of consecutive seconds a hub population imbalance (deficit or surplus)
+# must persist before the system permits corrective bot relocation.
+# Prevents responding to temporary player logins, logouts, or brief travel spikes.
+# 0 = React immediately on the next cycle (disables stability delay).
+# Range: 0 - 3600 (Up to 1 hour)
+# Default: 60
+#
+BotLevelBrackets.HubDisperse.StabilitySeconds = 60
+
+#
+# BotLevelBrackets.HubDisperse.CooldownSeconds
+# Minimum number of seconds before an individual bot can be relocated again
+# by the hub redistribution system (both inbound and outbound).
+# Prevents the same bot from being rapidly shuffled between city hubs and the wild.
+# Does NOT restrict wrong-map rescues, bracket re-leveling, or GM commands.
+# 0 = No individual cooldown (disables bot relocation cooldown).
+# Range: 0 - 86400 (Up to 24 hours)
+# Default: 180 (3 minutes)
+#
+BotLevelBrackets.HubDisperse.CooldownSeconds = 180
+
+#
+# BotLevelBrackets.HubDisperse.ManageCityStrategies
+# When enabled, bots teleported to or residing in capital city hubs automatically drop
+# open-world grind/loot locks and gain active city social, trade, RPG, and wander strategies.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.HubDisperse.ManageCityStrategies = 1
+
+#
+# BotLevelBrackets.HubDisperse.CityStrategies
+# Non-combat strategies applied to bots when inside a capital city hub.
+# Promotes active movement to auctioneers, vendors, trainers, innkeepers, greeting players, and roleplay actions.
+# Default: +rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say
+#
+BotLevelBrackets.HubDisperse.CityStrategies = +rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say
+
+#
+# BotLevelBrackets.HubDisperse.CityStripStrategies
+# Non-combat strategies stripped from bots when entering a capital city hub to prevent idle lock.
+# Stripping 'wander' prevents masterless bots from getting stuck in repetitive 'stop follow' halts.
+# Default: -grind,-wander,-loot,-tfish
+#
+BotLevelBrackets.HubDisperse.CityStripStrategies = -grind,-wander,-loot,-tfish
+
+#
+# BotLevelBrackets.WorldTeleport.ResetStrategies
+# When enabled, resets both Non-Combat (NC) and Combat (CO) strategies back to pristine engine
+# defaults whenever a bot is teleported out to the open world (including hub-to-world dispersal,
+# starter zone dispersal, wrong-map rescue, or world-to-world level bracket relocation).
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.WorldTeleport.ResetStrategies = 1
+
+#
 # BotLevelBrackets.HubPopulate.Frequency
 # Frequency (in seconds) at which capital city hub population and dispersal runs.
 # Default: 30

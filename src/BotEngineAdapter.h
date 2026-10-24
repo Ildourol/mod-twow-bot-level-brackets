@@ -299,6 +299,72 @@ public:
 
         return bot->TeleportTo(mapId, x, y, z, o);
     }
+
+    /**
+     * Retrieves the PlayerbotAI instance for a bot player entity, if available.
+     */
+#if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
+    static PlayerbotAI* GetBotAI(Player* bot)
+    {
+        if (!bot)
+            return nullptr;
+#if defined(HAVE_TORTOISEBOTS)
+        return PlayerbotAIStorage::Instance().GetAI(bot);
+#else
+        return GetBotAI(bot);
+#endif
+    }
+
+    /**
+     * Checks if a bot currently has a specific strategy active in a given engine state.
+     */
+    static bool HasStrategy(Player* bot, const std::string& name, BotState type = BotState::BOT_STATE_NON_COMBAT)
+    {
+        if (!bot)
+            return false;
+        PlayerbotAI* ai = GetBotAI(bot);
+        return ai && ai->HasStrategy(name, type);
+    }
+
+    /**
+     * Applies city social, trade, and ambiance strategies to a bot and strips open-world grind/loot locks.
+     */
+    static void ApplyCityStrategies(Player* bot, const std::string& stripStr, const std::string& addStr)
+    {
+        if (!bot)
+            return;
+        PlayerbotAI* ai = GetBotAI(bot);
+        if (!ai)
+            return;
+
+        if (!stripStr.empty())
+            ai->ChangeStrategy(stripStr, BotState::BOT_STATE_NON_COMBAT);
+
+        if (!addStr.empty())
+            ai->ChangeStrategy(addStr, BotState::BOT_STATE_NON_COMBAT);
+    }
+
+    /**
+     * Resets both combat (CO) and non-combat (NC) strategies back to pristine engine defaults when entering open world.
+     */
+    static void ResetDefaultStrategies(Player* bot)
+    {
+        if (!bot)
+            return;
+        PlayerbotAI* ai = GetBotAI(bot);
+        if (!ai)
+            return;
+
+        // ResetStrategies(true) wipes all engines (combat, non-combat, dead, reaction)
+        // and reloads default kits from AiFactory and database preferences.
+        ai->ResetStrategies(true);
+    }
+#else
+    static void* GetBotAI(Player* /*bot*/) { return nullptr; }
+    static bool HasStrategy(Player* /*bot*/, const std::string& /*name*/) { return false; }
+    static void ApplyCityStrategies(Player* /*bot*/, const std::string& /*stripStr*/, const std::string& /*addStr*/) {}
+    static void ResetDefaultStrategies(Player* /*bot*/) {}
+#endif
 };
 
 #endif // BOT_ENGINE_ADAPTER_H

@@ -29,6 +29,7 @@
 #include <mutex>
 #include <atomic>
 #include <ctime>
+#include <chrono>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -37,6 +38,14 @@
 // -----------------------------------------------------------------------------
 // DATA STRUCTURES
 // -----------------------------------------------------------------------------
+
+enum TeleportSource : uint8
+{
+    TELEPORT_SOURCE_LEVEL_BRACKET = 0,
+    TELEPORT_SOURCE_STARTING_ZONE = 1,
+    TELEPORT_SOURCE_WRONG_MAP     = 2,
+    TELEPORT_SOURCE_HUB           = 3
+};
 
 struct LevelRangeConfig
 {
@@ -55,16 +64,17 @@ struct PendingResetEntry
 
 struct PendingTeleportEntry
 {
-    ObjectGuid botGuid;
-    uint8      newLevel;
-    uint8      teamId;
-    uint32     enqueuedAt;
-    bool       useHubDest;
-    uint32     destMapId;
-    float      destX;
-    float      destY;
-    float      destZ;
-    float      destO;
+    ObjectGuid     botGuid;
+    uint8          newLevel;
+    uint8          teamId;
+    uint32         enqueuedAt;
+    bool           useHubDest;
+    uint32         destMapId;
+    float          destX;
+    float          destY;
+    float          destZ;
+    float          destO;
+    TeleportSource source{TELEPORT_SOURCE_LEVEL_BRACKET};
 };
 
 struct TeleportDestination
@@ -120,6 +130,57 @@ static uint32 g_HubPopulateFrequency             = 30;
 static uint32 g_StartingZoneDisperseFrequency    = 15;
 static uint32 g_WrongMapDisperseFrequency        = 60;
 static int32  g_HubCityPcts[8]                   = { 7, 5, 4, 4, 7, 5, 4, 4 };
+static uint32 g_HubDisperseHysteresisBots        = 2;
+static uint32 g_HubDisperseStabilitySeconds      = 60;
+static uint32 g_HubDisperseCooldownSeconds       = 180;
+static bool        g_ManageCityStrategies          = true;
+static std::string g_CityStrategies                = "+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say";
+static std::string g_CityStripStrategies           = "-grind,-wander,-loot,-tfish";
+static bool        g_WorldTeleportResetStrategies  = true;
+
+enum class HubImbalanceDirection : uint8
+{
+    Neutral = 0,
+    Underpopulated = 1,
+    Overpopulated = 2
+};
+
+struct HubStabilityRecord
+{
+    HubImbalanceDirection currentDirection{HubImbalanceDirection::Neutral};
+    int64                 imbalanceStartTime{0};
+    int32                 lastEffectivePopulation{0};
+};
+
+static HubStabilityRecord g_HubStability[8];
+
+struct BotHubCooldownRecord
+{
+    int64 lastRelocationTime{0};
+};
+
+static std::unordered_map<ObjectGuid, BotHubCooldownRecord> g_HubBotCooldowns;
+static std::mutex                                          g_HubCooldownMutex;
+static std::atomic<uint64>                                 g_StatsCooldownSkips{0};
+
+static inline int64 GetSteadySeconds()
+{
+    return std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+static bool IsBotOnHubCooldown(const ObjectGuid& guid, int64 now)
+{
+    if (g_HubDisperseCooldownSeconds == 0)
+        return false;
+
+    std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
+    auto it = g_HubBotCooldowns.find(guid);
+    if (it == g_HubBotCooldowns.end())
+        return false;
+
+    return (now - it->second.lastRelocationTime < static_cast<int64>(g_HubDisperseCooldownSeconds));
+}
 
 // Configured level ranges
 static std::vector<LevelRangeConfig> g_AllianceLevelRanges;
@@ -515,6 +576,22 @@ static void LoadBotLevelBracketsConfig()
     g_HubPopulateFrequency             = ReadBoundedUInt("BotLevelBrackets.HubPopulate.Frequency", 30, 1, 86400);
     g_StartingZoneDisperseFrequency    = ReadBoundedUInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 15, 1, 86400);
     g_WrongMapDisperseFrequency        = ReadBoundedUInt("BotLevelBrackets.WrongMapDisperse.Frequency", 60, 1, 86400);
+    g_HubDisperseHysteresisBots        = ReadBoundedUInt("BotLevelBrackets.HubDisperse.HysteresisBots", 2, 0, 100);
+    g_HubDisperseStabilitySeconds      = ReadBoundedUInt("BotLevelBrackets.HubDisperse.StabilitySeconds", 60, 0, 3600);
+    g_HubDisperseCooldownSeconds       = ReadBoundedUInt("BotLevelBrackets.HubDisperse.CooldownSeconds", 180, 0, 86400);
+    g_ManageCityStrategies             = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.ManageCityStrategies", true);
+    g_CityStrategies                   = sConfig.GetStringDefault("BotLevelBrackets.HubDisperse.CityStrategies",
+        "+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say");
+    g_CityStripStrategies              = sConfig.GetStringDefault("BotLevelBrackets.HubDisperse.CityStripStrategies",
+        "-grind,-wander,-loot,-tfish");
+    g_WorldTeleportResetStrategies     = sConfig.GetBoolDefault("BotLevelBrackets.WorldTeleport.ResetStrategies", true);
+
+    for (size_t h = 0; h < s_NumHubAreas; ++h)
+    {
+        g_HubStability[h].currentDirection = HubImbalanceDirection::Neutral;
+        g_HubStability[h].imbalanceStartTime = 0;
+        g_HubStability[h].lastEffectivePopulation = 0;
+    }
 
     std::string excludeNames = sConfig.GetStringDefault("BotLevelBrackets.ExcludeNames", "");
     {
@@ -737,10 +814,10 @@ static std::vector<LevelRangeConfig> const* GetFactionRanges(Player const* bot)
 // TELEPORTATION SYSTEM & CAPITAL HUB DISPERSAL
 // -----------------------------------------------------------------------------
 
-static void TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
+static bool TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
 {
     if (!bot || !bot->IsInWorld() || !g_TeleportOnLevelChange)
-        return;
+        return false;
 
     const TeleportDestination* zones = nullptr;
     size_t zoneCount = 0;
@@ -755,7 +832,7 @@ static void TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
         zoneCount = s_NumHordeZones;
     }
     else
-        return;
+        return false;
 
     int rangeIndex = GetLevelRangeIndex(newLevel, teamId);
     if (rangeIndex < 0)
@@ -803,29 +880,30 @@ static void TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
 
         if (hasRacialDest)
         {
-            BotEngineAdapter::TeleportBot(bot, racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, racialDest.o);
-            if (g_BotDistFullDebugMode)
+            bool ok = BotEngineAdapter::TeleportBot(bot, racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, racialDest.o);
+            if (ok && g_BotDistFullDebugMode)
             {
                 sLog.outString("[BotLevelBrackets] Teleported %s bot '%s' (Lvl %u, Race %u) to racial starting zone (Map %u, %.1f, %.1f, %.1f).",
                     (teamId == TEAM_ALLIANCE ? "Alliance" : "Horde"), bot->GetName(), newLevel, race, racialDest.mapId, racialDest.x, racialDest.y, racialDest.z);
             }
-            return;
+            return ok;
         }
     }
 
     size_t targetIdx = std::min<size_t>(static_cast<size_t>(rangeIndex), zoneCount - 1);
     const TeleportDestination& dest = zones[targetIdx];
 
-    BotEngineAdapter::TeleportBot(bot, dest.mapId, dest.x, dest.y, dest.z, dest.o);
+    bool ok = BotEngineAdapter::TeleportBot(bot, dest.mapId, dest.x, dest.y, dest.z, dest.o);
 
-    if (g_BotDistFullDebugMode)
+    if (ok && g_BotDistFullDebugMode)
     {
         sLog.outString("[BotLevelBrackets] Teleported %s bot '%s' (Lvl %u) to leveling zone (Map %u, %.1f, %.1f, %.1f).",
             (teamId == TEAM_ALLIANCE ? "Alliance" : "Horde"), bot->GetName(), newLevel, dest.mapId, dest.x, dest.y, dest.z);
     }
+    return ok;
 }
 
-static bool EnqueuePendingTeleport(Player* bot, uint8 newLevel, uint8 teamId)
+static bool EnqueuePendingTeleport(Player* bot, uint8 newLevel, uint8 teamId, TeleportSource source = TELEPORT_SOURCE_LEVEL_BRACKET)
 {
     if (!bot || !g_TeleportOnLevelChange)
         return false;
@@ -846,18 +924,20 @@ static bool EnqueuePendingTeleport(Player* bot, uint8 newLevel, uint8 teamId)
         entry.destY       = 0.0f;
         entry.destZ       = 0.0f;
         entry.destO       = 0.0f;
+        entry.source      = source;
 
         g_PendingTeleports.emplace(bot->GetObjectGuid(), entry);
     }
 
     if (g_BotDistFullDebugMode)
     {
-        sLog.outString("[BotLevelBrackets] Enqueued bot '%s' for teleport to level %u zone.", bot->GetName(), newLevel);
+        sLog.outString("[BotLevelBrackets] Enqueued bot '%s' for teleport to level %u zone (source: %u).",
+            bot->GetName(), newLevel, static_cast<uint32>(source));
     }
     return true;
 }
 
-static bool EnqueuePendingHubTeleport(Player* bot, uint32 mapId, float x, float y, float z, float o)
+static bool EnqueuePendingHubTeleport(Player* bot, uint32 mapId, float x, float y, float z, float o, TeleportSource source = TELEPORT_SOURCE_HUB)
 {
     if (!bot || !g_TeleportOnLevelChange)
         return false;
@@ -878,14 +958,15 @@ static bool EnqueuePendingHubTeleport(Player* bot, uint32 mapId, float x, float 
         entry.destY       = y;
         entry.destZ       = z;
         entry.destO       = o;
+        entry.source      = source;
 
         g_PendingTeleports.emplace(bot->GetObjectGuid(), entry);
     }
 
     if (g_BotDistFullDebugMode)
     {
-        sLog.outString("[BotLevelBrackets] Enqueued bot '%s' for teleport to hub (Map %u, %.1f, %.1f, %.1f).",
-            bot->GetName(), mapId, x, y, z);
+        sLog.outString("[BotLevelBrackets] Enqueued bot '%s' for teleport to hub (Map %u, %.1f, %.1f, %.1f, source: %u).",
+            bot->GetName(), mapId, x, y, z, static_cast<uint32>(source));
     }
     return true;
 }
@@ -897,6 +978,39 @@ static void RemoveBotFromPendingTeleports(Player* bot)
         std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
         g_PendingTeleports.erase(bot->GetObjectGuid());
     }
+}
+
+static bool IsInArea(const Player* bot, const HubArea& area)
+{
+    if (!bot || bot->GetMapId() != area.mapId)
+        return false;
+    if (bot->GetTeamId() != area.teamId)
+        return false;
+
+    float dx = bot->GetPositionX() - area.cx;
+    if (dx > area.radius || dx < -area.radius)
+        return false;
+    float dy = bot->GetPositionY() - area.cy;
+    if (dy > area.radius || dy < -area.radius)
+        return false;
+    float dz = bot->GetPositionZ() - area.cz;
+    if (dz > area.radius || dz < -area.radius)
+        return false;
+
+    return (dx * dx + dy * dy + dz * dz) <= area.radius * area.radius;
+}
+
+static bool IsInAnyHub(const Player* bot)
+{
+    if (!bot || !bot->IsInWorld())
+        return false;
+
+    for (size_t h = 0; h < s_NumHubAreas; ++h)
+    {
+        if (IsInArea(bot, s_HubAreas[h]))
+            return true;
+    }
+    return false;
 }
 
 static void ProcessPendingTeleports()
@@ -958,41 +1072,66 @@ static void ProcessPendingTeleports()
         if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
             continue;
 
+        bool success = false;
         if (cand.entry.useHubDest)
         {
-            BotEngineAdapter::TeleportBot(bot, cand.entry.destMapId, cand.entry.destX, cand.entry.destY, cand.entry.destZ, cand.entry.destO);
-            if (g_BotDistFullDebugMode)
+            success = BotEngineAdapter::TeleportBot(bot, cand.entry.destMapId, cand.entry.destX, cand.entry.destY, cand.entry.destZ, cand.entry.destO);
+            if (success)
             {
-                sLog.outString("[BotLevelBrackets] Teleported bot '%s' to hub (Map %u, %.1f, %.1f, %.1f).",
-                    bot->GetName(), cand.entry.destMapId, cand.entry.destX, cand.entry.destY, cand.entry.destZ);
+                if (g_ManageCityStrategies)
+                {
+                    BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
+                }
+                if (g_BotDistFullDebugMode)
+                {
+                    sLog.outString("[BotLevelBrackets] Teleported bot '%s' to hub (Map %u, %.1f, %.1f, %.1f) - applied city strategies.",
+                        bot->GetName(), cand.entry.destMapId, cand.entry.destX, cand.entry.destY, cand.entry.destZ);
+                }
             }
         }
         else
         {
-            TeleportBotToLevelZone(bot, cand.entry.newLevel, cand.entry.teamId);
+            success = TeleportBotToLevelZone(bot, cand.entry.newLevel, cand.entry.teamId);
+            if (success)
+            {
+                if (IsInAnyHub(bot))
+                {
+                    if (g_ManageCityStrategies)
+                    {
+                        BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
+                    }
+                    if (g_BotDistFullDebugMode)
+                    {
+                        sLog.outString("[BotLevelBrackets] Teleported bot '%s' (Lvl %u) to capital hub zone - applied city strategies.",
+                            bot->GetName(), cand.entry.newLevel);
+                    }
+                }
+                else
+                {
+                    if (g_WorldTeleportResetStrategies)
+                    {
+                        BotEngineAdapter::ResetDefaultStrategies(bot);
+                    }
+                    if (g_BotDistFullDebugMode)
+                    {
+                        sLog.outString("[BotLevelBrackets] Teleported bot '%s' (Lvl %u) out to world (source=%u) - reset NC & CO strategies to default.",
+                            bot->GetName(), cand.entry.newLevel, static_cast<uint32>(cand.entry.source));
+                    }
+                }
+            }
         }
-        g_StatsBotsTeleported.fetch_add(1, std::memory_order_relaxed);
+
+        if (success)
+        {
+            if (cand.entry.source == TELEPORT_SOURCE_HUB && g_HubDisperseCooldownSeconds > 0)
+            {
+                int64 steadyNow = GetSteadySeconds();
+                std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
+                g_HubBotCooldowns[cand.guid] = BotHubCooldownRecord{ steadyNow };
+            }
+            g_StatsBotsTeleported.fetch_add(1, std::memory_order_relaxed);
+        }
     }
-}
-
-static bool IsInArea(const Player* bot, const HubArea& area)
-{
-    if (!bot || bot->GetMapId() != area.mapId)
-        return false;
-    if (bot->GetTeamId() != area.teamId)
-        return false;
-
-    float dx = bot->GetPositionX() - area.cx;
-    if (dx > area.radius || dx < -area.radius)
-        return false;
-    float dy = bot->GetPositionY() - area.cy;
-    if (dy > area.radius || dy < -area.radius)
-        return false;
-    float dz = bot->GetPositionZ() - area.cz;
-    if (dz > area.radius || dz < -area.radius)
-        return false;
-
-    return (dx * dx + dy * dy + dz * dz) <= area.radius * area.radius;
 }
 
 static bool IsBotDispersable(Player* bot, const std::unordered_set<ObjectGuid>* pendingTeleportGuids)
@@ -1027,6 +1166,23 @@ static void ProcessHubPopulate()
     if (!g_HubDisperseEnabled || !g_TeleportOnLevelChange)
         return;
 
+    int64 now = GetSteadySeconds();
+
+    // Prune expired bot relocation cooldown entries
+    {
+        std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
+        if (!g_HubBotCooldowns.empty())
+        {
+            for (auto it = g_HubBotCooldowns.begin(); it != g_HubBotCooldowns.end();)
+            {
+                if (now - it->second.lastRelocationTime >= static_cast<int64>(g_HubDisperseCooldownSeconds))
+                    it = g_HubBotCooldowns.erase(it);
+                else
+                    ++it;
+            }
+        }
+    }
+
     uint32 processed = 0;
 
     struct BotInfo {
@@ -1037,10 +1193,31 @@ static void ProcessHubPopulate()
 
     HashMapHolder<Player>::MapType const& players = sObjectAccessor.GetPlayers();
     std::unordered_set<ObjectGuid> pendingTeleportGuids;
+    std::vector<uint32> pendingInbound(s_NumHubAreas, 0);
     {
         std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
         for (const auto& kv : g_PendingTeleports)
+        {
             pendingTeleportGuids.insert(kv.first);
+            const PendingTeleportEntry& entry = kv.second;
+            if (entry.useHubDest)
+            {
+                for (size_t h = 0; h < s_NumHubAreas; ++h)
+                {
+                    if (entry.destMapId == s_HubAreas[h].mapId)
+                    {
+                        float dx = entry.destX - s_HubAreas[h].cx;
+                        float dy = entry.destY - s_HubAreas[h].cy;
+                        float dz = entry.destZ - s_HubAreas[h].cz;
+                        if ((dx * dx + dy * dy + dz * dz) <= s_HubAreas[h].radius * s_HubAreas[h].radius)
+                        {
+                            ++pendingInbound[h];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     std::vector<BotInfo> allBots;
@@ -1072,6 +1249,35 @@ static void ProcessHubPopulate()
             }
         }
         allBots.push_back(info);
+
+        // Active city strategy synchronization for bots residing in hubs:
+        if (g_ManageCityStrategies && info.hubIdx >= 0)
+        {
+            if (!BotEngineAdapter::HasStrategy(bot, "rpg", BotState::BOT_STATE_NON_COMBAT))
+            {
+                BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
+                if (g_BotDistFullDebugMode)
+                {
+                    sLog.outString("[BotLevelBrackets] HubPopulate: Residing bot '%s' in hub %d missing 'rpg' - applied city strategies.",
+                        bot->GetName(), info.hubIdx);
+                }
+            }
+        }
+        else if (g_WorldTeleportResetStrategies && info.hubIdx < 0)
+        {
+            // If the bot is out in the open world but still retains city-only strategies, reset both NC and CO
+            if (BotEngineAdapter::HasStrategy(bot, "sit", BotState::BOT_STATE_NON_COMBAT) ||
+                BotEngineAdapter::HasStrategy(bot, "emote", BotState::BOT_STATE_NON_COMBAT) ||
+                !BotEngineAdapter::HasStrategy(bot, "grind", BotState::BOT_STATE_NON_COMBAT))
+            {
+                BotEngineAdapter::ResetDefaultStrategies(bot);
+                if (g_BotDistFullDebugMode)
+                {
+                    sLog.outString("[BotLevelBrackets] HubPopulate: Wild bot '%s' outside hubs had stale city strategies - reset NC & CO strategies.",
+                        bot->GetName());
+                }
+            }
+        }
     }
 
     if (allBots.empty())
@@ -1090,12 +1296,80 @@ static void ProcessHubPopulate()
             ++totalHordeBots;
     }
 
+    struct HubEval
+    {
+        uint32                 quota{0};
+        int32                  effectiveCount{0};
+        HubImbalanceDirection dir{HubImbalanceDirection::Neutral};
+        bool                   stabilityPermitted{false};
+    };
+
+    std::vector<HubEval> hubEvals(s_NumHubAreas);
+    for (size_t hubIdx = 0; hubIdx < s_NumHubAreas; ++hubIdx)
+    {
+        const HubArea& hub = s_HubAreas[hubIdx];
+        uint32 factionTotal = (hub.teamId == TEAM_ALLIANCE) ? totalAllianceBots : totalHordeBots;
+        uint32 quota = GetHubQuota(hubIdx, factionTotal);
+        int32 effectiveCount = static_cast<int32>(hubCounts[hubIdx] + pendingInbound[hubIdx]);
+        int32 deviation = effectiveCount - static_cast<int32>(quota);
+
+        HubImbalanceDirection dir = HubImbalanceDirection::Neutral;
+        if (quota == 0)
+        {
+            // Zero-Target Bypass: if quota is 0, any managed bot in the city is excess
+            if (effectiveCount > 0)
+                dir = HubImbalanceDirection::Overpopulated;
+            else
+                dir = HubImbalanceDirection::Neutral;
+        }
+        else
+        {
+            if (std::abs(deviation) <= static_cast<int32>(g_HubDisperseHysteresisBots))
+                dir = HubImbalanceDirection::Neutral;
+            else if (deviation > static_cast<int32>(g_HubDisperseHysteresisBots))
+                dir = HubImbalanceDirection::Overpopulated;
+            else
+                dir = HubImbalanceDirection::Underpopulated;
+        }
+
+        HubStabilityRecord& stab = g_HubStability[hubIdx];
+        bool stabilityPermitted = false;
+
+        if (dir == HubImbalanceDirection::Neutral)
+        {
+            stab.currentDirection = HubImbalanceDirection::Neutral;
+            stab.imbalanceStartTime = 0;
+            stab.lastEffectivePopulation = effectiveCount;
+        }
+        else if (dir != stab.currentDirection)
+        {
+            // Direction changed or new imbalance started
+            stab.currentDirection = dir;
+            stab.imbalanceStartTime = now;
+            stab.lastEffectivePopulation = effectiveCount;
+            if (g_HubDisperseStabilitySeconds == 0)
+                stabilityPermitted = true;
+        }
+        else
+        {
+            // Direction unchanged: imbalance persisted across check intervals
+            stab.lastEffectivePopulation = effectiveCount;
+            int64 elapsed = now - stab.imbalanceStartTime;
+            if (elapsed >= static_cast<int64>(g_HubDisperseStabilitySeconds))
+                stabilityPermitted = true;
+        }
+
+        hubEvals[hubIdx] = {quota, effectiveCount, dir, stabilityPermitted};
+    }
+
     std::unordered_set<ObjectGuid> alreadyProcessed;
 
     // Part A: Disperse wrong-level and excess bots from hubs
     for (size_t hubIdx = 0; hubIdx < s_NumHubAreas && processed < g_HubDisperseBotsPerCycle; ++hubIdx)
     {
         const HubArea& hub = s_HubAreas[hubIdx];
+        const HubEval& eval = hubEvals[hubIdx];
+
         std::vector<const BotInfo*> botsInHub;
         botsInHub.reserve(30);
 
@@ -1108,6 +1382,7 @@ static void ProcessHubPopulate()
         if (botsInHub.empty())
             continue;
 
+        // Disperse wrong-level bots (if configured on hub)
         for (const BotInfo* info : botsInHub)
         {
             if (processed >= g_HubDisperseBotsPerCycle)
@@ -1128,13 +1403,15 @@ static void ProcessHubPopulate()
             if (!IsBotSafeForTeleport(info->bot))
                 continue;
 
-            EnqueuePendingTeleport(info->bot, level, info->bot->GetTeamId());
+            EnqueuePendingTeleport(info->bot, level, info->bot->GetTeamId(), TELEPORT_SOURCE_HUB);
             alreadyProcessed.insert(info->bot->GetObjectGuid());
             ++processed;
         }
 
-        uint32 factionTotal = (hub.teamId == TEAM_ALLIANCE) ? totalAllianceBots : totalHordeBots;
-        uint32 quota = GetHubQuota(hubIdx, factionTotal);
+        // Only disperse excess if hub is confirmed Overpopulated and stability window is satisfied
+        if (eval.dir != HubImbalanceDirection::Overpopulated || !eval.stabilityPermitted)
+            continue;
+
         uint32 remaining = 0;
         for (const BotInfo* info : botsInHub)
         {
@@ -1142,10 +1419,11 @@ static void ProcessHubPopulate()
                 continue;
             ++remaining;
         }
-        if (remaining <= quota)
+
+        if (remaining <= eval.quota)
             continue;
 
-        uint32 toDisperse = remaining - quota;
+        uint32 toDisperse = remaining - eval.quota;
         for (const BotInfo* info : botsInHub)
         {
             if (processed >= g_HubDisperseBotsPerCycle || toDisperse == 0)
@@ -1153,10 +1431,16 @@ static void ProcessHubPopulate()
             if (alreadyProcessed.count(info->bot->GetObjectGuid()) > 0)
                 continue;
 
+            if (IsBotOnHubCooldown(info->bot->GetObjectGuid(), now))
+            {
+                g_StatsCooldownSkips.fetch_add(1, std::memory_order_relaxed);
+                continue;
+            }
+
             if (!IsBotSafeForTeleport(info->bot))
                 continue;
 
-            EnqueuePendingTeleport(info->bot, info->bot->GetLevel(), info->bot->GetTeamId());
+            EnqueuePendingTeleport(info->bot, info->bot->GetLevel(), info->bot->GetTeamId(), TELEPORT_SOURCE_HUB);
             alreadyProcessed.insert(info->bot->GetObjectGuid());
             ++processed;
             --toDisperse;
@@ -1167,13 +1451,16 @@ static void ProcessHubPopulate()
     for (size_t hubIdx = 0; hubIdx < s_NumHubAreas && processed < g_HubDisperseBotsPerCycle; ++hubIdx)
     {
         const HubArea& hub = s_HubAreas[hubIdx];
-        uint32 currentCount = hubCounts[hubIdx];
-        uint32 factionTotal = (hub.teamId == TEAM_ALLIANCE) ? totalAllianceBots : totalHordeBots;
-        uint32 quota = GetHubQuota(hubIdx, factionTotal);
-        if (currentCount >= quota)
+        const HubEval& eval = hubEvals[hubIdx];
+
+        // Only fill if hub is confirmed Underpopulated and stability window is satisfied
+        if (eval.dir != HubImbalanceDirection::Underpopulated || !eval.stabilityPermitted)
             continue;
 
-        uint32 needed = quota - currentCount;
+        if (eval.effectiveCount >= static_cast<int32>(eval.quota))
+            continue;
+
+        uint32 needed = eval.quota - eval.effectiveCount;
 
         for (const auto& info : allBots)
         {
@@ -1192,6 +1479,12 @@ static void ProcessHubPopulate()
             if (hub.maxLevel > 0 && level > hub.maxLevel)
                 continue;
 
+            if (IsBotOnHubCooldown(info.bot->GetObjectGuid(), now))
+            {
+                g_StatsCooldownSkips.fetch_add(1, std::memory_order_relaxed);
+                continue;
+            }
+
             if (!IsBotSafeForTeleport(info.bot))
                 continue;
 
@@ -1200,7 +1493,7 @@ static void ProcessHubPopulate()
             float dx = hub.cx + std::cos(angle) * offset;
             float dy = hub.cy + std::sin(angle) * offset;
 
-            EnqueuePendingHubTeleport(info.bot, hub.mapId, dx, dy, hub.cz, angle);
+            EnqueuePendingHubTeleport(info.bot, hub.mapId, dx, dy, hub.cz, angle, TELEPORT_SOURCE_HUB);
             alreadyProcessed.insert(info.bot->GetObjectGuid());
             ++processed;
             --needed;
@@ -1249,7 +1542,7 @@ static void ProcessStartingZoneDisperse()
             if (!IsBotSafeForTeleport(bot))
                 break;
 
-            EnqueuePendingTeleport(bot, level, bot->GetTeamId());
+            EnqueuePendingTeleport(bot, level, bot->GetTeamId(), TELEPORT_SOURCE_STARTING_ZONE);
             ++processed;
             if (g_BotDistFullDebugMode)
             {
@@ -1297,7 +1590,7 @@ static void ProcessWrongMapDisperse()
         if (!IsBotSafeForTeleport(bot))
             continue;
 
-        EnqueuePendingTeleport(bot, bot->GetLevel(), bot->GetTeamId());
+        EnqueuePendingTeleport(bot, bot->GetLevel(), bot->GetTeamId(), TELEPORT_SOURCE_WRONG_MAP);
         ++processed;
         if (g_BotDistFullDebugMode)
         {
@@ -2218,6 +2511,11 @@ public:
     {
         RemoveBotFromPendingResets(player);
         RemoveBotFromPendingTeleports(player);
+        if (player)
+        {
+            std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
+            g_HubBotCooldowns.erase(player->GetObjectGuid());
+        }
     }
 };
 
@@ -2449,8 +2747,10 @@ public:
             }
             handler->PSendSysMessage("[BotBrackets] Pending Resets: %u, Pending Teleports: %u",
                 (uint32)pendingResets, (uint32)pendingTeleports);
-            handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
+            handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Safeguards (Hysteresis:%u bots, Stability:%us, Cooldown:%us)",
                 (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
+                g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
+            handler->PSendSysMessage("[BotBrackets] Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
                 GetHubQuota(0, totalAlliance), GetHubQuota(1, totalAlliance), GetHubQuota(2, totalAlliance), GetHubQuota(3, totalAlliance),
                 GetHubQuota(4, totalHorde), GetHubQuota(5, totalHorde), GetHubQuota(6, totalHorde), GetHubQuota(7, totalHorde));
         }
@@ -2503,8 +2803,9 @@ public:
             handler->PSendSysMessage("  Bots Adjusted:     %u", (uint32)g_StatsBotsAdjusted.load());
             handler->PSendSysMessage("  Bots Teleported:   %u", (uint32)g_StatsBotsTeleported.load());
             handler->PSendSysMessage("  Bots Skipped:      %u", (uint32)g_StatsBotsSkipped.load());
+            handler->PSendSysMessage("  Cooldown Skips:    %u", (uint32)g_StatsCooldownSkips.load());
 
-            size_t resetCount = 0, teleportCount = 0;
+            size_t resetCount = 0, teleportCount = 0, cooldownCount = 0;
             {
                 std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
                 resetCount = g_PendingLevelResets.size();
@@ -2513,11 +2814,79 @@ public:
                 std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
                 teleportCount = g_PendingTeleports.size();
             }
-            handler->PSendSysMessage("  Active Queue:      Resets=%u, Teleports=%u", (uint32)resetCount, (uint32)teleportCount);
+            {
+                std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
+                cooldownCount = g_HubBotCooldowns.size();
+            }
+            handler->PSendSysMessage("  Active Queue:      Resets=%u, Teleports=%u, BotCooldowns=%u",
+                (uint32)resetCount, (uint32)teleportCount, (uint32)cooldownCount);
+        }
+        else if (subcommand == "hubs" || subcommand == "hub")
+        {
+            if (!hasSecurity(SEC_MODERATOR))
+            {
+                handler->SendSysMessage("You are not allowed to do that.");
+                return false;
+            }
+
+            uint32 totalAlliance = 0, totalHorde = 0;
+            HashMapHolder<Player>::MapType const& allPlayers = sObjectAccessor.GetPlayers();
+            for (const auto& itr : allPlayers)
+            {
+                Player* player = itr.second;
+                if (!player || !player->IsInWorld() || ShouldExcludeBot(player))
+                    continue;
+                if (IsAlliancePlayerBot(player))
+                    totalAlliance++;
+                else if (IsHordePlayerBot(player))
+                    totalHorde++;
+            }
+
+            static const char* hubNames[8] = {
+                "Stormwind", "Ironforge", "Darnassus", "Alah'Thalas",
+                "Orgrimmar", "Undercity", "Thunder Bluff", "Sparkwater"
+            };
+
+            int64 now = GetSteadySeconds();
+            handler->PSendSysMessage("[BotBrackets] Capital Hub Diagnostics (Hysteresis: %u bots, Stability: %us, Cooldown: %us):",
+                g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
+            handler->SendSysMessage("Hub            Team  Target  EffPop  State           Duration  Status");
+
+            for (size_t i = 0; i < s_NumHubAreas; ++i)
+            {
+                uint32 factionTotal = (s_HubAreas[i].teamId == TEAM_ALLIANCE) ? totalAlliance : totalHorde;
+                uint32 quota = GetHubQuota(i, factionTotal);
+                const HubStabilityRecord& stab = g_HubStability[i];
+
+                const char* stateStr = "Neutral";
+                if (stab.currentDirection == HubImbalanceDirection::Underpopulated)
+                    stateStr = "Deficit";
+                else if (stab.currentDirection == HubImbalanceDirection::Overpopulated)
+                    stateStr = "Surplus";
+
+                int64 duration = (stab.imbalanceStartTime > 0) ? (now - stab.imbalanceStartTime) : 0;
+                const char* statusStr = "Balanced";
+                if (stab.currentDirection != HubImbalanceDirection::Neutral)
+                {
+                    if (duration >= static_cast<int64>(g_HubDisperseStabilitySeconds))
+                        statusStr = "Actionable";
+                    else
+                        statusStr = "Waiting";
+                }
+
+                handler->PSendSysMessage("%-14s %-5s %-7u %-7d %-15s %-9d %s",
+                    hubNames[i],
+                    (s_HubAreas[i].teamId == TEAM_ALLIANCE ? "Alli" : "Horde"),
+                    quota,
+                    stab.lastEffectivePopulation,
+                    stateStr,
+                    (int32)duration,
+                    statusStr);
+            }
         }
         else
         {
-            handler->SendSysMessage("Usage: .blb <reload | status | force | pending | cleanup | stats>");
+            handler->SendSysMessage("Usage: .blb <reload | status | force | pending | cleanup | stats | hubs>");
         }
 
         return false;
