@@ -143,7 +143,7 @@ BotLevelBrackets.TeleportOnLevelChange = 1
 
 
 ###############################################################################
-# 5. CAPITAL CITY HUB GATHERING, QUOTAS & PER-BRACKET LIMITS
+# 5. CAPITAL CITY HUB GATHERING, QUOTAS & POPULATION LIMITS
 ###############################################################################
 
 #
@@ -156,8 +156,8 @@ BotLevelBrackets.HubDisperse.Enabled = 1
 #
 # BotLevelBrackets.HubDisperse.QuotaMode
 # Quota calculation mode for capital city hub ambiance populations:
-#   1 = Total number (Per-city population band defined by MinBotsPerHub / MaxBotsPerHub)
-#   2 = Percentage (Per-city faction percentage target, bounded by MinBotsPerHub / MaxBotsPerHub)
+#   1 = Total number (each city setting is an absolute bot count)
+#   2 = Percentage (each city setting is a percentage of online faction bots)
 # Default: 2 (Percentage mode)
 #
 BotLevelBrackets.HubDisperse.QuotaMode = 2
@@ -170,39 +170,42 @@ BotLevelBrackets.HubDisperse.QuotaMode = 2
 BotLevelBrackets.HubDisperse.BotsPerCycle = 50
 
 #
+# BotLevelBrackets.HubDisperse.PopulationLimitsEnabled
+# Apply MinBotsPerHub and MaxBotsPerHub to each city's calculated target in BOTH modes.
+# 1 = clamp targets to the configured low/high range; 0 = ignore both limits.
+# Disabled cities (city value 0), available faction population and movement safeguards
+# remain respected even when limits are disabled.
+# Default: 1 (Enabled)
+#
+BotLevelBrackets.HubDisperse.PopulationLimitsEnabled = 1
+
+#
 # BotLevelBrackets.HubDisperse.MinBotsPerHub
-# Lower population threshold for EACH capital city, counting all level brackets together.
-# QuotaMode = 1: pull eligible open-world bots into a city below this count, up to this count.
-# Between MinBotsPerHub and MaxBotsPerHub, no population balancing is needed.
-# 0 = use MaxBotsPerHub as the refill target (preserves the original headcount behavior).
-# QuotaMode = 2: minimum for the calculated percentage target; 0 = no minimum.
-# A city with its percentage set to 0 stays disabled, even when this minimum is positive.
+# Lower bound for each nonzero city target in BOTH modes when limits are enabled.
+# 0 = no minimum. It never substitutes Max as the refill goal.
 # Values above MaxBotsPerHub are clamped to MaxBotsPerHub with a warning.
-# Range: 0 - 500
-# Default: 0
+# Range: 0 - 500; Default: 0
 #
 BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 
 #
 # BotLevelBrackets.HubDisperse.MaxBotsPerHub
-# Upper population threshold for EACH capital city, counting all level brackets together.
-# QuotaMode = 1: disperse excess bots above this count back to open-world leveling zones.
-# Example: Min = 30, Max = 50 -> refill toward 30 when below 30; disperse toward 50 above 50.
-# QuotaMode = 2: cap each city's calculated percentage target at this count.
-# Example: 7% of 1000 faction bots = 70; Max = 50 limits that city's target to 50.
-# 0 = target 0 in both modes (empty managed hubs); it does NOT mean unlimited.
-# Both settings use existing hysteresis, stability, cooldown and per-cycle safeguards:
-# they are balancing targets, not instantaneous hard guarantees. Only eligible bots move;
-# no bots are spawned, and protected bots and hub level restrictions remain respected.
-# In percentage mode, the target cannot exceed the online faction bot count. Minimums
-# across several cities may be unattainable when there are too few eligible bots.
-# Range: 0 - 500
-# Default: 50
+# Upper bound for each city target in BOTH modes when limits are enabled.
+# Example: city target 20, Min 10, Max 50 -> target 20 (not 50).
+# Target 5 becomes 10; target 70 becomes 50. Min/Max bound the target,
+# rather than creating an idle population band between the two limits.
+# 0 = target 0 when limits are enabled; it does NOT mean unlimited.
+# Targets cannot exceed online faction bots. Only eligible bots move; no bots spawn.
+# Hysteresis, stability, cooldown, level restrictions and per-cycle limits still apply.
+# Range: 0 - 500; Default: 50
 #
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 
 #
-# Per-City Target Percentages (when QuotaMode = 2):
+# Per-City Targets (the existing Pct key names are retained in BOTH modes):
+# QuotaMode = 1: read each value as an absolute bot count, range 0 - 500.
+# QuotaMode = 2: read each value as a percentage, range 0 - 100.
+# Example: StormwindPct = 20 means 20 bots in mode 1, 20% in mode 2.
 # Specifies the exact percentage of total faction bots that should populate each capital city.
 # Defaults are balanced for a 100-bot faction (~20% across all 4 cities, leaving 80% out leveling in the world):
 #   - Primary trade capitals (Stormwind, Orgrimmar): 7% (~7 bots per 100 bots)
@@ -229,7 +232,7 @@ BotLevelBrackets.HubDisperse.SparkwaterPct    = 4
 # BotLevelBrackets.HubDisperse.HysteresisBots
 # Defines the population deadband around a hub's lower and upper targets.
 # Hub relocation will only trigger if the deviation strictly exceeds this threshold.
-# Example: Min 30, Max 50, Hysteresis 2 -> Populations 28 to 52 trigger no movement.
+# Example: bounded city target 30, Hysteresis 2 -> counts 28 to 32 trigger no movement.
 # 0 = React immediately to any nonzero deviation (disables hysteresis).
 # Range: 0 - 100
 # Default: 2
@@ -437,4 +440,5 @@ BotLevelBrackets.Horde.Range6.Pct   = 14
 BotLevelBrackets.Horde.Range7.Lower = 60
 BotLevelBrackets.Horde.Range7.Upper = 60
 BotLevelBrackets.Horde.Range7.Pct   = 14
+
 
