@@ -175,9 +175,9 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | `BotLevelBrackets.HubDisperse.UndercityPct` | Integer | `5` | Target percentage for Undercity (Horde classic capital). |
 | `BotLevelBrackets.HubDisperse.ThunderBluffPct` | Integer | `4` | Target percentage for Thunder Bluff (Horde classic capital). |
 | `BotLevelBrackets.HubDisperse.SparkwaterPct` | Integer | `4` | Target percentage for Sparkwater Port (Horde Goblin port). |
-| `BotLevelBrackets.HubPopulate.Frequency` | Integer | `30` | Frequency in seconds at which capital city hub population and dispersal runs. |
-| `BotLevelBrackets.StartingZoneDisperse.Frequency` | Integer | `15` | Frequency in seconds at which over-leveled bots (> Lvl 9) are dispersed from starter valleys. |
-| `BotLevelBrackets.WrongMapDisperse.Frequency` | Integer | `60` | Frequency in seconds at which bots stranded on invalid maps are evacuated to leveling zones. |
+| `BotLevelBrackets.HubPopulate.Frequency` | Integer | `90` (template; code fallback: `30`) | Frequency in seconds at which capital city hub population and dispersal runs. |
+| `BotLevelBrackets.StartingZoneDisperse.Frequency` | Integer | `120` (template; code fallback: `15`) | Frequency in seconds at which over-leveled bots (> Lvl 9) are dispersed from starter valleys. |
+| `BotLevelBrackets.WrongMapDisperse.Frequency` | Integer | `180` (template; code fallback: `60`) | Frequency in seconds at which bots stranded on invalid maps are evacuated to leveling zones. |
 
 ---
 
