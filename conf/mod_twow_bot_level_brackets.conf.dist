@@ -250,26 +250,26 @@ BotLevelBrackets.WorldTeleport.ResetStrategies = 1
 #
 # BotLevelBrackets.HubPopulate.Frequency
 # Frequency (in seconds) at which capital city hub population and dispersal runs.
-# Default: 30
+# Default: 30 (built-in fallback; recommended template: 90)
 #
-BotLevelBrackets.HubPopulate.Frequency = 30
+BotLevelBrackets.HubPopulate.Frequency = 90
 
 #
 # BotLevelBrackets.StartingZoneDisperse.Frequency
 # Frequency (in seconds) at which over-leveled bots are dispersed from starting areas
 # (Northshire, Coldridge, Shadowglen, Thalassian Highlands [High Elf], Valley of Trials,
 # Red Cloud Mesa, Deathknell, Blackstone Island [Goblin]).
-# Default: 15
+# Default: 15 (built-in fallback; recommended template: 120)
 #
-BotLevelBrackets.StartingZoneDisperse.Frequency = 15
+BotLevelBrackets.StartingZoneDisperse.Frequency = 120
 
 #
 # BotLevelBrackets.WrongMapDisperse.Frequency
 # Frequency (in seconds) at which bots stranded on invalid or non-continental maps
 # are dispersed to their appropriate leveling zones.
-# Default: 60
+# Default: 60 (built-in fallback; recommended template: 180)
 #
-BotLevelBrackets.WrongMapDisperse.Frequency = 60
+BotLevelBrackets.WrongMapDisperse.Frequency = 180
 
 #
 # BotLevelBrackets.Dynamic.UseDynamicDistribution
