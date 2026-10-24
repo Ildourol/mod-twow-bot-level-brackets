@@ -122,10 +122,11 @@ static bool   g_SyncFactions                     = false;
 static bool   g_TeleportOnLevelChange            = true;
 
 static bool   g_HubDisperseEnabled               = true;
-static uint32 g_HubDisperseQuotaMode             = 2;  // 1 = Total Number (MaxBotsPerHub), 2 = Percentage (HubBotPct / per-city)
+static uint32 g_HubDisperseQuotaMode             = 2;  // 1 = Total Number (MaxBotsPerHub), 2 = Percentage (per-city percentages)
 static uint32 g_HubDisperseBotsPerCycle          = 50;
 static uint32 g_HubDisperseMaxBotsPerHub         = 50;
-static uint32 g_HubDisperseDefaultPct            = 5;
+static uint32 g_HubDisperseMaxBotsPerBracket     = 0;  // 0 = disabled / off
+static uint32 g_HubDisperseMinBotsPerBracket     = 0;  // 0 = disabled / off
 static uint32 g_HubPopulateFrequency             = 30;
 static uint32 g_StartingZoneDisperseFrequency    = 15;
 static uint32 g_WrongMapDisperseFrequency        = 60;
@@ -493,9 +494,10 @@ static uint32 GetHubQuota(size_t hubIdx, uint32 factionTotal)
         return 0;
 
     int32 configuredPct = g_HubCityPcts[hubIdx];
-    uint32 pct = (configuredPct >= 0) ? static_cast<uint32>(configuredPct) : g_HubDisperseDefaultPct;
-    if (pct == 0)
+    if (configuredPct <= 0)
         return 0;
+
+    uint32 pct = static_cast<uint32>(configuredPct);
 
     // Standard rounding: (factionTotal * pct + 50) / 100
     uint32 quota = (factionTotal * pct + 50) / 100;
@@ -551,7 +553,15 @@ static void LoadBotLevelBracketsConfig()
     g_HubDisperseQuotaMode             = ReadBoundedUInt("BotLevelBrackets.HubDisperse.QuotaMode", 2, 1, 2);
     g_HubDisperseBotsPerCycle          = ReadBoundedUInt("BotLevelBrackets.HubDisperse.BotsPerCycle", 50, 1, 500);
     g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500);
-    g_HubDisperseDefaultPct            = ReadBoundedUInt("BotLevelBrackets.HubDisperse.HubBotPct", 5, 0, 100);
+    g_HubDisperseMaxBotsPerBracket     = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerBracket", 0, 0, 500);
+    g_HubDisperseMinBotsPerBracket     = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerBracket", 0, 0, 500);
+
+    if (g_HubDisperseMaxBotsPerBracket > 0 && g_HubDisperseMinBotsPerBracket > g_HubDisperseMaxBotsPerBracket)
+    {
+        sLog.outError("[BotLevelBrackets] WARNING: HubDisperse.MinBotsPerBracket (%u) exceeds MaxBotsPerBracket (%u). Clamping Min to Max.",
+            g_HubDisperseMinBotsPerBracket, g_HubDisperseMaxBotsPerBracket);
+        g_HubDisperseMinBotsPerBracket = g_HubDisperseMaxBotsPerBracket;
+    }
 
     int32 swPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.StormwindPct", 7);
     int32 ifPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.IronforgePct", 5);
@@ -563,15 +573,15 @@ static void LoadBotLevelBracketsConfig()
     int32 tbPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.ThunderBluffPct", 4);
     int32 spPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.SparkwaterPct", 4);
 
-    g_HubCityPcts[0] = (swPct >= 0) ? std::min(swPct, 100) : -1;
-    g_HubCityPcts[1] = (ifPct >= 0) ? std::min(ifPct, 100) : -1;
-    g_HubCityPcts[2] = (daPct >= 0) ? std::min(daPct, 100) : -1;
-    g_HubCityPcts[3] = (atPct >= 0) ? std::min(atPct, 100) : -1;
+    g_HubCityPcts[0] = (swPct >= 0) ? std::min(swPct, 100) : 0;
+    g_HubCityPcts[1] = (ifPct >= 0) ? std::min(ifPct, 100) : 0;
+    g_HubCityPcts[2] = (daPct >= 0) ? std::min(daPct, 100) : 0;
+    g_HubCityPcts[3] = (atPct >= 0) ? std::min(atPct, 100) : 0;
 
-    g_HubCityPcts[4] = (orPct >= 0) ? std::min(orPct, 100) : -1;
-    g_HubCityPcts[5] = (ucPct >= 0) ? std::min(ucPct, 100) : -1;
-    g_HubCityPcts[6] = (tbPct >= 0) ? std::min(tbPct, 100) : -1;
-    g_HubCityPcts[7] = (spPct >= 0) ? std::min(spPct, 100) : -1;
+    g_HubCityPcts[4] = (orPct >= 0) ? std::min(orPct, 100) : 0;
+    g_HubCityPcts[5] = (ucPct >= 0) ? std::min(ucPct, 100) : 0;
+    g_HubCityPcts[6] = (tbPct >= 0) ? std::min(tbPct, 100) : 0;
+    g_HubCityPcts[7] = (spPct >= 0) ? std::min(spPct, 100) : 0;
 
     g_HubPopulateFrequency             = ReadBoundedUInt("BotLevelBrackets.HubPopulate.Frequency", 30, 1, 86400);
     g_StartingZoneDisperseFrequency    = ReadBoundedUInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 15, 1, 86400);
@@ -1408,6 +1418,52 @@ static void ProcessHubPopulate()
             ++processed;
         }
 
+        // Disperse excess bots per bracket if MaxBotsPerBracket is configured
+        if (g_HubDisperseMaxBotsPerBracket > 0)
+        {
+            std::vector<uint32> bracketCounts(g_NumRanges, 0);
+            for (const BotInfo* info : botsInHub)
+            {
+                if (alreadyProcessed.count(info->bot->GetObjectGuid()) > 0)
+                    continue;
+                int r = GetLevelRangeIndex(info->bot->GetLevel(), hub.teamId);
+                if (r >= 0 && static_cast<uint32>(r) < g_NumRanges)
+                    bracketCounts[r]++;
+            }
+
+            for (const BotInfo* info : botsInHub)
+            {
+                if (processed >= g_HubDisperseBotsPerCycle)
+                    break;
+                if (alreadyProcessed.count(info->bot->GetObjectGuid()) > 0)
+                    continue;
+
+                int r = GetLevelRangeIndex(info->bot->GetLevel(), hub.teamId);
+                if (r >= 0 && static_cast<uint32>(r) < g_NumRanges && bracketCounts[r] > g_HubDisperseMaxBotsPerBracket)
+                {
+                    if (IsBotOnHubCooldown(info->bot->GetObjectGuid(), now))
+                    {
+                        g_StatsCooldownSkips.fetch_add(1, std::memory_order_relaxed);
+                        continue;
+                    }
+
+                    if (!IsBotSafeForTeleport(info->bot))
+                        continue;
+
+                    EnqueuePendingTeleport(info->bot, info->bot->GetLevel(), info->bot->GetTeamId(), TELEPORT_SOURCE_HUB);
+                    alreadyProcessed.insert(info->bot->GetObjectGuid());
+                    ++processed;
+                    --bracketCounts[r];
+
+                    if (g_BotDistFullDebugMode)
+                    {
+                        sLog.outString("[BotLevelBrackets] HubPopulate: Dispersed bot '%s' (Lvl %u, Bracket %u) from hub %u exceeding MaxBotsPerBracket cap (%u).",
+                            info->bot->GetName(), info->bot->GetLevel(), r + 1, static_cast<uint32>(hubIdx), g_HubDisperseMaxBotsPerBracket);
+                    }
+                }
+            }
+        }
+
         // Only disperse excess if hub is confirmed Overpopulated and stability window is satisfied
         if (eval.dir != HubImbalanceDirection::Overpopulated || !eval.stabilityPermitted)
             continue;
@@ -1462,6 +1518,78 @@ static void ProcessHubPopulate()
 
         uint32 needed = eval.quota - eval.effectiveCount;
 
+        // Track live bracket counts inside this hub
+        std::vector<uint32> currentHubBracketCounts(g_NumRanges, 0);
+        for (const auto& info : allBots)
+        {
+            if (info.hubIdx == static_cast<int8>(hubIdx) && alreadyProcessed.count(info.bot->GetObjectGuid()) == 0)
+            {
+                int r = GetLevelRangeIndex(info.bot->GetLevel(), hub.teamId);
+                if (r >= 0 && static_cast<uint32>(r) < g_NumRanges)
+                    currentHubBracketCounts[r]++;
+            }
+        }
+
+        auto tryTeleportBotToHub = [&](Player* candidateBot, int rangeIdx) -> bool
+        {
+            if (IsBotOnHubCooldown(candidateBot->GetObjectGuid(), now))
+            {
+                g_StatsCooldownSkips.fetch_add(1, std::memory_order_relaxed);
+                return false;
+            }
+
+            if (!IsBotSafeForTeleport(candidateBot))
+                return false;
+
+            float angle  = static_cast<float>(rand_norm()) * 2.0f * static_cast<float>(M_PI);
+            float offset = static_cast<float>(rand_norm()) * 30.0f;
+            float dx = hub.cx + std::cos(angle) * offset;
+            float dy = hub.cy + std::sin(angle) * offset;
+
+            EnqueuePendingHubTeleport(candidateBot, hub.mapId, dx, dy, hub.cz, angle, TELEPORT_SOURCE_HUB);
+            alreadyProcessed.insert(candidateBot->GetObjectGuid());
+            if (rangeIdx >= 0 && static_cast<uint32>(rangeIdx) < g_NumRanges)
+                currentHubBracketCounts[rangeIdx]++;
+            ++processed;
+            --needed;
+            return true;
+        };
+
+        // Phase 1: Prioritize filling brackets below MinBotsPerBracket floor
+        if (g_HubDisperseMinBotsPerBracket > 0)
+        {
+            for (const auto& info : allBots)
+            {
+                if (processed >= g_HubDisperseBotsPerCycle || needed == 0)
+                    break;
+                if (alreadyProcessed.count(info.bot->GetObjectGuid()) > 0)
+                    continue;
+                if (info.bot->GetTeamId() != hub.teamId)
+                    continue;
+                if (info.hubIdx >= 0 || info.inStarting)
+                    continue;
+
+                uint8 level = info.bot->GetLevel();
+                if (hub.minLevel > 0 && level < hub.minLevel)
+                    continue;
+                if (hub.maxLevel > 0 && level > hub.maxLevel)
+                    continue;
+
+                int rangeIdx = GetLevelRangeIndex(level, hub.teamId);
+                if (rangeIdx < 0 || static_cast<uint32>(rangeIdx) >= g_NumRanges)
+                    continue;
+
+                if (currentHubBracketCounts[rangeIdx] >= g_HubDisperseMinBotsPerBracket)
+                    continue;
+
+                if (g_HubDisperseMaxBotsPerBracket > 0 && currentHubBracketCounts[rangeIdx] >= g_HubDisperseMaxBotsPerBracket)
+                    continue;
+
+                tryTeleportBotToHub(info.bot, rangeIdx);
+            }
+        }
+
+        // Phase 2: Fill remaining needed quota with eligible wild bots respecting MaxBotsPerBracket
         for (const auto& info : allBots)
         {
             if (processed >= g_HubDisperseBotsPerCycle || needed == 0)
@@ -1479,31 +1607,22 @@ static void ProcessHubPopulate()
             if (hub.maxLevel > 0 && level > hub.maxLevel)
                 continue;
 
-            if (IsBotOnHubCooldown(info.bot->GetObjectGuid(), now))
+            int rangeIdx = GetLevelRangeIndex(level, hub.teamId);
+            if (g_HubDisperseMaxBotsPerBracket > 0 && rangeIdx >= 0 && static_cast<uint32>(rangeIdx) < g_NumRanges)
             {
-                g_StatsCooldownSkips.fetch_add(1, std::memory_order_relaxed);
-                continue;
+                if (currentHubBracketCounts[rangeIdx] >= g_HubDisperseMaxBotsPerBracket)
+                    continue;
             }
 
-            if (!IsBotSafeForTeleport(info.bot))
-                continue;
-
-            float angle  = static_cast<float>(rand_norm()) * 2.0f * static_cast<float>(M_PI);
-            float offset = static_cast<float>(rand_norm()) * 30.0f;
-            float dx = hub.cx + std::cos(angle) * offset;
-            float dy = hub.cy + std::sin(angle) * offset;
-
-            EnqueuePendingHubTeleport(info.bot, hub.mapId, dx, dy, hub.cz, angle, TELEPORT_SOURCE_HUB);
-            alreadyProcessed.insert(info.bot->GetObjectGuid());
-            ++processed;
-            --needed;
+            tryTeleportBotToHub(info.bot, rangeIdx);
         }
     }
 
     if (processed > 0 && g_BotDistFullDebugMode)
     {
-        sLog.outString("[BotLevelBrackets] HubPopulate: processed %u bots this cycle (Mode: %s).",
-            processed, (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"));
+        sLog.outString("[BotLevelBrackets] HubPopulate: processed %u bots this cycle (Mode: %s, MinPerBracket: %u, MaxPerBracket: %u).",
+            processed, (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
+            g_HubDisperseMinBotsPerBracket, g_HubDisperseMaxBotsPerBracket);
     }
 }
 
@@ -2750,6 +2869,11 @@ public:
             handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Safeguards (Hysteresis:%u bots, Stability:%us, Cooldown:%us)",
                 (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
                 g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
+            if (g_HubDisperseMaxBotsPerBracket > 0 || g_HubDisperseMinBotsPerBracket > 0)
+            {
+                handler->PSendSysMessage("[BotBrackets] Hub Bracket Limits: Min=%u, Max=%u per bracket",
+                    g_HubDisperseMinBotsPerBracket, g_HubDisperseMaxBotsPerBracket);
+            }
             handler->PSendSysMessage("[BotBrackets] Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
                 GetHubQuota(0, totalAlliance), GetHubQuota(1, totalAlliance), GetHubQuota(2, totalAlliance), GetHubQuota(3, totalAlliance),
                 GetHubQuota(4, totalHorde), GetHubQuota(5, totalHorde), GetHubQuota(6, totalHorde), GetHubQuota(7, totalHorde));
@@ -2848,8 +2972,9 @@ public:
             };
 
             int64 now = GetSteadySeconds();
-            handler->PSendSysMessage("[BotBrackets] Capital Hub Diagnostics (Hysteresis: %u bots, Stability: %us, Cooldown: %us):",
-                g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
+            handler->PSendSysMessage("[BotBrackets] Capital Hub Diagnostics (Hysteresis: %u bots, Stability: %us, Cooldown: %us | Min/Max per Bracket: %u/%u):",
+                g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds,
+                g_HubDisperseMinBotsPerBracket, g_HubDisperseMaxBotsPerBracket);
             handler->SendSysMessage("Hub            Team  Target  EffPop  State           Duration  Status");
 
             for (size_t i = 0; i < s_NumHubAreas; ++i)

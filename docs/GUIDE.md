@@ -163,10 +163,11 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | :--- | :---: | :---: | :--- |
 | `BotLevelBrackets.TeleportOnLevelChange` | Boolean | `1` | Safely dismounts and transports bots to an appropriate leveling zone upon level adjustment. |
 | `BotLevelBrackets.HubDisperse.Enabled` | Boolean | `1` | Master toggle for capital city gatherings and starting-zone dispersals. |
-| `BotLevelBrackets.HubDisperse.QuotaMode` | Integer | `2` | Quota mode for capital hubs (`1` = Absolute headcount `MaxBotsPerHub`, `2` = Percentage `HubBotPct`/per-city). |
+| `BotLevelBrackets.HubDisperse.QuotaMode` | Integer | `2` | Quota mode for capital hubs (`1` = Absolute headcount `MaxBotsPerHub`, `2` = Percentage per-city). |
 | `BotLevelBrackets.HubDisperse.BotsPerCycle` | Integer | `50` | Maximum number of bots moved per world scheduler cycle. |
 | `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | Integer | `50` | Target ambiance population for each capital city hub when `QuotaMode = 1`. |
-| `BotLevelBrackets.HubDisperse.HubBotPct` | Integer | `5` | Default target percentage of total faction bots per capital city hub when `QuotaMode = 2`. |
+| `BotLevelBrackets.HubDisperse.MaxBotsPerBracket` | Integer | `0` | Maximum bots of any single level bracket allowed in a capital city hub (`0` = disabled/unlimited). Excess bots in a bracket are dispersed. |
+| `BotLevelBrackets.HubDisperse.MinBotsPerBracket` | Integer | `0` | Minimum bots of each level bracket desired in a capital city hub (`0` = disabled). Hub filling prioritizes underrepresented brackets to meet this floor. |
 | `BotLevelBrackets.HubDisperse.StormwindPct` | Integer | `7` | Target percentage for Stormwind City (Alliance primary trade capital). |
 | `BotLevelBrackets.HubDisperse.IronforgePct` | Integer | `5` | Target percentage for Ironforge (Alliance mountain capital). |
 | `BotLevelBrackets.HubDisperse.DarnassusPct` | Integer | `4` | Target percentage for Darnassus (Alliance classic capital). |

@@ -4,6 +4,10 @@
 # Comprehensive Autonomous Bot Level Distribution, Capital Hub Gathering & Dispersal
 #
 
+###############################################################################
+# 1. CORE MODULE & DIAGNOSTICS
+###############################################################################
+
 #
 # BotLevelBrackets.Enabled
 # Enables or disables the Bot Level Brackets module.
@@ -24,6 +28,11 @@ BotLevelBrackets.FullDebugMode = 0
 # Default: 0 (Disabled)
 #
 BotLevelBrackets.LiteDebugMode = 0
+
+
+###############################################################################
+# 2. RUNTIME FREQUENCIES & BATCH PROCESSING
+###############################################################################
 
 #
 # BotLevelBrackets.CheckFrequency
@@ -74,6 +83,11 @@ BotLevelBrackets.PendingQueueTTL = 0
 #
 BotLevelBrackets.MinBracketChangeThreshold = 0
 
+
+###############################################################################
+# 3. REAL PLAYER SOCIAL PROTECTION & GUILD ISOLATION
+###############################################################################
+
 #
 # BotLevelBrackets.SocialListRefreshFrequency
 # Frequency (in seconds) at which human-player friends lists are refreshed from the database.
@@ -113,6 +127,11 @@ BotLevelBrackets.IgnoreArenaTeamBots = 1
 #
 BotLevelBrackets.GuildTrackerUpdateFrequency = 600
 
+
+###############################################################################
+# 4. TELEPORTATION & RACIAL STARTER ZONE ROUTING
+###############################################################################
+
 #
 # BotLevelBrackets.TeleportOnLevelChange
 # When enabled, bots are safely dismounted and teleported to an appropriate leveling zone
@@ -121,6 +140,11 @@ BotLevelBrackets.GuildTrackerUpdateFrequency = 600
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.TeleportOnLevelChange = 1
+
+
+###############################################################################
+# 5. CAPITAL CITY HUB GATHERING, QUOTAS & PER-BRACKET LIMITS
+###############################################################################
 
 #
 # BotLevelBrackets.HubDisperse.Enabled
@@ -153,13 +177,28 @@ BotLevelBrackets.HubDisperse.BotsPerCycle = 50
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 
 #
-# BotLevelBrackets.HubDisperse.HubBotPct
-# Default target ambiance percentage of total faction bots for capital city hubs when QuotaMode = 2.
-# Example: For 100 bots in a faction, a value of 5 means ~5 bots in that city hub.
-# Range: 0 - 100
-# Default: 5
+# BotLevelBrackets.HubDisperse.MaxBotsPerBracket
+# Maximum number of bots belonging to any single level bracket allowed inside a capital city hub.
+# When set to a positive value, any surplus bots of that bracket exceeding this cap in a city hub
+# are dispersed to open-world leveling zones. Also prevents pulling bots into a city if their
+# bracket is already at or above this cap.
+# 0 = Disabled / Off (No per-bracket cap; hubs allow any level distribution up to total quota).
+# Range: 0 - 500
+# Default: 0 (Off)
 #
-BotLevelBrackets.HubDisperse.HubBotPct = 5
+BotLevelBrackets.HubDisperse.MaxBotsPerBracket = 0
+
+#
+# BotLevelBrackets.HubDisperse.MinBotsPerBracket
+# Minimum number of bots belonging to each level bracket desired inside a capital city hub.
+# When set to a positive value, city hub population cycles prioritize pulling eligible bots
+# from underrepresented brackets until each bracket reaches at least this target floor (subject
+# to the hub's total quota and cycle limits).
+# 0 = Disabled / Off (No per-bracket floor; bots of any bracket can populate the hub).
+# Range: 0 - 500
+# Default: 0 (Off)
+#
+BotLevelBrackets.HubDisperse.MinBotsPerBracket = 0
 
 #
 # Per-City Target Percentages (when QuotaMode = 2):
@@ -168,7 +207,7 @@ BotLevelBrackets.HubDisperse.HubBotPct = 5
 #   - Primary trade capitals (Stormwind, Orgrimmar): 7% (~7 bots per 100 bots)
 #   - Secondary capitals (Ironforge, Undercity): 5% (~5 bots per 100 bots)
 #   - Regional & custom capitals (Darnassus, Alah'Thalas, Thunder Bluff, Sparkwater Port): 4% (~4 bots per 100 bots)
-# Set to -1 to use the global HubDisperse.HubBotPct fallback value instead.
+# Set to 0 to disable bot gatherings in that specific capital city.
 #
 BotLevelBrackets.HubDisperse.StormwindPct     = 7
 BotLevelBrackets.HubDisperse.IronforgePct     = 5
@@ -179,6 +218,11 @@ BotLevelBrackets.HubDisperse.OrgrimmarPct     = 7
 BotLevelBrackets.HubDisperse.UndercityPct     = 5
 BotLevelBrackets.HubDisperse.ThunderBluffPct  = 4
 BotLevelBrackets.HubDisperse.SparkwaterPct    = 4
+
+
+###############################################################################
+# 6. CAPITAL CITY HUB SAFEGUARDS (HYSTERESIS, STABILITY & COOLDOWNS)
+###############################################################################
 
 #
 # BotLevelBrackets.HubDisperse.HysteresisBots
@@ -214,6 +258,11 @@ BotLevelBrackets.HubDisperse.StabilitySeconds = 60
 #
 BotLevelBrackets.HubDisperse.CooldownSeconds = 180
 
+
+###############################################################################
+# 7. CAPITAL CITY & OPEN-WORLD STRATEGY MANAGEMENT
+###############################################################################
+
 #
 # BotLevelBrackets.HubDisperse.ManageCityStrategies
 # When enabled, bots teleported to or residing in capital city hubs automatically drop
@@ -247,6 +296,11 @@ BotLevelBrackets.HubDisperse.CityStripStrategies = -grind,-wander,-loot,-tfish
 #
 BotLevelBrackets.WorldTeleport.ResetStrategies = 1
 
+
+###############################################################################
+# 8. AUTONOMOUS WORLD SCHEDULER FREQUENCIES
+###############################################################################
+
 #
 # BotLevelBrackets.HubPopulate.Frequency
 # Frequency (in seconds) at which capital city hub population and dispersal runs.
@@ -271,6 +325,11 @@ BotLevelBrackets.StartingZoneDisperse.Frequency = 120
 #
 BotLevelBrackets.WrongMapDisperse.Frequency = 180
 
+
+###############################################################################
+# 9. DYNAMIC REAL-PLAYER LEVEL DISTRIBUTION
+###############################################################################
+
 #
 # BotLevelBrackets.Dynamic.UseDynamicDistribution
 # Dynamically adjusts bracket distribution percentages based on real player level clusters.
@@ -292,6 +351,11 @@ BotLevelBrackets.Dynamic.RealPlayerWeight = 1.0
 #
 BotLevelBrackets.Dynamic.SyncFactions = 0
 
+
+###############################################################################
+# 10. BRACKET COUNTS & EXCLUSIONS
+###############################################################################
+
 #
 # BotLevelBrackets.NumRanges
 # Number of level brackets configured. Default for Vanilla (1-60) is 7 ranges.
@@ -307,9 +371,11 @@ BotLevelBrackets.NumRanges = 7
 #
 BotLevelBrackets.ExcludeNames = ""
 
-# -----------------------------------------------------------------------------
-# Alliance Level Brackets Configuration (Percentages must sum to 100)
-# -----------------------------------------------------------------------------
+
+###############################################################################
+# 11. ALLIANCE LEVEL BRACKETS CONFIGURATION (Percentages must sum to 100)
+###############################################################################
+
 BotLevelBrackets.Alliance.Range1.Lower = 1
 BotLevelBrackets.Alliance.Range1.Upper = 9
 BotLevelBrackets.Alliance.Range1.Pct   = 16
@@ -338,9 +404,11 @@ BotLevelBrackets.Alliance.Range7.Lower = 60
 BotLevelBrackets.Alliance.Range7.Upper = 60
 BotLevelBrackets.Alliance.Range7.Pct   = 14
 
-# -----------------------------------------------------------------------------
-# Horde Level Brackets Configuration (Percentages must sum to 100)
-# -----------------------------------------------------------------------------
+
+###############################################################################
+# 12. HORDE LEVEL BRACKETS CONFIGURATION (Percentages must sum to 100)
+###############################################################################
+
 BotLevelBrackets.Horde.Range1.Lower = 1
 BotLevelBrackets.Horde.Range1.Upper = 9
 BotLevelBrackets.Horde.Range1.Pct   = 16
