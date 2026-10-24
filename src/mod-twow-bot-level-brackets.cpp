@@ -122,10 +122,11 @@ static bool   g_SyncFactions                     = false;
 static bool   g_TeleportOnLevelChange            = true;
 
 static bool   g_HubDisperseEnabled               = true;
-static uint32 g_HubDisperseQuotaMode             = 2;  // 1 = Min/Max headcount band, 2 = bounded per-city percentages
+static uint32 g_HubDisperseQuotaMode             = 2;  // 1 = per-city headcounts, 2 = per-city percentages
 static uint32 g_HubDisperseBotsPerCycle          = 50;
+static bool   g_HubDispersePopulationLimitsEnabled = true;
 static uint32 g_HubDisperseMaxBotsPerHub         = 50;
-static uint32 g_HubDisperseMinBotsPerHub         = 0;  // 0 = use the upper target in headcount mode
+static uint32 g_HubDisperseMinBotsPerHub         = 0;  // 0 = no lower bound
 static uint32 g_HubPopulateFrequency             = 30;
 static uint32 g_StartingZoneDisperseFrequency    = 15;
 static uint32 g_WrongMapDisperseFrequency        = 60;
@@ -483,32 +484,25 @@ static bool IsBotSafeForTeleport(Player* bot)
 
 static uint32 GetHubQuota(size_t hubIdx, uint32 factionTotal)
 {
-    if (g_HubDisperseQuotaMode == 1) // Mode 1: Total number (absolute headcount)
-    {
-        return g_HubDisperseMaxBotsPerHub;
-    }
-
-    // Mode 2: Percentage of total faction bots
     if (hubIdx >= s_NumHubAreas || factionTotal == 0)
         return 0;
 
-    int32 configuredPct = g_HubCityPcts[hubIdx];
-    if (configuredPct <= 0)
-        return 0;
+    int32 configuredValue = g_HubCityPcts[hubIdx];
+    if (configuredValue <= 0)
+        return 0; // A disabled city is never raised to the minimum.
 
-    uint32 pct = static_cast<uint32>(configuredPct);
-
-    // Standard rounding: (factionTotal * pct + 50) / 100
-    uint32 quota = (factionTotal * pct + 50) / 100;
-    return std::min<uint32>(std::max(g_HubDisperseMinBotsPerHub,
-        std::min(quota, g_HubDisperseMaxBotsPerHub)), factionTotal);
+    uint32 value = static_cast<uint32>(configuredValue);
+    uint32 quota = g_HubDisperseQuotaMode == 1 ? value :
+        static_cast<uint32>((static_cast<uint64>(factionTotal) * value + 50) / 100);
+    if (g_HubDispersePopulationLimitsEnabled)
+        quota = std::max(g_HubDisperseMinBotsPerHub,
+            std::min(quota, g_HubDisperseMaxBotsPerHub));
+    return std::min(quota, factionTotal);
 }
 
-// Headcount mode permits a population band; percentage mode has one bounded target.
+// Both modes balance toward their per-city target after optional bounds.
 static uint32 GetHubMinimum(uint32 quota)
 {
-    if (g_HubDisperseQuotaMode == 1 && g_HubDisperseMinBotsPerHub > 0)
-        return std::min(g_HubDisperseMinBotsPerHub, quota);
     return quota;
 }
 
@@ -560,6 +554,7 @@ static void LoadBotLevelBracketsConfig()
     g_HubDisperseEnabled               = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.Enabled", true);
     g_HubDisperseQuotaMode             = ReadBoundedUInt("BotLevelBrackets.HubDisperse.QuotaMode", 2, 1, 2);
     g_HubDisperseBotsPerCycle          = ReadBoundedUInt("BotLevelBrackets.HubDisperse.BotsPerCycle", 50, 1, 500);
+    g_HubDispersePopulationLimitsEnabled = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.PopulationLimitsEnabled", true);
     g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500);
     g_HubDisperseMinBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerHub", 0, 0, 500);
 
@@ -580,15 +575,16 @@ static void LoadBotLevelBracketsConfig()
     int32 tbPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.ThunderBluffPct", 4);
     int32 spPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.SparkwaterPct", 4);
 
-    g_HubCityPcts[0] = (swPct >= 0) ? std::min(swPct, 100) : 0;
-    g_HubCityPcts[1] = (ifPct >= 0) ? std::min(ifPct, 100) : 0;
-    g_HubCityPcts[2] = (daPct >= 0) ? std::min(daPct, 100) : 0;
-    g_HubCityPcts[3] = (atPct >= 0) ? std::min(atPct, 100) : 0;
+    const int32 cityValueMax = g_HubDisperseQuotaMode == 1 ? 500 : 100;
+    g_HubCityPcts[0] = (swPct >= 0) ? std::min(swPct, cityValueMax) : 0;
+    g_HubCityPcts[1] = (ifPct >= 0) ? std::min(ifPct, cityValueMax) : 0;
+    g_HubCityPcts[2] = (daPct >= 0) ? std::min(daPct, cityValueMax) : 0;
+    g_HubCityPcts[3] = (atPct >= 0) ? std::min(atPct, cityValueMax) : 0;
 
-    g_HubCityPcts[4] = (orPct >= 0) ? std::min(orPct, 100) : 0;
-    g_HubCityPcts[5] = (ucPct >= 0) ? std::min(ucPct, 100) : 0;
-    g_HubCityPcts[6] = (tbPct >= 0) ? std::min(tbPct, 100) : 0;
-    g_HubCityPcts[7] = (spPct >= 0) ? std::min(spPct, 100) : 0;
+    g_HubCityPcts[4] = (orPct >= 0) ? std::min(orPct, cityValueMax) : 0;
+    g_HubCityPcts[5] = (ucPct >= 0) ? std::min(ucPct, cityValueMax) : 0;
+    g_HubCityPcts[6] = (tbPct >= 0) ? std::min(tbPct, cityValueMax) : 0;
+    g_HubCityPcts[7] = (spPct >= 0) ? std::min(spPct, cityValueMax) : 0;
 
     g_HubPopulateFrequency             = ReadBoundedUInt("BotLevelBrackets.HubPopulate.Frequency", 30, 1, 86400);
     g_StartingZoneDisperseFrequency    = ReadBoundedUInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 15, 1, 86400);
@@ -2774,8 +2770,8 @@ public:
             handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Safeguards (Hysteresis:%u bots, Stability:%us, Cooldown:%us)",
                 (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
                 g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
-            handler->PSendSysMessage("[BotBrackets] Hub Population Limits: Min=%u, Max=%u per hub",
-                g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
+            handler->PSendSysMessage("[BotBrackets] Hub Population Limits: %s, Min=%u, Max=%u per hub",
+                (g_HubDispersePopulationLimitsEnabled ? "Enabled" : "Disabled"), g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
             handler->PSendSysMessage("[BotBrackets] Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
                 GetHubQuota(0, totalAlliance), GetHubQuota(1, totalAlliance), GetHubQuota(2, totalAlliance), GetHubQuota(3, totalAlliance),
                 GetHubQuota(4, totalHorde), GetHubQuota(5, totalHorde), GetHubQuota(6, totalHorde), GetHubQuota(7, totalHorde));
@@ -2931,4 +2927,5 @@ void Addmod_twow_bot_level_bracketsScripts()
     new BotLevelBracketsGuildScript();
     new BotLevelBracketsCommandScript();
 }
+
 
