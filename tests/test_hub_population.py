@@ -17,8 +17,10 @@ harness = r'''
 #include <cstdint>
 #include <cstddef>
 using uint32 = uint32_t;
+using uint64 = uint64_t;
 using int32 = int32_t;
 static uint32 g_HubDisperseQuotaMode = 1;
+static bool g_HubDispersePopulationLimitsEnabled = true;
 static uint32 g_HubDisperseMinBotsPerHub = 0;
 static uint32 g_HubDisperseMaxBotsPerHub = 50;
 static uint32 g_HubDisperseHysteresisBots = 2;
@@ -35,45 +37,54 @@ static HubImbalanceDirection classify(uint32 quota, int32 effectiveCount)
 int main()
 {
     using D = HubImbalanceDirection;
-    assert(GetHubQuota(0, 1000) == 50);
-    assert(GetHubMinimum(50) == 50); // Legacy headcount target.
-    assert(classify(50, 47) == D::Underpopulated);
-    assert(classify(50, 48) == D::Neutral);
-    assert(classify(50, 52) == D::Neutral);
-    assert(classify(50, 53) == D::Overpopulated);
-    g_HubDisperseMinBotsPerHub = 30;
-    assert(GetHubMinimum(50) == 30);
-    for (int32 count = 0; count <= 100; ++count)
-        assert(classify(50, count) == (count < 28 ? D::Underpopulated :
-            count > 52 ? D::Overpopulated : D::Neutral));
-    g_HubDisperseHysteresisBots = 0;
-    assert(classify(50, 29) == D::Underpopulated);
-    assert(classify(50, 30) == D::Neutral);
-    assert(classify(50, 50) == D::Neutral);
-    assert(classify(50, 51) == D::Overpopulated);
-    g_HubDisperseQuotaMode = 2;
-    assert(GetHubQuota(0, 1000) == 50); // Percentage cap.
-    assert(GetHubQuota(0, 100) == 30); // Percentage floor.
-    assert(GetHubQuota(0, 10) == 10); // Available faction population.
-    assert(GetHubQuota(0, 0) == 0);
-    assert(GetHubQuota(8, 100) == 0);
-    g_HubCityPcts[0] = 0;
-    assert(GetHubQuota(0, 100) == 0); // Disabled city beats floor.
-    g_HubCityPcts[0] = 7;
-    g_HubDisperseMinBotsPerHub = 0;
-    assert(GetHubQuota(0, 100) == 7);
-    assert(GetHubQuota(0, 50) == 4); // Rounding.
-    assert(GetHubQuota(0, 7) == 0);
-    assert(GetHubQuota(0, 8) == 1);
-    assert(GetHubMinimum(7) == 7);
-    g_HubDisperseMaxBotsPerHub = 0;
     for (uint32 mode : {1u, 2u}) {
         g_HubDisperseQuotaMode = mode;
-        assert(GetHubQuota(0, 1000) == 0);
-        assert(GetHubMinimum(0) == 0);
-        assert(classify(0, 0) == D::Neutral);
+        g_HubDispersePopulationLimitsEnabled = true;
+        g_HubDisperseMinBotsPerHub = 0;
+        g_HubDisperseMaxBotsPerHub = 50;
+        // Mode 1 reads 7 bots; mode 2 reads 7% of 1000, capped to 50.
+        assert(GetHubQuota(0, 1000) == (mode == 1 ? 7u : 50u));
+        g_HubDisperseMinBotsPerHub = 10;
+        assert(GetHubQuota(0, 100) == 10);
+        g_HubCityPcts[0] = 20;
+        assert(GetHubQuota(0, 100) == 20); // Max is not the goal.
+        assert(GetHubMinimum(20) == 20);
+        assert(classify(20, 17) == D::Underpopulated);
+        assert(classify(20, 18) == D::Neutral);
+        assert(classify(20, 22) == D::Neutral);
+        assert(classify(20, 23) == D::Overpopulated);
+        g_HubCityPcts[0] = 70;
+        assert(GetHubQuota(0, 100) == 50);
+        g_HubDispersePopulationLimitsEnabled = false;
+        assert(GetHubQuota(0, 100) == 70);
+        g_HubCityPcts[0] = 5;
+        assert(GetHubQuota(0, 100) == 5); // Floor ignored.
+        g_HubDisperseMaxBotsPerHub = 0;
+        g_HubDisperseMinBotsPerHub = 0;
+        assert(GetHubQuota(0, 100) == 5); // Ceiling ignored.
+        g_HubDispersePopulationLimitsEnabled = true;
+        assert(GetHubQuota(0, 100) == 0);
         assert(classify(0, 1) == D::Overpopulated);
+        g_HubDisperseMaxBotsPerHub = 50;
+        g_HubDisperseMinBotsPerHub = 30;
+        g_HubCityPcts[0] = 0;
+        assert(GetHubQuota(0, 100) == 0); // Disabled city beats floor.
+        g_HubCityPcts[0] = 7;
+        assert(GetHubQuota(0, 10) == 10); // Faction availability.
+        assert(GetHubQuota(0, 0) == 0);
+        assert(GetHubQuota(8, 100) == 0);
     }
+    g_HubDisperseQuotaMode = 1;
+    g_HubDispersePopulationLimitsEnabled = false;
+    g_HubCityPcts[0] = 250;
+    assert(GetHubQuota(0, 1000) == 250);
+    assert(GetHubQuota(0, 100) == 100);
+    g_HubDisperseQuotaMode = 2;
+    g_HubCityPcts[0] = 7;
+    assert(GetHubQuota(0, 50) == 4); // Standard rounding.
+    assert(GetHubQuota(0, 7) == 0);
+    assert(GetHubQuota(0, 8) == 1);
+
 }
 '''
 with tempfile.TemporaryDirectory() as folder:
@@ -83,3 +94,4 @@ with tempfile.TemporaryDirectory() as folder:
     subprocess.run(['g++', '-std=c++17', '-Wall', '-Wextra', '-Werror', str(cpp), '-o', str(binary)], check=True)
     subprocess.run([str(binary)], check=True)
 print('Hub population behavior checks passed.')
+
