@@ -156,8 +156,8 @@ BotLevelBrackets.HubDisperse.Enabled = 1
 #
 # BotLevelBrackets.HubDisperse.QuotaMode
 # Quota calculation mode for capital city hub ambiance populations:
-#   1 = Total number (Absolute headcount per city hub, defined by HubDisperse.MaxBotsPerHub)
-#   2 = Percentage (Percentage of total online faction bots per city hub)
+#   1 = Total number (Per-city population band defined by MinBotsPerHub / MaxBotsPerHub)
+#   2 = Percentage (Per-city faction percentage target, bounded by MinBotsPerHub / MaxBotsPerHub)
 # Default: 2 (Percentage mode)
 #
 BotLevelBrackets.HubDisperse.QuotaMode = 2
@@ -170,35 +170,36 @@ BotLevelBrackets.HubDisperse.QuotaMode = 2
 BotLevelBrackets.HubDisperse.BotsPerCycle = 50
 
 #
+# BotLevelBrackets.HubDisperse.MinBotsPerHub
+# Lower population threshold for EACH capital city, counting all level brackets together.
+# QuotaMode = 1: pull eligible open-world bots into a city below this count, up to this count.
+# Between MinBotsPerHub and MaxBotsPerHub, no population balancing is needed.
+# 0 = use MaxBotsPerHub as the refill target (preserves the original headcount behavior).
+# QuotaMode = 2: minimum for the calculated percentage target; 0 = no minimum.
+# A city with its percentage set to 0 stays disabled, even when this minimum is positive.
+# Values above MaxBotsPerHub are clamped to MaxBotsPerHub with a warning.
+# Range: 0 - 500
+# Default: 0
+#
+BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
+
+#
 # BotLevelBrackets.HubDisperse.MaxBotsPerHub
-# Target ambiance population for each capital city hub when QuotaMode = 1 (Total number mode).
+# Upper population threshold for EACH capital city, counting all level brackets together.
+# QuotaMode = 1: disperse excess bots above this count back to open-world leveling zones.
+# Example: Min = 30, Max = 50 -> refill toward 30 when below 30; disperse toward 50 above 50.
+# QuotaMode = 2: cap each city's calculated percentage target at this count.
+# Example: 7% of 1000 faction bots = 70; Max = 50 limits that city's target to 50.
+# 0 = target 0 in both modes (empty managed hubs); it does NOT mean unlimited.
+# Both settings use existing hysteresis, stability, cooldown and per-cycle safeguards:
+# they are balancing targets, not instantaneous hard guarantees. Only eligible bots move;
+# no bots are spawned, and protected bots and hub level restrictions remain respected.
+# In percentage mode, the target cannot exceed the online faction bot count. Minimums
+# across several cities may be unattainable when there are too few eligible bots.
+# Range: 0 - 500
 # Default: 50
 #
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
-
-#
-# BotLevelBrackets.HubDisperse.MaxBotsPerBracket
-# Maximum number of bots belonging to any single level bracket allowed inside a capital city hub.
-# When set to a positive value, any surplus bots of that bracket exceeding this cap in a city hub
-# are dispersed to open-world leveling zones. Also prevents pulling bots into a city if their
-# bracket is already at or above this cap.
-# 0 = Disabled / Off (No per-bracket cap; hubs allow any level distribution up to total quota).
-# Range: 0 - 500
-# Default: 0 (Off)
-#
-BotLevelBrackets.HubDisperse.MaxBotsPerBracket = 0
-
-#
-# BotLevelBrackets.HubDisperse.MinBotsPerBracket
-# Minimum number of bots belonging to each level bracket desired inside a capital city hub.
-# When set to a positive value, city hub population cycles prioritize pulling eligible bots
-# from underrepresented brackets until each bracket reaches at least this target floor (subject
-# to the hub's total quota and cycle limits).
-# 0 = Disabled / Off (No per-bracket floor; bots of any bracket can populate the hub).
-# Range: 0 - 500
-# Default: 0 (Off)
-#
-BotLevelBrackets.HubDisperse.MinBotsPerBracket = 0
 
 #
 # Per-City Target Percentages (when QuotaMode = 2):
@@ -226,9 +227,9 @@ BotLevelBrackets.HubDisperse.SparkwaterPct    = 4
 
 #
 # BotLevelBrackets.HubDisperse.HysteresisBots
-# Defines the population deadband (+/- bots) around a hub's calculated quota.
+# Defines the population deadband around a hub's lower and upper targets.
 # Hub relocation will only trigger if the deviation strictly exceeds this threshold.
-# Example: Target 30, Hysteresis 2 -> Populations 28 to 32 trigger no movement.
+# Example: Min 30, Max 50, Hysteresis 2 -> Populations 28 to 52 trigger no movement.
 # 0 = React immediately to any nonzero deviation (disables hysteresis).
 # Range: 0 - 100
 # Default: 2
@@ -436,3 +437,4 @@ BotLevelBrackets.Horde.Range6.Pct   = 14
 BotLevelBrackets.Horde.Range7.Lower = 60
 BotLevelBrackets.Horde.Range7.Upper = 60
 BotLevelBrackets.Horde.Range7.Pct   = 14
+
