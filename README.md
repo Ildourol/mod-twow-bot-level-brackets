@@ -106,14 +106,18 @@ BotLevelBrackets.IgnoreArenaTeamBots = 1
 BotLevelBrackets.TeleportOnLevelChange = 1
 BotLevelBrackets.HubDisperse.Enabled = 1
 BotLevelBrackets.HubDisperse.QuotaMode = 2
+BotLevelBrackets.HubDisperse.PopulationLimitsEnabled = 1
 BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 BotLevelBrackets.HubDisperse.HysteresisBots = 2
 BotLevelBrackets.HubDisperse.StabilitySeconds = 60
 BotLevelBrackets.HubDisperse.CooldownSeconds = 180
 
-# Mode 1: Min = 0 refills toward Max; positive Min creates a Min..Max band.
-# Mode 2: percentage targets are bounded by Min/Max; Max = 0 empties hubs.
+# Mode 1: city Pct settings are absolute bot counts (0-500).
+# Mode 2: city Pct settings are faction percentages (0-100).
+# With limits enabled, Min/Max bound each target; Min 0 means no floor.
+# Disable PopulationLimitsEnabled to ignore both bounds in either mode.
+# Example: StormwindPct 20, Min 10, Max 50 -> mode 1 targets 20 bots.
 
 # Capital City Ambiance & Open-World Strategy Management
 BotLevelBrackets.HubDisperse.ManageCityStrategies = 1
@@ -151,4 +155,5 @@ Game Masters and Administrators can manage the module using `.blb <command>` or 
 ## 🛡️ License
 
 This project is licensed under the **GNU General Public License v2 (GPL-2.0)**.
+
 
