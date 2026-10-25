@@ -322,6 +322,17 @@ static void ToLowerInPlace(std::string& value)
     });
 }
 
+static bool HasConfigOption(Config& config, const char* name, std::string* outVal = nullptr)
+{
+    static const char* sentinel = "\x01__NOT_CONFIGURED__\x01";
+    std::string val = config.GetStringDefault(name, sentinel);
+    if (val == sentinel)
+        return false;
+    if (outVal)
+        *outVal = val;
+    return true;
+}
+
 static bool IsPlayerBot(Player* player)
 {
     return BotEngineAdapter::IsBot(player);
@@ -605,6 +616,33 @@ static void LoadBotLevelBracketsConfig(Config& config = sConfig)
     g_HubDisperseMinBotsLimitEnabled   = config.GetBoolDefault("BotLevelBrackets.HubDisperse.MinBotsLimitEnabled", false);
     g_HubDisperseMaxBotsLimitEnabled   = config.GetBoolDefault("BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled", true);
     g_HubDisperseLimitsMode            = ReadBoundedUInt("BotLevelBrackets.HubDisperse.LimitsMode", 1, 1, 2, config);
+
+    // Backward-compatible fallback for legacy BotLevelBrackets.HubDisperse.PopulationLimitsEnabled
+    const char* legacyLimitsKey = "BotLevelBrackets.HubDisperse.PopulationLimitsEnabled";
+    std::string legacyLimitsVal;
+    if (HasConfigOption(config, legacyLimitsKey, &legacyLimitsVal))
+    {
+        bool hasMinKey = HasConfigOption(config, "BotLevelBrackets.HubDisperse.MinBotsLimitEnabled");
+        bool hasMaxKey = HasConfigOption(config, "BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled");
+        if (!hasMinKey || !hasMaxKey)
+        {
+            std::string lowerVal = legacyLimitsVal;
+            ToLowerInPlace(lowerVal);
+            bool legacyEnabled = (lowerVal == "1" || lowerVal == "true" || lowerVal == "yes" || lowerVal == "on");
+            if (!hasMinKey)
+                g_HubDisperseMinBotsLimitEnabled = legacyEnabled;
+            if (!hasMaxKey)
+                g_HubDisperseMaxBotsLimitEnabled = legacyEnabled;
+
+            sLog.outString("[BotLevelBrackets] Notice: '%s = %s' is deprecated. "
+                           "Applying fallback to unspecified limit toggles (Min: %u, Max: %u). "
+                           "Please update your configuration to use 'BotLevelBrackets.HubDisperse.MinBotsLimitEnabled' "
+                           "and 'BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled'.",
+                           legacyLimitsKey, legacyLimitsVal.c_str(),
+                           g_HubDisperseMinBotsLimitEnabled ? 1 : 0,
+                           g_HubDisperseMaxBotsLimitEnabled ? 1 : 0);
+        }
+    }
     g_HubDisperseMinBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerHub", 0, 0, 500, config);
     g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500, config);
 

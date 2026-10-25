@@ -192,6 +192,13 @@ BotLevelBrackets.HubDisperse.QuotaMode = 2
 BotLevelBrackets.HubDisperse.BotsPerCycle = 50
 
 #
+# (Upgrade Notice / Deprecated: BotLevelBrackets.HubDisperse.PopulationLimitsEnabled)
+# Prior versions used 'PopulationLimitsEnabled' as a single toggle for both limits.
+# That key is deprecated in favor of independent 'MinBotsLimitEnabled' and 'MaxBotsLimitEnabled' toggles.
+# Existing installations containing only 'PopulationLimitsEnabled' will fall back gracefully to that value.
+#
+
+#
 # BotLevelBrackets.HubDisperse.MinBotsLimitEnabled
 # Enables or disables the minimum population floor (MinBotsPerHub) across all capital cities.
 # When enabled (1), any active/nonzero city target that calculates to fewer bots than MinBotsPerHub

@@ -94,6 +94,28 @@ int main()
     commands.CanExecuteCommand(&chat,"blb","reload");BotLevelBracketsWorldScript world;world.OnUpdate(1);
     assert(g_BotLevelBracketsEnabled); // Reload drains even while disabled.
 
+    // Legacy PopulationLimitsEnabled migration fallback tests
+    Reset();
+    sConfig.values.clear();
+    sConfig.values["BotLevelBrackets.HubDisperse.PopulationLimitsEnabled"] = "0";
+    LoadBotLevelBracketsConfig();
+    assert(!g_HubDisperseMinBotsLimitEnabled && !g_HubDisperseMaxBotsLimitEnabled);
+
+    Reset();
+    sConfig.values.clear();
+    sConfig.values["BotLevelBrackets.HubDisperse.PopulationLimitsEnabled"] = "1";
+    LoadBotLevelBracketsConfig();
+    assert(g_HubDisperseMinBotsLimitEnabled && g_HubDisperseMaxBotsLimitEnabled);
+
+    // Explicit toggles take precedence over legacy toggle
+    Reset();
+    sConfig.values.clear();
+    sConfig.values["BotLevelBrackets.HubDisperse.PopulationLimitsEnabled"] = "1";
+    sConfig.values["BotLevelBrackets.HubDisperse.MinBotsLimitEnabled"] = "0";
+    sConfig.values["BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled"] = "0";
+    LoadBotLevelBracketsConfig();
+    assert(!g_HubDisperseMinBotsLimitEnabled && !g_HubDisperseMaxBotsLimitEnabled);
+
 #if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
     Reset();Player social(1);Add(social);InCity(social,0);
     SyncOwnedCityStrategies(&social,true);assert(social.strategies.count("rpg") && !social.strategies.count("grind"));

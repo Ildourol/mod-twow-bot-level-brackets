@@ -113,18 +113,23 @@ BotLevelBrackets.Teleport.ExecutionLimit = 25
 BotLevelBrackets.Teleport.MaxAttempts = 3
 BotLevelBrackets.HubDisperse.Enabled = 1
 BotLevelBrackets.HubDisperse.QuotaMode = 2
-BotLevelBrackets.HubDisperse.PopulationLimitsEnabled = 1
+BotLevelBrackets.HubDisperse.MinBotsLimitEnabled = 0
+BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled = 1
+BotLevelBrackets.HubDisperse.LimitsMode = 1
 BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 BotLevelBrackets.HubDisperse.HysteresisBots = 2
 BotLevelBrackets.HubDisperse.StabilitySeconds = 60
 BotLevelBrackets.HubDisperse.CooldownSeconds = 180
 
-# Mode 1: city Pct settings are absolute bot counts (0-500).
-# Mode 2: city Pct settings are faction percentages (0-100).
-# With limits enabled, Min/Max bound each target; Min 0 means no floor.
-# Disable PopulationLimitsEnabled to ignore both bounds in either mode.
-# Example: StormwindPct 20, Min 10, Max 50 -> mode 1 targets 20 bots.
+# QuotaMode 1: city Pct settings are absolute bot headcounts (0-500).
+# QuotaMode 2: city Pct settings are faction percentages (0-100).
+# LimitsMode 1: Min/Max bounds are absolute bot counts (e.g. Min 10 bots, Max 50 bots).
+# LimitsMode 2: Min/Max bounds are percentages of online faction bots (e.g. Min 5%, Max 25%).
+# MinBotsLimitEnabled / MaxBotsLimitEnabled independently toggle the floor and ceiling.
+# (Legacy upgrade notice: If using legacy 'PopulationLimitsEnabled', it automatically falls
+# back to controlling both toggles until updated).
+# Example: StormwindPct 20, Min 10, Max 50, QuotaMode 1, LimitsMode 1 -> targets 20 bots.
 
 # Capital City Ambiance & Open-World Strategy Management
 BotLevelBrackets.HubDisperse.ManageCityStrategies = 1

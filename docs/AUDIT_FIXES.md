@@ -26,10 +26,14 @@ This change hardens the standalone Bot Level Brackets module for Turtle WoW cust
 ```ini
 BotLevelBrackets.Teleport.ExecutionLimit = 25
 BotLevelBrackets.Teleport.MaxAttempts = 3
-BotLevelBrackets.HubDisperse.PopulationLimitsEnabled = 1
+BotLevelBrackets.HubDisperse.MinBotsLimitEnabled = 0
+BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled = 1
+BotLevelBrackets.HubDisperse.LimitsMode = 1
 BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 ```
+
+*(Note for upgrades: The legacy shared toggle `BotLevelBrackets.HubDisperse.PopulationLimitsEnabled` is deprecated but retains automatic fallback if present and new toggles are omitted).*
 
 The execution limit is a shared budget, separate from each scheduler's existing `BotsPerCycle`. A failed attempt counts against the budget. Unsafe entries wait without consuming an attempt. Failure retries wait `2 * attempts` seconds; dropping a failed entry does not stop a future scheduler pass from selecting that bot again.
 
