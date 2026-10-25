@@ -82,9 +82,9 @@ BotLevelBrackets.PendingQueueTTL = 0
 # any bots out of it. Prevents constant churn in near-balanced brackets where surplus
 # is only 1-2 bots.
 # 0 = disabled (always redistribute, even for a surplus of 1).
-# Default: 0
+# Default: 2
 #
-BotLevelBrackets.MinBracketChangeThreshold = 0
+BotLevelBrackets.MinBracketChangeThreshold = 2
 
 
 ###############################################################################
@@ -190,13 +190,6 @@ BotLevelBrackets.HubDisperse.QuotaMode = 2
 # Default: 50
 #
 BotLevelBrackets.HubDisperse.BotsPerCycle = 50
-
-#
-# (Upgrade Notice / Deprecated: BotLevelBrackets.HubDisperse.PopulationLimitsEnabled)
-# Prior versions used 'PopulationLimitsEnabled' as a single toggle for both limits.
-# That key is deprecated in favor of independent 'MinBotsLimitEnabled' and 'MaxBotsLimitEnabled' toggles.
-# Existing installations containing only 'PopulationLimitsEnabled' will fall back gracefully to that value.
-#
 
 #
 # BotLevelBrackets.HubDisperse.MinBotsLimitEnabled

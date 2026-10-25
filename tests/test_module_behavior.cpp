@@ -94,27 +94,16 @@ int main()
     commands.CanExecuteCommand(&chat,"blb","reload");BotLevelBracketsWorldScript world;world.OnUpdate(1);
     assert(g_BotLevelBracketsEnabled); // Reload drains even while disabled.
 
-    // Legacy PopulationLimitsEnabled migration fallback tests
+    // LimitsMode=2 percentage clamping and default MinBracketChangeThreshold
     Reset();
     sConfig.values.clear();
-    sConfig.values["BotLevelBrackets.HubDisperse.PopulationLimitsEnabled"] = "0";
+    sConfig.values["BotLevelBrackets.HubDisperse.LimitsMode"] = "2";
+    sConfig.values["BotLevelBrackets.HubDisperse.MinBotsPerHub"] = "150";
+    sConfig.values["BotLevelBrackets.HubDisperse.MaxBotsPerHub"] = "120";
     LoadBotLevelBracketsConfig();
-    assert(!g_HubDisperseMinBotsLimitEnabled && !g_HubDisperseMaxBotsLimitEnabled);
-
-    Reset();
-    sConfig.values.clear();
-    sConfig.values["BotLevelBrackets.HubDisperse.PopulationLimitsEnabled"] = "1";
-    LoadBotLevelBracketsConfig();
-    assert(g_HubDisperseMinBotsLimitEnabled && g_HubDisperseMaxBotsLimitEnabled);
-
-    // Explicit toggles take precedence over legacy toggle
-    Reset();
-    sConfig.values.clear();
-    sConfig.values["BotLevelBrackets.HubDisperse.PopulationLimitsEnabled"] = "1";
-    sConfig.values["BotLevelBrackets.HubDisperse.MinBotsLimitEnabled"] = "0";
-    sConfig.values["BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled"] = "0";
-    LoadBotLevelBracketsConfig();
-    assert(!g_HubDisperseMinBotsLimitEnabled && !g_HubDisperseMaxBotsLimitEnabled);
+    assert(g_HubDisperseMinBotsPerHub == 100);
+    assert(g_HubDisperseMaxBotsPerHub == 100);
+    assert(g_MinBracketChangeThreshold == 2);
 
 #if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
     Reset();Player social(1);Add(social);InCity(social,0);

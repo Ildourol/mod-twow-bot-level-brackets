@@ -137,7 +137,7 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | :--- | :---: | :---: | :--- |
 | `BotLevelBrackets.MaxPendingQueueSize` | Integer | `0` | Queue depth ceiling for pending level resets (`0` = unlimited). Rejects new enqueues if queue depth exceeds this value. |
 | `BotLevelBrackets.PendingQueueTTL` | Integer | `0` | Time-to-live in seconds for pending resets (`0` = disabled). Drops stale queue entries stuck in prolonged combat. |
-| `BotLevelBrackets.MinBracketChangeThreshold` | Integer | `0` | Churn dampener (`0` = disabled). Surplus bots are only moved if $\text{Actual} - \text{Desired} > \text{Threshold}$. |
+| `BotLevelBrackets.MinBracketChangeThreshold` | Integer | `2` | Churn dampener (`0` = disabled). Surplus bots are only moved if $\text{Actual} - \text{Desired} > \text{Threshold}$. |
 | `BotLevelBrackets.SocialListRefreshFrequency` | Integer | `300` | Frequency in seconds at which human friend lists are cached from `character_social`. |
 
 ---

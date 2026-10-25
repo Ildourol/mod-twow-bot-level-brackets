@@ -123,7 +123,7 @@ static bool   g_IgnoreFriendListed               = true;
 static uint32 g_FlaggedProcessLimit              = 5;   // 0 = unlimited
 static uint32 g_MaxPendingQueueSize              = 0;   // 0 = unlimited
 static uint32 g_PendingQueueTTL                  = 0;   // 0 = disabled
-static uint32 g_MinBracketChangeThreshold        = 0;   // 0 = disabled
+static uint32 g_MinBracketChangeThreshold        = 2;   // 0 = disabled, default 2
 static float  g_RealPlayerWeight                 = 1.0f;
 static bool   g_SyncFactions                     = false;
 static bool   g_TeleportOnLevelChange            = true;
@@ -320,17 +320,6 @@ static void ToLowerInPlace(std::string& value)
     {
         return static_cast<char>(std::tolower(c));
     });
-}
-
-static bool HasConfigOption(Config& config, const char* name, std::string* outVal = nullptr)
-{
-    static const char* sentinel = "\x01__NOT_CONFIGURED__\x01";
-    std::string val = config.GetStringDefault(name, sentinel);
-    if (val == sentinel)
-        return false;
-    if (outVal)
-        *outVal = val;
-    return true;
 }
 
 static bool IsPlayerBot(Player* player)
@@ -605,7 +594,7 @@ static void LoadBotLevelBracketsConfig(Config& config = sConfig)
     g_FlaggedProcessLimit              = ReadBoundedUInt("BotLevelBrackets.FlaggedProcessLimit", 5, 0, 10000, config);
     g_MaxPendingQueueSize              = ReadBoundedUInt("BotLevelBrackets.MaxPendingQueueSize", 0, 0, 100000, config);
     g_PendingQueueTTL                  = ReadBoundedUInt("BotLevelBrackets.PendingQueueTTL", 0, 0, 86400, config);
-    g_MinBracketChangeThreshold        = ReadBoundedUInt("BotLevelBrackets.MinBracketChangeThreshold", 0, 0, 1000, config);
+    g_MinBracketChangeThreshold        = ReadBoundedUInt("BotLevelBrackets.MinBracketChangeThreshold", 2, 0, 1000, config);
     g_TeleportOnLevelChange            = config.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true);
 
     g_HubDisperseEnabled               = config.GetBoolDefault("BotLevelBrackets.HubDisperse.Enabled", true);
@@ -617,34 +606,24 @@ static void LoadBotLevelBracketsConfig(Config& config = sConfig)
     g_HubDisperseMaxBotsLimitEnabled   = config.GetBoolDefault("BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled", true);
     g_HubDisperseLimitsMode            = ReadBoundedUInt("BotLevelBrackets.HubDisperse.LimitsMode", 1, 1, 2, config);
 
-    // Backward-compatible fallback for legacy BotLevelBrackets.HubDisperse.PopulationLimitsEnabled
-    const char* legacyLimitsKey = "BotLevelBrackets.HubDisperse.PopulationLimitsEnabled";
-    std::string legacyLimitsVal;
-    if (HasConfigOption(config, legacyLimitsKey, &legacyLimitsVal))
-    {
-        bool hasMinKey = HasConfigOption(config, "BotLevelBrackets.HubDisperse.MinBotsLimitEnabled");
-        bool hasMaxKey = HasConfigOption(config, "BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled");
-        if (!hasMinKey || !hasMaxKey)
-        {
-            std::string lowerVal = legacyLimitsVal;
-            ToLowerInPlace(lowerVal);
-            bool legacyEnabled = (lowerVal == "1" || lowerVal == "true" || lowerVal == "yes" || lowerVal == "on");
-            if (!hasMinKey)
-                g_HubDisperseMinBotsLimitEnabled = legacyEnabled;
-            if (!hasMaxKey)
-                g_HubDisperseMaxBotsLimitEnabled = legacyEnabled;
-
-            sLog.outString("[BotLevelBrackets] Notice: '%s = %s' is deprecated. "
-                           "Applying fallback to unspecified limit toggles (Min: %u, Max: %u). "
-                           "Please update your configuration to use 'BotLevelBrackets.HubDisperse.MinBotsLimitEnabled' "
-                           "and 'BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled'.",
-                           legacyLimitsKey, legacyLimitsVal.c_str(),
-                           g_HubDisperseMinBotsLimitEnabled ? 1 : 0,
-                           g_HubDisperseMaxBotsLimitEnabled ? 1 : 0);
-        }
-    }
     g_HubDisperseMinBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerHub", 0, 0, 500, config);
     g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500, config);
+
+    if (g_HubDisperseLimitsMode == 2)
+    {
+        if (g_HubDisperseMinBotsPerHub > 100)
+        {
+            sLog.outError("[BotLevelBrackets] WARNING: HubDisperse.MinBotsPerHub (%u%%) exceeds 100%% in percentage LimitsMode (2). Clamping to 100%%.",
+                g_HubDisperseMinBotsPerHub);
+            g_HubDisperseMinBotsPerHub = 100;
+        }
+        if (g_HubDisperseMaxBotsPerHub > 100)
+        {
+            sLog.outError("[BotLevelBrackets] WARNING: HubDisperse.MaxBotsPerHub (%u%%) exceeds 100%% in percentage LimitsMode (2). Clamping to 100%%.",
+                g_HubDisperseMaxBotsPerHub);
+            g_HubDisperseMaxBotsPerHub = 100;
+        }
+    }
 
     if (g_HubDisperseMinBotsLimitEnabled && g_HubDisperseMaxBotsLimitEnabled && g_HubDisperseMinBotsPerHub > g_HubDisperseMaxBotsPerHub)
     {
@@ -1182,9 +1161,39 @@ static void ProcessPendingTeleports()
         return a.botGuid.GetRawValue() < b.botGuid.GetRawValue();
     });
     uint32 attempted = 0;
+    bool hubCensusCalculated = false;
+    uint32 cachedFactionTotal[2] = { 0, 0 };
+    uint32 cachedHubResidents[s_NumHubAreas] = { 0 };
+
+    auto EnsureHubCensus = [&]()
+    {
+        if (hubCensusCalculated)
+            return;
+        hubCensusCalculated = true;
+        for (const auto& kv : sObjectAccessor.GetPlayers())
+        {
+            Player* p = kv.second;
+            if (!p || !p->IsInWorld() || !IsPlayerBot(p) || !IsPlayerRandomBot(p))
+                continue;
+            if (p->GetTeamId() == TEAM_ALLIANCE)
+                ++cachedFactionTotal[0];
+            else if (p->GetTeamId() == TEAM_HORDE)
+                ++cachedFactionTotal[1];
+            for (size_t h = 0; h < s_NumHubAreas; ++h)
+            {
+                if (IsInArea(p, s_HubAreas[h]))
+                {
+                    ++cachedHubResidents[h];
+                    break;
+                }
+            }
+        }
+    };
+
     for (auto entry : ordered)
     {
         Player* bot = sObjectAccessor.FindPlayer(entry.botGuid);
+        int8 targetHub = -1;
         bool invalid = !g_TeleportOnLevelChange ||
             (entry.source != TELEPORT_SOURCE_LEVEL_BRACKET && !g_HubDisperseEnabled) ||
             entry.configGeneration != g_ConfigGeneration || !bot || !bot->IsInWorld() ||
@@ -1202,7 +1211,6 @@ static void ProcessPendingTeleports()
             if (!invalid && entry.useHubDest)
             {
                 bool factionMatches = false;
-                int8 targetHub = -1;
                 for (size_t h = 0; h < s_NumHubAreas; ++h)
                 {
                     if (s_HubAreas[h].mapId == entry.destMapId)
@@ -1225,18 +1233,9 @@ static void ProcessPendingTeleports()
                     invalid = true;
                 else if (targetHub >= 0)
                 {
-                    uint32 factionTotal = 0;
-                    uint32 currentResidents = 0;
-                    for (const auto& kv : sObjectAccessor.GetPlayers())
-                    {
-                        Player* p = kv.second;
-                        if (!p || !p->IsInWorld() || !IsPlayerBot(p) || !IsPlayerRandomBot(p))
-                            continue;
-                        if (p->GetTeamId() == bot->GetTeamId())
-                            ++factionTotal;
-                        if (IsInArea(p, s_HubAreas[targetHub]))
-                            ++currentResidents;
-                    }
+                    EnsureHubCensus();
+                    uint32 factionTotal = (bot->GetTeamId() == TEAM_ALLIANCE) ? cachedFactionTotal[0] : cachedFactionTotal[1];
+                    uint32 currentResidents = cachedHubResidents[targetHub];
                     uint32 quota = GetHubQuota(targetHub, factionTotal);
                     if (currentResidents >= quota)
                         invalid = true;
@@ -1268,6 +1267,9 @@ static void ProcessPendingTeleports()
         ++entry.attempts;
         if (success)
         {
+            if (entry.useHubDest && targetHub >= 0 && targetHub < static_cast<int8>(s_NumHubAreas))
+                ++cachedHubResidents[targetHub];
+
             // Hub intent is explicit. Cross-map TeleportTo can complete on a later tick.
             if (entry.useHubDest)
                 SyncOwnedCityStrategies(bot, true);

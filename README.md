@@ -127,8 +127,6 @@ BotLevelBrackets.HubDisperse.CooldownSeconds = 180
 # LimitsMode 1: Min/Max bounds are absolute bot counts (e.g. Min 10 bots, Max 50 bots).
 # LimitsMode 2: Min/Max bounds are percentages of online faction bots (e.g. Min 5%, Max 25%).
 # MinBotsLimitEnabled / MaxBotsLimitEnabled independently toggle the floor and ceiling.
-# (Legacy upgrade notice: If using legacy 'PopulationLimitsEnabled', it automatically falls
-# back to controlling both toggles until updated).
 # Example: StormwindPct 20, Min 10, Max 50, QuotaMode 1, LimitsMode 1 -> targets 20 bots.
 
 # Capital City Ambiance & Open-World Strategy Management

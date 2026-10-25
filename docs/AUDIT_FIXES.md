@@ -33,8 +33,6 @@ BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 ```
 
-*(Note for upgrades: The legacy shared toggle `BotLevelBrackets.HubDisperse.PopulationLimitsEnabled` is deprecated but retains automatic fallback if present and new toggles are omitted).*
-
 The execution limit is a shared budget, separate from each scheduler's existing `BotsPerCycle`. A failed attempt counts against the budget. Unsafe entries wait without consuming an attempt. Failure retries wait `2 * attempts` seconds; dropping a failed entry does not stop a future scheduler pass from selecting that bot again.
 
 Min/Max bound the calculated target, not observed population. For Stormwind 7% and 3,000 online Alliance random bots, the raw target is 210 and the bounded target is 50. Protected residents still count but never become movable just because the city is above target. Hysteresis, stability, cooldown and bot availability remain relevant.
