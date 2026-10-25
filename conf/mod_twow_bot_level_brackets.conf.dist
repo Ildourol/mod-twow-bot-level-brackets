@@ -192,35 +192,60 @@ BotLevelBrackets.HubDisperse.QuotaMode = 2
 BotLevelBrackets.HubDisperse.BotsPerCycle = 50
 
 #
-# BotLevelBrackets.HubDisperse.PopulationLimitsEnabled
-# Apply MinBotsPerHub and MaxBotsPerHub to each city's calculated target in BOTH modes.
-# 1 = clamp targets to the configured low/high range; 0 = ignore both limits.
-# Disabled cities (city value 0), available faction population and movement safeguards
-# remain respected even when limits are disabled.
+# BotLevelBrackets.HubDisperse.MinBotsLimitEnabled
+# Enables or disables the minimum population floor (MinBotsPerHub) across all capital cities.
+# When enabled (1), any active/nonzero city target that calculates to fewer bots than MinBotsPerHub
+# will be elevated up to the minimum floor.
+# When disabled (0), no minimum floor is enforced; city targets remain at their calculated values
+# regardless of how low they are.
+# Disabled cities (city setting 0) are NEVER forced to have bots, even when this limit is enabled.
+# Default: 0 (Disabled)
+#
+BotLevelBrackets.HubDisperse.MinBotsLimitEnabled = 0
+
+#
+# BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled
+# Enables or disables the maximum population ceiling (MaxBotsPerHub) across all capital cities.
+# When enabled (1), any city target that calculates to more bots than MaxBotsPerHub
+# will be capped down to the maximum ceiling.
+# When disabled (0), no maximum ceiling is enforced; city targets can grow as high as calculated
+# by the quota formula (up to the faction's total available online bot count).
 # Default: 1 (Enabled)
 #
-BotLevelBrackets.HubDisperse.PopulationLimitsEnabled = 1
+BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled = 1
+
+#
+# BotLevelBrackets.HubDisperse.LimitsMode
+# Determines how MinBotsPerHub and MaxBotsPerHub are interpreted:
+#   1 = Total number (absolute bot headcount, e.g. Min 10 bots, Max 50 bots)
+#   2 = Percentage (percentage of total online faction bots, e.g. Min 5%, Max 25%)
+# Operates independently of QuotaMode: you may use percentage city targets with headcount limits,
+# or headcount city targets with percentage limits.
+# Default: 1 (Total number mode)
+#
+BotLevelBrackets.HubDisperse.LimitsMode = 1
 
 #
 # BotLevelBrackets.HubDisperse.MinBotsPerHub
-# Lower bound for each nonzero city target in BOTH modes when limits are enabled.
-# 0 = no minimum. It never substitutes Max as the refill goal.
-# Values above MaxBotsPerHub are clamped to MaxBotsPerHub with a warning.
+# Lower bound value for each nonzero city target when MinBotsLimitEnabled = 1.
+#   LimitsMode = 1: Treated as an absolute bot headcount (e.g., 10 = minimum 10 bots).
+#   LimitsMode = 2: Treated as a percentage of online faction bots (e.g., 5 = minimum 5% of faction bots).
+# If MaxBotsLimitEnabled = 1 and MinBotsPerHub exceeds MaxBotsPerHub, Min is automatically clamped
+# to Max with a warning.
 # Range: 0 - 500; Default: 0
 #
 BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 
 #
 # BotLevelBrackets.HubDisperse.MaxBotsPerHub
-# Upper bound for each city target in BOTH modes when limits are enabled.
-# Example: city target 20, Min 10, Max 50 -> target 20 (not 50).
-# Target 5 becomes 10; target 70 becomes 50. Min/Max bound the target,
-# rather than creating an idle population band between the two limits.
-# 0 = target 0 when limits are enabled; it does NOT mean unlimited.
-# Targets cannot exceed online random faction bots, including protected/excluded bots.
-# All online random residents count toward the city population, even if protected.
-# Only eligible bots move; no bots spawn. Protected residents can leave a city above target.
-# Hysteresis, stability, cooldown, level restrictions and per-cycle limits still apply.
+# Upper bound value for each city target when MaxBotsLimitEnabled = 1.
+#   LimitsMode = 1: Treated as an absolute bot headcount (e.g., 50 = maximum 50 bots).
+#   LimitsMode = 2: Treated as a percentage of online faction bots (e.g., 20 = maximum 20% of faction bots).
+# Prevents capital cities from accumulating too many bots and draining leveling presence from
+# the open world.
+# Example: with Max 50 (Mode 1), a calculated city target of 70 is capped at 50 bots.
+# City targets can never exceed total online faction bots. All online random residents count toward
+# occupancy, including protected bots. Only safe, eligible bots are moved.
 # Range: 0 - 500; Default: 50
 #
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50

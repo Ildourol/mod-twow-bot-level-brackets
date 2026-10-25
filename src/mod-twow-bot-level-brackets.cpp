@@ -136,9 +136,11 @@ static uint32 g_TeleportMaxAttempts              = 3;
 static size_t g_NextHubStart                     = 0;
 static uint64 g_LastHubCycleMicros               = 0;
 static uint64 g_MaxHubCycleMicros                = 0;
-static bool   g_HubDispersePopulationLimitsEnabled = true;
+static bool   g_HubDisperseMinBotsLimitEnabled     = false;
+static bool   g_HubDisperseMaxBotsLimitEnabled     = true;
+static uint32 g_HubDisperseLimitsMode              = 1;  // 1 = absolute headcount, 2 = percentage
+static uint32 g_HubDisperseMinBotsPerHub         = 0;
 static uint32 g_HubDisperseMaxBotsPerHub         = 50;
-static uint32 g_HubDisperseMinBotsPerHub         = 0;  // 0 = no lower bound
 static uint32 g_HubPopulateFrequency             = 90;
 static uint32 g_StartingZoneDisperseFrequency    = 120;
 static uint32 g_WrongMapDisperseFrequency        = 180;
@@ -522,9 +524,25 @@ static uint32 GetHubQuota(size_t hubIdx, uint32 factionTotal)
     uint32 value = static_cast<uint32>(configuredValue);
     uint32 quota = g_HubDisperseQuotaMode == 1 ? value :
         static_cast<uint32>((static_cast<uint64>(factionTotal) * value + 50) / 100);
-    if (g_HubDispersePopulationLimitsEnabled)
-        quota = std::max(g_HubDisperseMinBotsPerHub,
-            std::min(quota, g_HubDisperseMaxBotsPerHub));
+
+    // Calculate effective Min/Max bounds according to LimitsMode (1 = Headcount, 2 = Percentage)
+    uint32 minBound = g_HubDisperseMinBotsPerHub;
+    uint32 maxBound = g_HubDisperseMaxBotsPerHub;
+    if (g_HubDisperseLimitsMode == 2)
+    {
+        minBound = static_cast<uint32>((static_cast<uint64>(factionTotal) * g_HubDisperseMinBotsPerHub + 50) / 100);
+        maxBound = static_cast<uint32>((static_cast<uint64>(factionTotal) * g_HubDisperseMaxBotsPerHub + 50) / 100);
+    }
+
+    if (g_HubDisperseMaxBotsLimitEnabled)
+        quota = std::min(quota, maxBound);
+
+    if (g_HubDisperseMinBotsLimitEnabled)
+    {
+        uint32 effectiveMin = g_HubDisperseMaxBotsLimitEnabled ? std::min(minBound, maxBound) : minBound;
+        quota = std::max(quota, effectiveMin);
+    }
+
     return std::min(quota, factionTotal);
 }
 
@@ -584,11 +602,13 @@ static void LoadBotLevelBracketsConfig(Config& config = sConfig)
     g_TeleportExecutionLimit = ReadBoundedUInt("BotLevelBrackets.Teleport.ExecutionLimit", 25, 1, 500, config);
     g_TeleportMaxAttempts = ReadBoundedUInt("BotLevelBrackets.Teleport.MaxAttempts", 3, 1, 10, config);
     g_HubDisperseBotsPerCycle          = ReadBoundedUInt("BotLevelBrackets.HubDisperse.BotsPerCycle", 50, 1, 500, config);
-    g_HubDispersePopulationLimitsEnabled = config.GetBoolDefault("BotLevelBrackets.HubDisperse.PopulationLimitsEnabled", true);
-    g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500, config);
+    g_HubDisperseMinBotsLimitEnabled   = config.GetBoolDefault("BotLevelBrackets.HubDisperse.MinBotsLimitEnabled", false);
+    g_HubDisperseMaxBotsLimitEnabled   = config.GetBoolDefault("BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled", true);
+    g_HubDisperseLimitsMode            = ReadBoundedUInt("BotLevelBrackets.HubDisperse.LimitsMode", 1, 1, 2, config);
     g_HubDisperseMinBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerHub", 0, 0, 500, config);
+    g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500, config);
 
-    if (g_HubDisperseMinBotsPerHub > g_HubDisperseMaxBotsPerHub)
+    if (g_HubDisperseMinBotsLimitEnabled && g_HubDisperseMaxBotsLimitEnabled && g_HubDisperseMinBotsPerHub > g_HubDisperseMaxBotsPerHub)
     {
         sLog.outError("[BotLevelBrackets] WARNING: HubDisperse.MinBotsPerHub (%u) exceeds MaxBotsPerHub (%u). Clamping Min to Max.",
             g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
@@ -1607,9 +1627,11 @@ static void ProcessHubPopulate()
 
     if (processed > 0 && g_BotDistFullDebugMode)
     {
-        sLog.outString("[BotLevelBrackets] HubPopulate: processed %u bots this cycle (Mode: %s, MinPerHub: %u, MaxPerHub: %u).",
+        sLog.outString("[BotLevelBrackets] HubPopulate: processed %u bots this cycle (Mode: %s, LimitsMode: %s, Min: %u [%s], Max: %u [%s]).",
             processed, (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
-            g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
+            (g_HubDisperseLimitsMode == 1 ? "Headcount" : "Percentage"),
+            g_HubDisperseMinBotsPerHub, (g_HubDisperseMinBotsLimitEnabled ? "Enabled" : "Disabled"),
+            g_HubDisperseMaxBotsPerHub, (g_HubDisperseMaxBotsLimitEnabled ? "Enabled" : "Disabled"));
     }
 }
 
@@ -2965,8 +2987,10 @@ static bool ExecuteBotBracketsCommand(ChatHandler* handler, char const* args)
         handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Safeguards (Hysteresis:%u bots, Stability:%us, Cooldown:%us)",
             (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
             g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
-        handler->PSendSysMessage("[BotBrackets] Hub Population Limits: %s, Min=%u, Max=%u per hub",
-            (g_HubDispersePopulationLimitsEnabled ? "Enabled" : "Disabled"), g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
+        handler->PSendSysMessage("[BotBrackets] Hub Limits (Mode:%s): Min=%u (%s), Max=%u (%s)",
+            (g_HubDisperseLimitsMode == 1 ? "Headcount" : "Percentage"),
+            g_HubDisperseMinBotsPerHub, (g_HubDisperseMinBotsLimitEnabled ? "Enabled" : "Disabled"),
+            g_HubDisperseMaxBotsPerHub, (g_HubDisperseMaxBotsLimitEnabled ? "Enabled" : "Disabled"));
         const HubCensus hubCensus = BuildHubCensus();
         handler->PSendSysMessage("[BotBrackets] Hub denominator (online random bots): Alliance=%u, Horde=%u",
             hubCensus.alliance, hubCensus.horde);
@@ -3060,9 +3084,11 @@ static bool ExecuteBotBracketsCommand(ChatHandler* handler, char const* args)
             "Stormwind", "Ironforge", "Darnassus", "Alah'Thalas",
             "Orgrimmar", "Undercity", "Thunder Bluff", "Sparkwater"
         };
-        handler->PSendSysMessage("[BotBrackets] Hub mode=%u, bounds=%s, Min=%u, Max=%u; online random bots A=%u H=%u",
-            g_HubDisperseQuotaMode, g_HubDispersePopulationLimitsEnabled ? "on" : "off",
-            g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub, census.alliance, census.horde);
+        handler->PSendSysMessage("[BotBrackets] Hub mode=%u, LimitsMode=%s (Min=%u [%s], Max=%u [%s]); online random bots A=%u H=%u",
+            g_HubDisperseQuotaMode, (g_HubDisperseLimitsMode == 1 ? "Headcount" : "Percentage"),
+            g_HubDisperseMinBotsPerHub, (g_HubDisperseMinBotsLimitEnabled ? "on" : "off"),
+            g_HubDisperseMaxBotsPerHub, (g_HubDisperseMaxBotsLimitEnabled ? "on" : "off"),
+            census.alliance, census.horde);
         handler->SendSysMessage("City: value / raw / target | residents / movable / pending-in / pending-out / effective");
         for (size_t h = 0; h < s_NumHubAreas; ++h)
         {

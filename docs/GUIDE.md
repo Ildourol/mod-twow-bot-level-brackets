@@ -66,7 +66,10 @@ To keep major cities lively without draining the open world, the module supports
 * **Mode 1 (Total number):** Each city's existing `*Pct` setting is an absolute bot count (0–500). For example, `StormwindPct = 20` targets 20 bots.
 * **Mode 2 (Percentage - Default):** Each city setting is a percentage (0–100) of online faction bots, rounded to the nearest bot.
 
-`PopulationLimitsEnabled = 1` (default) bounds each nonzero city target between `MinBotsPerHub` and `MaxBotsPerHub` in both modes. Min `0` means no minimum; Max is never substituted as the refill goal. With Min `10`, Max `50`, a target of `20` stays `20`, `5` becomes `10`, and `70` becomes `50`. Set the toggle to `0` to ignore both bounds. A city setting of `0` remains disabled. With limits enabled, Max `0` targets empty hubs; Min above Max is clamped with a warning.
+`MinBotsLimitEnabled` and `MaxBotsLimitEnabled` provide independent controls over city population bounds:
+* **`LimitsMode = 1` (Headcount):** `MinBotsPerHub` and `MaxBotsPerHub` are interpreted as absolute bot counts (e.g., Min 10 bots, Max 50 bots).
+* **`LimitsMode = 2` (Percentage):** `MinBotsPerHub` and `MaxBotsPerHub` are interpreted as percentages of online faction bots (e.g., Min 5%, Max 25%).
+When `MinBotsLimitEnabled = 1`, active city targets falling below Min are elevated to the lower bound. When `MaxBotsLimitEnabled = 1`, targets exceeding Max are clamped to the ceiling. A city setting of `0` remains permanently disabled and is never forced to receive bots.
 
 Both modes refill and disperse toward the resulting city target, subject to hysteresis, stability, cooldown, pending inbound accounting, cycle limits, eligibility and city level restrictions. Targets cannot exceed online faction bots. No bots are spawned; insufficient eligible bots can leave a city below its target. Limits count all brackets together.
 
@@ -261,9 +264,11 @@ The module utilizes two non-intrusive tables in the character database (`tw_char
 
 | Setting | Default | Behavior |
 | :--- | :---: | :--- |
-| `BotLevelBrackets.HubDisperse.PopulationLimitsEnabled` | `1` | Apply both target bounds in either quota mode; `0` ignores both. |
-| `BotLevelBrackets.HubDisperse.MinBotsPerHub` | `0` | Lower target bound, 0–500; `0` means no floor. |
-| `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | `50` | Upper target bound, 0–500; `0` targets empty hubs when bounds are enabled. |
+| `BotLevelBrackets.HubDisperse.MinBotsLimitEnabled` | `0` | Enable lower bound `MinBotsPerHub` for active city targets (`0` = off, `1` = on). |
+| `BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled` | `1` | Enable upper bound `MaxBotsPerHub` for city targets (`0` = off, `1` = on). |
+| `BotLevelBrackets.HubDisperse.LimitsMode` | `1` | Limits mode (`1` = absolute bot count, `2` = percentage of online faction bots). |
+| `BotLevelBrackets.HubDisperse.MinBotsPerHub` | `0` | Lower bound value (headcount or percentage based on `LimitsMode`), range 0–500. |
+| `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | `50` | Upper bound value (headcount or percentage based on `LimitsMode`), range 0–500. |
 
 ### Audit hardening: execution, ownership and diagnostics
 

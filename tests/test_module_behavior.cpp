@@ -10,7 +10,7 @@ static void Reset()
     g_HubBotCooldowns.clear(); g_ConfigGeneration=1; g_TeleportExecutionLimit=25; g_TeleportMaxAttempts=3;
     g_PendingQueueTTL=0; g_HubDisperseEnabled=true; g_BotLevelBracketsEnabled=true;
     g_TeleportOnLevelChange=true; g_HubDisperseQuotaMode=1;
-    g_HubDispersePopulationLimitsEnabled=true;g_HubDisperseMinBotsPerHub=0;g_HubDisperseMaxBotsPerHub=50;
+    g_HubDisperseMinBotsLimitEnabled=false;g_HubDisperseMaxBotsLimitEnabled=true;g_HubDisperseLimitsMode=1;g_HubDisperseMinBotsPerHub=0;g_HubDisperseMaxBotsPerHub=50;
     g_HubDisperseHysteresisBots=0;g_HubDisperseStabilitySeconds=0;g_NextHubStart=0;
     g_HubDisperseCooldownSeconds=0;g_HubDisperseBotsPerCycle=50;
     g_ManageCityStrategies=true;g_WorldTeleportResetStrategies=true;
