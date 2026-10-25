@@ -3,7 +3,7 @@
 ![Bot Level Brackets Banner](preview.jpg)
 
 [![Turtle WoW](https://img.shields.io/badge/Turtle_WoW-1.18.1%20%2F%201.12.1-orange.svg)](https://turtle-wow.org)
-[![Core](https://img.shields.io/badge/Core-tortoise--wow%20(vMaNGOS)-blue.svg)](https://github.com/Ildourol/tortoise-wow)
+[![Core](https://img.shields.io/badge/Core-tortoise--wow%20(vMaNGOS)-blue.svg)](https://github.com/tortoise-wow/tortoise-wow)
 [![Bot Engine](https://img.shields.io/badge/Bot%20Engine-TortoiseBots%20%7C%20PlayerBots-brightgreen.svg)](https://github.com/Sagiroth/TortoiseBots)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-GPL%20v2-blue.svg)]()
@@ -31,7 +31,7 @@ In standard World of Warcraft servers running companion bot engines, playerbots 
 * **Multi-Engine Portability:** Compile-time auto-discovery seamlessly adapts to modern modular **`TortoiseBots`**, legacy vendored PlayerBots (`sRandomPlayerbotMgr`), or core headless bot sessions.
 * **8 Racial Capital City Hubs:** Ambiance quota management for Stormwind, Ironforge, Darnassus, Alah'Thalas (High Elf), Orgrimmar, Undercity, Thunder Bluff, and Sparkwater Port (Goblin).
 * **Native Racial Starter Routing:** Level 1–9 bots are intelligently transported to their native racial starting valleys rather than generic dumping grounds.
-* **Persistent Recovery Across Reboots:** Pending level adjustments are stored in MySQL/MariaDB (`bot_level_brackets_pending_resets`), ensuring zero loss of operations across server restarts.
+* **Persistent Recovery Across Reboots:** Pending level adjustments are stored in MySQL/MariaDB (`bot_level_brackets_pending_resets`), ensuring saved resets wait through logout/restart until the bot returns, expires or becomes ineligible.
 * **Safe State Verification:** Bots in combat, casting spells, flying on taxis, trading, looting, dead, or logging out are never interrupted.
 * **Churn Dampening:** Threshold dampening suppresses redistribution oscillations in near-balanced brackets.
 * **In-Game Administration Suite:** Complete `.blb` and `.botbrackets` CLI with live status reporting, on-the-fly config reloading, queue telemetry, and cumulative stats.
@@ -90,8 +90,13 @@ BotLevelBrackets.CheckFrequency = 300
 
 # Level Bracket Definitions (Alliance & Horde)
 BotLevelBrackets.NumRanges = 7
-BotLevelBrackets.AllianceBrackets = "1-9:16,10-19:14,20-29:14,30-39:14,40-49:14,50-59:14,60:14"
-BotLevelBrackets.HordeBrackets = "1-9:16,10-19:14,20-29:14,30-39:14,40-49:14,50-59:14,60:14"
+BotLevelBrackets.Alliance.Range1.Lower = 1
+BotLevelBrackets.Alliance.Range1.Upper = 9
+BotLevelBrackets.Alliance.Range1.Pct = 16
+BotLevelBrackets.Horde.Range1.Lower = 1
+BotLevelBrackets.Horde.Range1.Upper = 9
+BotLevelBrackets.Horde.Range1.Pct = 16
+# Configure Range2 through Range7 with the numbered keys in the full template.
 
 # Dynamic Real-Player Following (0 = disabled, 1 = enabled)
 BotLevelBrackets.Dynamic.UseDynamicDistribution = 0
@@ -104,6 +109,8 @@ BotLevelBrackets.IgnoreArenaTeamBots = 1
 
 # Teleportation & World Presences
 BotLevelBrackets.TeleportOnLevelChange = 1
+BotLevelBrackets.Teleport.ExecutionLimit = 25
+BotLevelBrackets.Teleport.MaxAttempts = 3
 BotLevelBrackets.HubDisperse.Enabled = 1
 BotLevelBrackets.HubDisperse.QuotaMode = 2
 BotLevelBrackets.HubDisperse.PopulationLimitsEnabled = 1
@@ -157,3 +164,19 @@ Game Masters and Administrators can manage the module using `.blb <command>` or 
 This project is licensed under the **GNU General Public License v2 (GPL-2.0)**.
 
 
+
+## Audit hardening and regression checks
+
+Hub evacuation now leaves managed cities, including at level 60. Queued actions recheck protections, saved resets survive offline periods, and in-game admin commands execute on the world thread. City strategy changes have ownership tracking and are restored without broad AI engine resets. Population diagnostics share the scheduler's census, and Min/Max still bound each city's configured target in both quota modes.
+
+Read [Audit fixes and validation](docs/AUDIT_FIXES.md) for operator details, compatibility references and remaining live-server checks.
+
+Run the deterministic checks with Python 3 and g++ (C++17):
+
+```bash
+python3 tests/test_hub_population.py
+python3 tests/test_module_behavior.py
+python3 tests/test_config_defaults.py
+```
+
+The module behavior suite compiles the actual module and adapter with host doubles in native TortoiseBots, legacy PlayerBots and generic headless modes. It does not replace a build against the real server or in-game validation.

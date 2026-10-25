@@ -1,7 +1,8 @@
 # Workspace and internal architecture documentation (local only)
 AGENTS.md
 .agents/
-tests/
+tests/__pycache__/
+tests/.pytest_cache/
 docs/ARCHITECTURE.md
 docs/CORE_PORTABILITY_GUIDE.md
 docs/FEATURE_PORT_REPORT.md
