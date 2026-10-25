@@ -185,16 +185,22 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 
 ### 3.6 Bracket Definition
 
-Brackets are configured using bracket strings formatted as `min-max:percentage`:
+Brackets are configured per faction using `.Lower`, `.Upper`, and `.Pct` keys for each range index from 1 to `NumRanges`:
 
 ```ini
 BotLevelBrackets.NumRanges = 7
 
 # Standard Vanilla 1-60 Curve (Alliance)
-BotLevelBrackets.AllianceBrackets = "1-9:16,10-19:14,20-29:14,30-39:14,40-49:14,50-59:14,60:14"
+BotLevelBrackets.Alliance.Range1.Lower = 1
+BotLevelBrackets.Alliance.Range1.Upper = 9
+BotLevelBrackets.Alliance.Range1.Pct   = 16
+# ... through Range7 (Range1 - Range7)
 
 # Standard Vanilla 1-60 Curve (Horde)
-BotLevelBrackets.HordeBrackets = "1-9:16,10-19:14,20-29:14,30-39:14,40-49:14,50-59:14,60:14"
+BotLevelBrackets.Horde.Range1.Lower = 1
+BotLevelBrackets.Horde.Range1.Upper = 9
+BotLevelBrackets.Horde.Range1.Pct   = 16
+# ... through Range7 (Range1 - Range7)
 ```
 
 * Percentages are automatically normalized to 100% on reload.
@@ -214,6 +220,7 @@ Commands can be executed via `.blb <command>` or `.botbrackets <command>`:
 | `.blb pending` | Moderator (1) | Displays current depths of pending level reset and teleport queues, TTL values, and candidate ages. |
 | `.blb cleanup` | Administrator (3) | Scans `bot_level_brackets_guild_tracker` and removes entries for guilds that no longer have human players. |
 | `.blb stats` | Moderator (1) | Displays cumulative counters since server boot: cycles executed, bots adjusted, bots teleported, and bots skipped due to unsafe conditions. |
+| `.blb hubs` | Moderator (1) | Displays capital hub diagnostics table: team, target quota, effective population, imbalance state, duration, and stability status across all 8 racial hubs. |
 
 ---
 

@@ -311,7 +311,7 @@ public:
 #if defined(HAVE_TORTOISEBOTS)
         return PlayerbotAIStorage::Instance().GetAI(bot);
 #else
-        return GetBotAI(bot);
+        return GET_PLAYERBOT_AI(bot);
 #endif
     }
 

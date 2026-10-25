@@ -1266,7 +1266,7 @@ static void ProcessHubPopulate()
         // Active city strategy synchronization for bots residing in hubs:
         if (g_ManageCityStrategies && info.hubIdx >= 0)
         {
-            if (!BotEngineAdapter::HasStrategy(bot, "rpg", BotState::BOT_STATE_NON_COMBAT))
+            if (!BotEngineAdapter::HasStrategy(bot, "rpg"))
             {
                 BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
                 if (g_BotDistFullDebugMode)
@@ -1279,9 +1279,9 @@ static void ProcessHubPopulate()
         else if (g_WorldTeleportResetStrategies && info.hubIdx < 0)
         {
             // If the bot is out in the open world but still retains city-only strategies, reset both NC and CO
-            if (BotEngineAdapter::HasStrategy(bot, "sit", BotState::BOT_STATE_NON_COMBAT) ||
-                BotEngineAdapter::HasStrategy(bot, "emote", BotState::BOT_STATE_NON_COMBAT) ||
-                !BotEngineAdapter::HasStrategy(bot, "grind", BotState::BOT_STATE_NON_COMBAT))
+            if (BotEngineAdapter::HasStrategy(bot, "sit") ||
+                BotEngineAdapter::HasStrategy(bot, "emote") ||
+                !BotEngineAdapter::HasStrategy(bot, "grind"))
             {
                 BotEngineAdapter::ResetDefaultStrategies(bot);
                 if (g_BotDistFullDebugMode)
@@ -1301,7 +1301,7 @@ static void ProcessHubPopulate()
     for (const auto& itr : players)
     {
         Player* p = itr.second;
-        if (!p || !p->IsInWorld() || !IsPlayerBot(p) || !IsPlayerRandomBot(p) || IsBotExcluded(p))
+        if (!p || !p->IsInWorld() || ShouldExcludeBot(p))
             continue;
         if (p->GetTeamId() == TEAM_ALLIANCE)
             ++totalAllianceBots;
