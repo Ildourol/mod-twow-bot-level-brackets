@@ -30,6 +30,8 @@
 #include <atomic>
 #include <ctime>
 #include <chrono>
+#include <deque>
+#include <array>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -60,6 +62,8 @@ struct PendingResetEntry
     int        targetRange;
     uint8      teamId;
     uint32     enqueuedAt;
+    uint8      minLevel{0};
+    uint8      maxLevel{0};
 };
 
 struct PendingTeleportEntry
@@ -75,6 +79,9 @@ struct PendingTeleportEntry
     float          destZ;
     float          destO;
     TeleportSource source{TELEPORT_SOURCE_LEVEL_BRACKET};
+    uint32 attempts{0};
+    int64 nextAttemptAt{0};
+    uint32 configGeneration{0};
 };
 
 struct TeleportDestination
@@ -124,12 +131,17 @@ static bool   g_TeleportOnLevelChange            = true;
 static bool   g_HubDisperseEnabled               = true;
 static uint32 g_HubDisperseQuotaMode             = 2;  // 1 = per-city headcounts, 2 = per-city percentages
 static uint32 g_HubDisperseBotsPerCycle          = 50;
+static uint32 g_TeleportExecutionLimit           = 25;
+static uint32 g_TeleportMaxAttempts              = 3;
+static size_t g_NextHubStart                     = 0;
+static uint64 g_LastHubCycleMicros               = 0;
+static uint64 g_MaxHubCycleMicros                = 0;
 static bool   g_HubDispersePopulationLimitsEnabled = true;
 static uint32 g_HubDisperseMaxBotsPerHub         = 50;
 static uint32 g_HubDisperseMinBotsPerHub         = 0;  // 0 = no lower bound
-static uint32 g_HubPopulateFrequency             = 30;
-static uint32 g_StartingZoneDisperseFrequency    = 15;
-static uint32 g_WrongMapDisperseFrequency        = 60;
+static uint32 g_HubPopulateFrequency             = 90;
+static uint32 g_StartingZoneDisperseFrequency    = 120;
+static uint32 g_WrongMapDisperseFrequency        = 180;
 static int32  g_HubCityPcts[8]                   = { 7, 5, 4, 4, 7, 5, 4, 4 };
 static uint32 g_HubDisperseHysteresisBots        = 2;
 static uint32 g_HubDisperseStabilitySeconds      = 60;
@@ -201,6 +213,14 @@ static std::unordered_map<ObjectGuid, PendingResetEntry>     g_PendingLevelReset
 static std::mutex                                            g_PendingLevelResetsMutex;
 static std::unordered_map<ObjectGuid, PendingTeleportEntry>   g_PendingTeleports;
 static std::mutex                                            g_PendingTeleportsMutex;
+// Ownership is world-thread-only; never infer ownership from a bot's strategy names.
+static std::unordered_map<ObjectGuid, BotEngineAdapter::StrategySnapshot> g_CityStrategyOwners;
+struct PendingCommand { ObjectGuid requester; std::string args; };
+static std::deque<PendingCommand> g_PendingCommands;
+static std::mutex g_CommandMutex;
+static std::unordered_set<ObjectGuid> g_LoggedOutGuids;
+static constexpr size_t kCommandQueueLimit = 256;
+static constexpr size_t kCommandsPerTick = 16;
 
 // Runtime atomics and cumulative stats
 static std::atomic<bool>                                     g_DistributionInProgress{false};
@@ -208,6 +228,10 @@ static std::atomic<uint64>                                   g_StatsBotsAdjusted
 static std::atomic<uint64>                                   g_StatsBotsTeleported{0};
 static std::atomic<uint64>                                   g_StatsBotsSkipped{0};
 static std::atomic<uint64>                                   g_StatsCyclesRun{0};
+static uint64 g_StatsTeleportFailures = 0;
+static uint64 g_StatsTeleportCancelled = 0;
+static uint64 g_StatsCityStrategyApplies = 0;
+static uint64 g_StatsCityStrategyRestores = 0;
 
 // Forward declarations
 static bool IsAlliancePlayerBot(Player* bot);
@@ -215,6 +239,10 @@ static bool IsHordePlayerBot(Player* bot);
 static void ClampAndBalanceBrackets(bool warnLayout = true);
 static void RunDistributionCycle(ChatHandler* handler = nullptr);
 static void CleanupGuildTracker();
+static bool ExecuteBotBracketsCommand(ChatHandler* handler, char const* args);
+static void DrainBotBracketsCommands();
+static void LoadSocialFriendList();
+static void LoadPersistentGuildTracker(bool force = false);
 
 // -----------------------------------------------------------------------------
 // VANILLA / TURTLE WOW LEVELING ZONES & HUBS
@@ -228,7 +256,7 @@ static const TeleportDestination s_AllianceZones[] =
     { 0, -11340.0f,  -200.0f,  75.0f, 0.0f },     // 30-39: Northern STV (Rebel Camp)
     { 1,  -4380.0f,  2060.0f,  49.0f, 0.0f },     // 40-49: Feralas (Feathermoon Stronghold)
     { 0,    940.0f, -1450.0f,  63.0f, 0.0f },     // 50-59: Western Plaguelands (Chillwind Camp)
-    { 0,  -8810.0f,   640.0f,  94.0f, 0.0f }      // 60:    Stormwind City
+    { 0,    940.0f, -1450.0f,  63.0f, 0.0f }      // 60:    Western Plaguelands (outdoors)
 };
 static constexpr size_t s_NumAllianceZones = sizeof(s_AllianceZones) / sizeof(s_AllianceZones[0]);
 
@@ -240,7 +268,7 @@ static const TeleportDestination s_HordeZones[] =
     { 0,    -24.0f,  -870.0f,  55.0f, 0.0f },     // 30-39: Hillsbrad Foothills (Tarren Mill)
     { 1,  -4400.0f,   190.0f,  25.0f, 0.0f },     // 40-49: Feralas (Camp Mojache)
     { 1,  -7180.0f, -1070.0f, -188.0f, 0.0f },    // 50-59: Un'Goro Crater (Entrance)
-    { 1,   1570.0f, -4400.0f,   8.0f, 0.0f }      // 60:    Orgrimmar
+    { 1,  -7180.0f, -1070.0f, -188.0f, 0.0f }     // 60:    Un'Goro Crater (outdoors)
 };
 static constexpr size_t s_NumHordeZones = sizeof(s_HordeZones) / sizeof(s_HordeZones[0]);
 
@@ -274,9 +302,9 @@ static constexpr size_t s_NumStartingAreas = sizeof(s_StartingAreas) / sizeof(s_
 // HELPER UTILITIES
 // -----------------------------------------------------------------------------
 
-static uint32 ReadBoundedUInt(char const* key, int32 defaultValue, uint32 minimum, uint32 maximum)
+static uint32 ReadBoundedUInt(char const* key, int32 defaultValue, uint32 minimum, uint32 maximum, Config& config = sConfig)
 {
-    int64 value = sConfig.GetIntDefault(key, defaultValue);
+    int64 value = config.GetIntDefault(key, defaultValue);
     if (value < static_cast<int64>(minimum))
         value = minimum;
     if (value > static_cast<int64>(maximum))
@@ -529,34 +557,36 @@ static bool ShouldExcludeBot(Player* bot)
 // CONFIGURATION LOADER
 // -----------------------------------------------------------------------------
 
-static void LoadBotLevelBracketsConfig()
+static void LoadBotLevelBracketsConfig(Config& config = sConfig)
 {
-    g_BotLevelBracketsEnabled           = sConfig.GetBoolDefault("BotLevelBrackets.Enabled", true);
-    g_IgnoreGuildBotsWithRealPlayers   = sConfig.GetBoolDefault("BotLevelBrackets.IgnoreGuildBotsWithRealPlayers", true);
-    g_IgnoreArenaTeamBots              = sConfig.GetBoolDefault("BotLevelBrackets.IgnoreArenaTeamBots", true);
-    g_BotDistFullDebugMode             = sConfig.GetBoolDefault("BotLevelBrackets.FullDebugMode", false);
-    g_BotDistLiteDebugMode             = sConfig.GetBoolDefault("BotLevelBrackets.LiteDebugMode", false);
-    g_BotDistCheckFrequency            = ReadBoundedUInt("BotLevelBrackets.CheckFrequency", 300, 1, 86400);
-    g_BotDistFlaggedCheckFrequency     = ReadBoundedUInt("BotLevelBrackets.CheckFlaggedFrequency", 15, 1, 86400);
-    g_GuildTrackerUpdateFrequency      = ReadBoundedUInt("BotLevelBrackets.GuildTrackerUpdateFrequency", 600, 1, 86400);
-    g_SocialListRefreshFrequency       = ReadBoundedUInt("BotLevelBrackets.SocialListRefreshFrequency", 300, 1, 86400);
-    g_UseDynamicDistribution           = sConfig.GetBoolDefault("BotLevelBrackets.Dynamic.UseDynamicDistribution", false);
+    g_BotLevelBracketsEnabled           = config.GetBoolDefault("BotLevelBrackets.Enabled", true);
+    g_IgnoreGuildBotsWithRealPlayers   = config.GetBoolDefault("BotLevelBrackets.IgnoreGuildBotsWithRealPlayers", true);
+    g_IgnoreArenaTeamBots              = config.GetBoolDefault("BotLevelBrackets.IgnoreArenaTeamBots", true);
+    g_BotDistFullDebugMode             = config.GetBoolDefault("BotLevelBrackets.FullDebugMode", false);
+    g_BotDistLiteDebugMode             = config.GetBoolDefault("BotLevelBrackets.LiteDebugMode", false);
+    g_BotDistCheckFrequency            = ReadBoundedUInt("BotLevelBrackets.CheckFrequency", 300, 1, 86400, config);
+    g_BotDistFlaggedCheckFrequency     = ReadBoundedUInt("BotLevelBrackets.CheckFlaggedFrequency", 15, 1, 86400, config);
+    g_GuildTrackerUpdateFrequency      = ReadBoundedUInt("BotLevelBrackets.GuildTrackerUpdateFrequency", 600, 1, 86400, config);
+    g_SocialListRefreshFrequency       = ReadBoundedUInt("BotLevelBrackets.SocialListRefreshFrequency", 300, 1, 86400, config);
+    g_UseDynamicDistribution           = config.GetBoolDefault("BotLevelBrackets.Dynamic.UseDynamicDistribution", false);
     g_RealPlayerWeight                 = std::max(0.0f, std::min(100.0f,
-        sConfig.GetFloatDefault("BotLevelBrackets.Dynamic.RealPlayerWeight", 1.0f)));
-    g_SyncFactions                     = sConfig.GetBoolDefault("BotLevelBrackets.Dynamic.SyncFactions", false);
-    g_IgnoreFriendListed               = sConfig.GetBoolDefault("BotLevelBrackets.IgnoreFriendListed", true);
-    g_FlaggedProcessLimit              = ReadBoundedUInt("BotLevelBrackets.FlaggedProcessLimit", 5, 0, 10000);
-    g_MaxPendingQueueSize              = ReadBoundedUInt("BotLevelBrackets.MaxPendingQueueSize", 0, 0, 100000);
-    g_PendingQueueTTL                  = ReadBoundedUInt("BotLevelBrackets.PendingQueueTTL", 0, 0, 86400);
-    g_MinBracketChangeThreshold        = ReadBoundedUInt("BotLevelBrackets.MinBracketChangeThreshold", 0, 0, 1000);
-    g_TeleportOnLevelChange            = sConfig.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true);
+        config.GetFloatDefault("BotLevelBrackets.Dynamic.RealPlayerWeight", 1.0f)));
+    g_SyncFactions                     = config.GetBoolDefault("BotLevelBrackets.Dynamic.SyncFactions", false);
+    g_IgnoreFriendListed               = config.GetBoolDefault("BotLevelBrackets.IgnoreFriendListed", true);
+    g_FlaggedProcessLimit              = ReadBoundedUInt("BotLevelBrackets.FlaggedProcessLimit", 5, 0, 10000, config);
+    g_MaxPendingQueueSize              = ReadBoundedUInt("BotLevelBrackets.MaxPendingQueueSize", 0, 0, 100000, config);
+    g_PendingQueueTTL                  = ReadBoundedUInt("BotLevelBrackets.PendingQueueTTL", 0, 0, 86400, config);
+    g_MinBracketChangeThreshold        = ReadBoundedUInt("BotLevelBrackets.MinBracketChangeThreshold", 0, 0, 1000, config);
+    g_TeleportOnLevelChange            = config.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true);
 
-    g_HubDisperseEnabled               = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.Enabled", true);
-    g_HubDisperseQuotaMode             = ReadBoundedUInt("BotLevelBrackets.HubDisperse.QuotaMode", 2, 1, 2);
-    g_HubDisperseBotsPerCycle          = ReadBoundedUInt("BotLevelBrackets.HubDisperse.BotsPerCycle", 50, 1, 500);
-    g_HubDispersePopulationLimitsEnabled = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.PopulationLimitsEnabled", true);
-    g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500);
-    g_HubDisperseMinBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerHub", 0, 0, 500);
+    g_HubDisperseEnabled               = config.GetBoolDefault("BotLevelBrackets.HubDisperse.Enabled", true);
+    g_HubDisperseQuotaMode             = ReadBoundedUInt("BotLevelBrackets.HubDisperse.QuotaMode", 2, 1, 2, config);
+    g_TeleportExecutionLimit = ReadBoundedUInt("BotLevelBrackets.Teleport.ExecutionLimit", 25, 1, 500, config);
+    g_TeleportMaxAttempts = ReadBoundedUInt("BotLevelBrackets.Teleport.MaxAttempts", 3, 1, 10, config);
+    g_HubDisperseBotsPerCycle          = ReadBoundedUInt("BotLevelBrackets.HubDisperse.BotsPerCycle", 50, 1, 500, config);
+    g_HubDispersePopulationLimitsEnabled = config.GetBoolDefault("BotLevelBrackets.HubDisperse.PopulationLimitsEnabled", true);
+    g_HubDisperseMaxBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MaxBotsPerHub", 50, 0, 500, config);
+    g_HubDisperseMinBotsPerHub         = ReadBoundedUInt("BotLevelBrackets.HubDisperse.MinBotsPerHub", 0, 0, 500, config);
 
     if (g_HubDisperseMinBotsPerHub > g_HubDisperseMaxBotsPerHub)
     {
@@ -565,15 +595,15 @@ static void LoadBotLevelBracketsConfig()
         g_HubDisperseMinBotsPerHub = g_HubDisperseMaxBotsPerHub;
     }
 
-    int32 swPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.StormwindPct", 7);
-    int32 ifPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.IronforgePct", 5);
-    int32 daPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.DarnassusPct", 4);
-    int32 atPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.AlahThalasPct", 4);
+    int32 swPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.StormwindPct", 7);
+    int32 ifPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.IronforgePct", 5);
+    int32 daPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.DarnassusPct", 4);
+    int32 atPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.AlahThalasPct", 4);
 
-    int32 orPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.OrgrimmarPct", 7);
-    int32 ucPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.UndercityPct", 5);
-    int32 tbPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.ThunderBluffPct", 4);
-    int32 spPct = sConfig.GetIntDefault("BotLevelBrackets.HubDisperse.SparkwaterPct", 4);
+    int32 orPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.OrgrimmarPct", 7);
+    int32 ucPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.UndercityPct", 5);
+    int32 tbPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.ThunderBluffPct", 4);
+    int32 spPct = config.GetIntDefault("BotLevelBrackets.HubDisperse.SparkwaterPct", 4);
 
     const int32 cityValueMax = g_HubDisperseQuotaMode == 1 ? 500 : 100;
     g_HubCityPcts[0] = (swPct >= 0) ? std::min(swPct, cityValueMax) : 0;
@@ -586,18 +616,18 @@ static void LoadBotLevelBracketsConfig()
     g_HubCityPcts[6] = (tbPct >= 0) ? std::min(tbPct, cityValueMax) : 0;
     g_HubCityPcts[7] = (spPct >= 0) ? std::min(spPct, cityValueMax) : 0;
 
-    g_HubPopulateFrequency             = ReadBoundedUInt("BotLevelBrackets.HubPopulate.Frequency", 30, 1, 86400);
-    g_StartingZoneDisperseFrequency    = ReadBoundedUInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 15, 1, 86400);
-    g_WrongMapDisperseFrequency        = ReadBoundedUInt("BotLevelBrackets.WrongMapDisperse.Frequency", 60, 1, 86400);
-    g_HubDisperseHysteresisBots        = ReadBoundedUInt("BotLevelBrackets.HubDisperse.HysteresisBots", 2, 0, 100);
-    g_HubDisperseStabilitySeconds      = ReadBoundedUInt("BotLevelBrackets.HubDisperse.StabilitySeconds", 60, 0, 3600);
-    g_HubDisperseCooldownSeconds       = ReadBoundedUInt("BotLevelBrackets.HubDisperse.CooldownSeconds", 180, 0, 86400);
-    g_ManageCityStrategies             = sConfig.GetBoolDefault("BotLevelBrackets.HubDisperse.ManageCityStrategies", true);
-    g_CityStrategies                   = sConfig.GetStringDefault("BotLevelBrackets.HubDisperse.CityStrategies",
+    g_HubPopulateFrequency             = ReadBoundedUInt("BotLevelBrackets.HubPopulate.Frequency", 90, 1, 86400, config);
+    g_StartingZoneDisperseFrequency    = ReadBoundedUInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 120, 1, 86400, config);
+    g_WrongMapDisperseFrequency        = ReadBoundedUInt("BotLevelBrackets.WrongMapDisperse.Frequency", 180, 1, 86400, config);
+    g_HubDisperseHysteresisBots        = ReadBoundedUInt("BotLevelBrackets.HubDisperse.HysteresisBots", 2, 0, 100, config);
+    g_HubDisperseStabilitySeconds      = ReadBoundedUInt("BotLevelBrackets.HubDisperse.StabilitySeconds", 60, 0, 3600, config);
+    g_HubDisperseCooldownSeconds       = ReadBoundedUInt("BotLevelBrackets.HubDisperse.CooldownSeconds", 180, 0, 86400, config);
+    g_ManageCityStrategies             = config.GetBoolDefault("BotLevelBrackets.HubDisperse.ManageCityStrategies", true);
+    g_CityStrategies                   = config.GetStringDefault("BotLevelBrackets.HubDisperse.CityStrategies",
         "+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say");
-    g_CityStripStrategies              = sConfig.GetStringDefault("BotLevelBrackets.HubDisperse.CityStripStrategies",
+    g_CityStripStrategies              = config.GetStringDefault("BotLevelBrackets.HubDisperse.CityStripStrategies",
         "-grind,-wander,-loot,-tfish");
-    g_WorldTeleportResetStrategies     = sConfig.GetBoolDefault("BotLevelBrackets.WorldTeleport.ResetStrategies", true);
+    g_WorldTeleportResetStrategies     = config.GetBoolDefault("BotLevelBrackets.WorldTeleport.ResetStrategies", true);
 
     for (size_t h = 0; h < s_NumHubAreas; ++h)
     {
@@ -606,7 +636,7 @@ static void LoadBotLevelBracketsConfig()
         g_HubStability[h].lastEffectivePopulation = 0;
     }
 
-    std::string excludeNames = sConfig.GetStringDefault("BotLevelBrackets.ExcludeNames", "");
+    std::string excludeNames = config.GetStringDefault("BotLevelBrackets.ExcludeNames", "");
     {
         std::lock_guard<std::mutex> lock(g_SocialDataMutex);
         g_ExcludeBotNames.clear();
@@ -635,7 +665,7 @@ static void LoadBotLevelBracketsConfig()
     g_RandomBotMaxLevel = static_cast<uint8>(std::min<uint32>(configuredMaxLevel, 255));
 
     uint32 const maximumUsefulRanges = std::max<uint32>(1, g_RandomBotMaxLevel - g_RandomBotMinLevel + 1);
-    g_NumRanges = ReadBoundedUInt("BotLevelBrackets.NumRanges", 7, 1, std::min<uint32>(60, maximumUsefulRanges));
+    g_NumRanges = ReadBoundedUInt("BotLevelBrackets.NumRanges", 7, 1, std::min<uint32>(60, maximumUsefulRanges), config);
 
     g_AllianceLevelRanges.resize(g_NumRanges);
     g_HordeLevelRanges.resize(g_NumRanges);
@@ -647,13 +677,13 @@ static void LoadBotLevelBracketsConfig()
         uint32 defaultUpper = (i < g_NumRanges - 1 ? i * 10 + 9 : g_RandomBotMaxLevel);
         uint32 defaultPct   = (i == 0 ? 16 : 14);
 
-        g_AllianceLevelRanges[i].lower = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Alliance.Range" + idx + ".Lower").c_str(), defaultLower, 0, 255));
-        g_AllianceLevelRanges[i].upper = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Alliance.Range" + idx + ".Upper").c_str(), defaultUpper, 0, 255));
-        g_AllianceLevelRanges[i].desiredPercent = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Alliance.Range" + idx + ".Pct").c_str(), defaultPct, 0, 100));
+        g_AllianceLevelRanges[i].lower = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Alliance.Range" + idx + ".Lower").c_str(), defaultLower, 0, 255, config));
+        g_AllianceLevelRanges[i].upper = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Alliance.Range" + idx + ".Upper").c_str(), defaultUpper, 0, 255, config));
+        g_AllianceLevelRanges[i].desiredPercent = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Alliance.Range" + idx + ".Pct").c_str(), defaultPct, 0, 100, config));
 
-        g_HordeLevelRanges[i].lower = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Horde.Range" + idx + ".Lower").c_str(), defaultLower, 0, 255));
-        g_HordeLevelRanges[i].upper = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Horde.Range" + idx + ".Upper").c_str(), defaultUpper, 0, 255));
-        g_HordeLevelRanges[i].desiredPercent = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Horde.Range" + idx + ".Pct").c_str(), defaultPct, 0, 100));
+        g_HordeLevelRanges[i].lower = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Horde.Range" + idx + ".Lower").c_str(), defaultLower, 0, 255, config));
+        g_HordeLevelRanges[i].upper = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Horde.Range" + idx + ".Upper").c_str(), defaultUpper, 0, 255, config));
+        g_HordeLevelRanges[i].desiredPercent = static_cast<uint8>(ReadBoundedUInt(("BotLevelBrackets.Horde.Range" + idx + ".Pct").c_str(), defaultPct, 0, 100, config));
     }
 
     if (g_SyncFactions)
@@ -681,6 +711,12 @@ static void LoadBotLevelBracketsConfig()
     }
 
     ++g_ConfigGeneration;
+    // Recompute transient intents under the new configuration; durable level resets survive.
+    {
+        std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+        g_StatsTeleportCancelled += g_PendingTeleports.size();
+        g_PendingTeleports.clear();
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -791,9 +827,11 @@ static int GetLevelRangeIndex(uint8 level, uint8 teamID)
         for (uint32 i = 0; i < g_NumRanges; ++i)
         {
             for (uint32 lv = g_AllianceLevelRanges[i].lower; lv <= g_AllianceLevelRanges[i].upper && lv < 256; ++lv)
-                allianceLut[lv] = static_cast<int8>(i);
+                if (allianceLut[lv] == -1)
+                    allianceLut[lv] = static_cast<int8>(i);
             for (uint32 lv = g_HordeLevelRanges[i].lower; lv <= g_HordeLevelRanges[i].upper && lv < 256; ++lv)
-                hordeLut[lv] = static_cast<int8>(i);
+                if (hordeLut[lv] == -1)
+                    hordeLut[lv] = static_cast<int8>(i);
         }
         lutInit = true;
         lutGeneration = g_ConfigGeneration;
@@ -827,7 +865,18 @@ static std::vector<LevelRangeConfig> const* GetFactionRanges(Player const* bot)
 // TELEPORTATION SYSTEM & CAPITAL HUB DISPERSAL
 // -----------------------------------------------------------------------------
 
-static bool TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
+static bool DestinationIsInManagedHub(const TeleportDestination& dest)
+{
+    for (const auto& hub : s_HubAreas)
+    {
+        const float dx = dest.x - hub.cx, dy = dest.y - hub.cy, dz = dest.z - hub.cz;
+        if (dest.mapId == hub.mapId && dx * dx + dy * dy + dz * dz <= hub.radius * hub.radius)
+            return true;
+    }
+    return false;
+}
+
+static bool TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId, bool outsideHubs = false)
 {
     if (!bot || !bot->IsInWorld() || !g_TeleportOnLevelChange)
         return false;
@@ -847,12 +896,10 @@ static bool TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
     else
         return false;
 
-    int rangeIndex = GetLevelRangeIndex(newLevel, teamId);
-    if (rangeIndex < 0)
-        rangeIndex = 0;
+    const size_t levelZoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, zoneCount - 1);
 
     // Racial starter zone awareness for level 1-9 (bracket 0)
-    if (rangeIndex == 0)
+    if (newLevel < 10)
     {
         uint8 race = bot->GetRace();
         TeleportDestination racialDest{0, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -891,7 +938,9 @@ static bool TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
                 break;
         }
 
-        if (hasRacialDest)
+        // Some custom starter spheres overlap a managed capital. Hub evacuation
+        // must still leave the hub; ordinary level routing retains racial destinations.
+        if (hasRacialDest && (!outsideHubs || !DestinationIsInManagedHub(racialDest)))
         {
             bool ok = BotEngineAdapter::TeleportBot(bot, racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, racialDest.o);
             if (ok && g_BotDistFullDebugMode)
@@ -903,8 +952,10 @@ static bool TeleportBotToLevelZone(Player* bot, uint8 newLevel, uint8 teamId)
         }
     }
 
-    size_t targetIdx = std::min<size_t>(static_cast<size_t>(rangeIndex), zoneCount - 1);
+    size_t targetIdx = levelZoneIndex;
     const TeleportDestination& dest = zones[targetIdx];
+    if (DestinationIsInManagedHub(dest))
+        return false;
 
     bool ok = BotEngineAdapter::TeleportBot(bot, dest.mapId, dest.x, dest.y, dest.z, dest.o);
 
@@ -938,6 +989,7 @@ static bool EnqueuePendingTeleport(Player* bot, uint8 newLevel, uint8 teamId, Te
         entry.destZ       = 0.0f;
         entry.destO       = 0.0f;
         entry.source      = source;
+        entry.configGeneration = g_ConfigGeneration;
 
         g_PendingTeleports.emplace(bot->GetObjectGuid(), entry);
     }
@@ -972,6 +1024,7 @@ static bool EnqueuePendingHubTeleport(Player* bot, uint32 mapId, float x, float 
         entry.destZ       = z;
         entry.destO       = o;
         entry.source      = source;
+        entry.configGeneration = g_ConfigGeneration;
 
         g_PendingTeleports.emplace(bot->GetObjectGuid(), entry);
     }
@@ -1026,123 +1079,158 @@ static bool IsInAnyHub(const Player* bot)
     return false;
 }
 
-static void ProcessPendingTeleports()
+static bool IsTeleportEligible(Player* bot)
 {
-    struct TeleportCandidate
+    return bot && !ShouldExcludeBot(bot) && IsBotSafeForTeleport(bot);
+}
+
+static void SyncOwnedCityStrategies(Player* bot, bool inHub)
+{
+    auto it = g_CityStrategyOwners.find(bot->GetObjectGuid());
+    if (inHub)
     {
-        ObjectGuid           guid;
-        PendingTeleportEntry entry;
-    };
-
-    std::vector<TeleportCandidate> candidates;
-
-    {
-        std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
-        if (g_PendingTeleports.empty())
-            return;
-
-        uint32 now = static_cast<uint32>(time(nullptr));
-
-        for (auto it = g_PendingTeleports.begin(); it != g_PendingTeleports.end();)
+        if (g_ManageCityStrategies && it == g_CityStrategyOwners.end() &&
+            BotEngineAdapter::GetBotAI(bot))
         {
-            Player* bot = sObjectAccessor.FindPlayer(it->first);
-            if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
-            {
-                it = g_PendingTeleports.erase(it);
-                continue;
-            }
-
-            if (bot->IsBeingTeleported())
-            {
-                ++it;
-                continue;
-            }
-
-            if (!IsBotSafeForTeleport(bot))
-            {
-                if (g_PendingQueueTTL > 0 && (now - it->second.enqueuedAt) > g_PendingQueueTTL)
-                {
-                    if (g_BotDistFullDebugMode)
-                    {
-                        sLog.outString("[BotLevelBrackets] Bot '%s' pending teleport expired (TTL %us), dropping.",
-                            bot->GetName(), g_PendingQueueTTL);
-                    }
-                    it = g_PendingTeleports.erase(it);
-                }
-                else
-                    ++it;
-                continue;
-            }
-
-            candidates.push_back({it->first, it->second});
-            it = g_PendingTeleports.erase(it);
+            g_CityStrategyOwners.emplace(bot->GetObjectGuid(),
+                BotEngineAdapter::ApplyOwnedCityStrategies(bot, g_CityStripStrategies, g_CityStrategies));
+            ++g_StatsCityStrategyApplies;
         }
     }
-
-    for (const auto& cand : candidates)
+    else if (it != g_CityStrategyOwners.end() && g_WorldTeleportResetStrategies)
     {
-        Player* bot = sObjectAccessor.FindPlayer(cand.guid);
-        if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
+        BotEngineAdapter::RestoreOwnedCityStrategies(bot, it->second);
+        g_CityStrategyOwners.erase(it);
+        ++g_StatsCityStrategyRestores;
+    }
+}
+
+static void ProcessPendingTeleports()
+{
+    const uint32 wallNow = static_cast<uint32>(time(nullptr));
+    const int64 steadyNow = GetSteadySeconds();
+    std::vector<PendingTeleportEntry> ordered;
+    {
+        std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+        ordered.reserve(g_PendingTeleports.size());
+        for (const auto& item : g_PendingTeleports)
+            ordered.push_back(item.second);
+    }
+    // Oldest first; failed attempts move behind fresh work. GUID breaks timestamp ties.
+    std::sort(ordered.begin(), ordered.end(), [](const PendingTeleportEntry& a, const PendingTeleportEntry& b)
+    {
+        if (a.attempts != b.attempts) return a.attempts < b.attempts;
+        if (a.enqueuedAt != b.enqueuedAt) return a.enqueuedAt < b.enqueuedAt;
+        return a.botGuid.GetRawValue() < b.botGuid.GetRawValue();
+    });
+    uint32 attempted = 0;
+    for (auto entry : ordered)
+    {
+        Player* bot = sObjectAccessor.FindPlayer(entry.botGuid);
+        bool invalid = !g_TeleportOnLevelChange ||
+            (entry.source != TELEPORT_SOURCE_LEVEL_BRACKET && !g_HubDisperseEnabled) ||
+            entry.configGeneration != g_ConfigGeneration || !bot || !bot->IsInWorld() ||
+            ShouldExcludeBot(bot) ||
+            (g_PendingQueueTTL > 0 && wallNow >= entry.enqueuedAt && wallNow - entry.enqueuedAt > g_PendingQueueTTL);
+
+        // A03 & A10: Complete eligibility check, instance/dungeon revalidation, faction verification, and action context
+        if (!invalid && bot)
+        {
+            // 1. Instance / Dungeon / Raid / BG exclusion
+            if (bot->GetMap() && (bot->GetMap()->IsDungeon() || bot->GetMap()->IsRaid() || bot->GetMap()->IsBattleGround()))
+                invalid = true;
+
+            // 2. Faction & demand verification for hub refill destinations
+            if (!invalid && entry.useHubDest)
+            {
+                bool factionMatches = false;
+                int8 targetHub = -1;
+                for (size_t h = 0; h < s_NumHubAreas; ++h)
+                {
+                    if (s_HubAreas[h].mapId == entry.destMapId)
+                    {
+                        float dx = entry.destX - s_HubAreas[h].cx;
+                        float dy = entry.destY - s_HubAreas[h].cy;
+                        float dz = entry.destZ - s_HubAreas[h].cz;
+                        if ((dx * dx + dy * dy + dz * dz) <= (s_HubAreas[h].radius * 1.5f) * (s_HubAreas[h].radius * 1.5f))
+                        {
+                            targetHub = static_cast<int8>(h);
+                            if (s_HubAreas[h].teamId == bot->GetTeamId())
+                                factionMatches = true;
+                            break;
+                        }
+                    }
+                }
+                if (!factionMatches)
+                    invalid = true;
+                else if (targetHub >= 0 && IsInArea(bot, s_HubAreas[targetHub]))
+                    invalid = true;
+                else if (targetHub >= 0)
+                {
+                    uint32 factionTotal = 0;
+                    uint32 currentResidents = 0;
+                    for (const auto& kv : sObjectAccessor.GetPlayers())
+                    {
+                        Player* p = kv.second;
+                        if (!p || !p->IsInWorld() || !IsPlayerBot(p) || !IsPlayerRandomBot(p))
+                            continue;
+                        if (p->GetTeamId() == bot->GetTeamId())
+                            ++factionTotal;
+                        if (IsInArea(p, s_HubAreas[targetHub]))
+                            ++currentResidents;
+                    }
+                    uint32 quota = GetHubQuota(targetHub, factionTotal);
+                    if (currentResidents >= quota)
+                        invalid = true;
+                }
+            }
+
+            // 3. Action context verification for evacuation
+            if (!invalid && entry.source == TELEPORT_SOURCE_HUB && !entry.useHubDest)
+            {
+                if (!IsInAnyHub(bot))
+                    invalid = true;
+            }
+        }
+
+        if (invalid)
+        {
+            std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+            g_PendingTeleports.erase(entry.botGuid);
+            ++g_StatsTeleportCancelled;
             continue;
-
-        bool success = false;
-        if (cand.entry.useHubDest)
-        {
-            success = BotEngineAdapter::TeleportBot(bot, cand.entry.destMapId, cand.entry.destX, cand.entry.destY, cand.entry.destZ, cand.entry.destO);
-            if (success)
-            {
-                if (g_ManageCityStrategies)
-                {
-                    BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
-                }
-                if (g_BotDistFullDebugMode)
-                {
-                    sLog.outString("[BotLevelBrackets] Teleported bot '%s' to hub (Map %u, %.1f, %.1f, %.1f) - applied city strategies.",
-                        bot->GetName(), cand.entry.destMapId, cand.entry.destX, cand.entry.destY, cand.entry.destZ);
-                }
-            }
         }
-        else
-        {
-            success = TeleportBotToLevelZone(bot, cand.entry.newLevel, cand.entry.teamId);
-            if (success)
-            {
-                if (IsInAnyHub(bot))
-                {
-                    if (g_ManageCityStrategies)
-                    {
-                        BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
-                    }
-                    if (g_BotDistFullDebugMode)
-                    {
-                        sLog.outString("[BotLevelBrackets] Teleported bot '%s' (Lvl %u) to capital hub zone - applied city strategies.",
-                            bot->GetName(), cand.entry.newLevel);
-                    }
-                }
-                else
-                {
-                    if (g_WorldTeleportResetStrategies)
-                    {
-                        BotEngineAdapter::ResetDefaultStrategies(bot);
-                    }
-                    if (g_BotDistFullDebugMode)
-                    {
-                        sLog.outString("[BotLevelBrackets] Teleported bot '%s' (Lvl %u) out to world (source=%u) - reset NC & CO strategies to default.",
-                            bot->GetName(), cand.entry.newLevel, static_cast<uint32>(cand.entry.source));
-                    }
-                }
-            }
-        }
-
+        if (attempted >= g_TeleportExecutionLimit || entry.nextAttemptAt > steadyNow || !IsTeleportEligible(bot))
+            continue;
+        // A level reset supersedes the saved destination level; use current faction and level.
+        bool success = entry.useHubDest ?
+            BotEngineAdapter::TeleportBot(bot, entry.destMapId, entry.destX, entry.destY, entry.destZ, entry.destO) :
+            TeleportBotToLevelZone(bot, bot->GetLevel(), bot->GetTeamId(), entry.source == TELEPORT_SOURCE_HUB);
+        ++attempted;
+        ++entry.attempts;
         if (success)
         {
-            if (cand.entry.source == TELEPORT_SOURCE_HUB && g_HubDisperseCooldownSeconds > 0)
+            // Hub intent is explicit. Cross-map TeleportTo can complete on a later tick.
+            if (entry.useHubDest)
+                SyncOwnedCityStrategies(bot, true);
+            else
+                SyncOwnedCityStrategies(bot, false);
+            if (entry.source == TELEPORT_SOURCE_HUB && g_HubDisperseCooldownSeconds > 0)
             {
-                int64 steadyNow = GetSteadySeconds();
                 std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
-                g_HubBotCooldowns[cand.guid] = BotHubCooldownRecord{ steadyNow };
+                g_HubBotCooldowns[entry.botGuid] = BotHubCooldownRecord{steadyNow};
             }
             g_StatsBotsTeleported.fetch_add(1, std::memory_order_relaxed);
+        }
+        else
+            ++g_StatsTeleportFailures;
+        std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+        if (success || entry.attempts >= g_TeleportMaxAttempts)
+            g_PendingTeleports.erase(entry.botGuid);
+        else
+        {
+            entry.nextAttemptAt = steadyNow + 2 * entry.attempts;
+            g_PendingTeleports[entry.botGuid] = entry;
         }
     }
 }
@@ -1174,11 +1262,115 @@ static bool IsBotDispersable(Player* bot, const std::unordered_set<ObjectGuid>* 
     return true;
 }
 
+struct HubBotInfo
+{
+    Player* bot;
+    int8 hubIdx;
+    bool inStarting;
+};
+
+struct HubCensus
+{
+    uint32 alliance{0}, horde{0};
+    std::array<uint32, 8> residents{}, movable{}, inbound{}, outbound{};
+    std::vector<HubBotInfo> candidates;
+    std::array<std::vector<size_t>, 8> byHub;
+    std::array<std::vector<size_t>, 2> wildByFaction;
+};
+
+static int8 FindHub(Player* bot)
+{
+    for (size_t h = 0; h < s_NumHubAreas; ++h)
+        if (IsInArea(bot, s_HubAreas[h])) return static_cast<int8>(h);
+    return -1;
+}
+
+static HubCensus BuildHubCensus()
+{
+    HubCensus census;
+    std::unordered_map<ObjectGuid, PendingTeleportEntry> pending;
+    std::unordered_set<ObjectGuid> pendingGuids, pendingResets;
+    {
+        std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+        pending = g_PendingTeleports;
+        for (const auto& item : pending) pendingGuids.insert(item.first);
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
+        for (const auto& item : g_PendingLevelResets) pendingResets.insert(item.first);
+    }
+    const auto& players = sObjectAccessor.GetPlayers();
+    census.candidates.reserve(players.size());
+    for (const auto& item : players)
+    {
+        Player* bot = item.second;
+        if (!bot || !bot->IsInWorld() || !IsPlayerBot(bot) || !IsPlayerRandomBot(bot))
+            continue;
+        if (bot->GetTeamId() == TEAM_ALLIANCE) ++census.alliance;
+        else if (bot->GetTeamId() == TEAM_HORDE) ++census.horde;
+        else continue;
+        const int8 hub = FindHub(bot);
+        if (hub >= 0) ++census.residents[hub]; // Protected residents still occupy the city.
+        auto queued = pending.find(bot->GetObjectGuid());
+        if (queued != pending.end() && queued->second.configGeneration == g_ConfigGeneration &&
+            !ShouldExcludeBot(bot))
+        {
+            int8 destination = -1;
+            const auto& entry = queued->second;
+            if (entry.useHubDest)
+                for (size_t h = 0; h < s_NumHubAreas; ++h)
+                {
+                    const auto& area = s_HubAreas[h];
+                    const float dx = entry.destX - area.cx, dy = entry.destY - area.cy, dz = entry.destZ - area.cz;
+                    if (entry.teamId == area.teamId && entry.destMapId == area.mapId &&
+                        dx * dx + dy * dy + dz * dz <= area.radius * area.radius)
+                    { destination = static_cast<int8>(h); break; }
+                }
+            if (destination != hub)
+            {
+                if (hub >= 0) ++census.outbound[hub];
+                if (destination >= 0) ++census.inbound[destination];
+            }
+        }
+        if (!IsBotDispersable(bot, &pendingGuids) || pendingResets.count(bot->GetObjectGuid()))
+            continue;
+        bool starting = false;
+        for (const auto& area : s_StartingAreas)
+            if (IsInArea(bot, area)) { starting = true; break; }
+        if (hub >= 0)
+        {
+            census.byHub[hub].push_back(census.candidates.size());
+            if (IsBotSafeForTeleport(bot)) ++census.movable[hub];
+        }
+        if (hub < 0 && !starting)
+            census.wildByFaction[bot->GetTeamId() == TEAM_ALLIANCE ? 0 : 1].push_back(census.candidates.size());
+        census.candidates.push_back({bot, hub, starting});
+    }
+    return census;
+}
+
+static int32 EffectiveHubPopulation(const HubCensus& census, size_t hub)
+{
+    return static_cast<int32>(census.residents[hub] + census.inbound[hub]) -
+        static_cast<int32>(census.outbound[hub]);
+}
+
 static void ProcessHubPopulate()
 {
     if (!g_HubDisperseEnabled || !g_TeleportOnLevelChange)
         return;
 
+    const auto cycleStart = std::chrono::steady_clock::now();
+    struct CycleTimer
+    {
+        std::chrono::steady_clock::time_point start;
+        ~CycleTimer()
+        {
+            g_LastHubCycleMicros = static_cast<uint64>(std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - start).count());
+            g_MaxHubCycleMicros = std::max(g_MaxHubCycleMicros, g_LastHubCycleMicros);
+        }
+    } cycleTimer{cycleStart};
     int64 now = GetSteadySeconds();
 
     // Prune expired bot relocation cooldown entries
@@ -1198,116 +1390,12 @@ static void ProcessHubPopulate()
 
     uint32 processed = 0;
 
-    struct BotInfo {
-        Player* bot;
-        int8 hubIdx;
-        bool inStarting;
-    };
-
-    HashMapHolder<Player>::MapType const& players = sObjectAccessor.GetPlayers();
-    std::unordered_set<ObjectGuid> pendingTeleportGuids;
-    std::vector<uint32> pendingInbound(s_NumHubAreas, 0);
-    {
-        std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
-        for (const auto& kv : g_PendingTeleports)
-        {
-            pendingTeleportGuids.insert(kv.first);
-            const PendingTeleportEntry& entry = kv.second;
-            if (entry.useHubDest)
-            {
-                for (size_t h = 0; h < s_NumHubAreas; ++h)
-                {
-                    if (entry.destMapId == s_HubAreas[h].mapId)
-                    {
-                        float dx = entry.destX - s_HubAreas[h].cx;
-                        float dy = entry.destY - s_HubAreas[h].cy;
-                        float dz = entry.destZ - s_HubAreas[h].cz;
-                        if ((dx * dx + dy * dy + dz * dz) <= s_HubAreas[h].radius * s_HubAreas[h].radius)
-                        {
-                            ++pendingInbound[h];
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    std::vector<BotInfo> allBots;
-    allBots.reserve(players.size());
-    std::vector<uint32> hubCounts(s_NumHubAreas, 0);
-
-    for (const auto& itr : players)
-    {
-        Player* bot = itr.second;
-        if (!IsBotDispersable(bot, &pendingTeleportGuids))
-            continue;
-
-        BotInfo info{bot, -1, false};
-        for (size_t h = 0; h < s_NumHubAreas; ++h)
-        {
-            if (IsInArea(bot, s_HubAreas[h]))
-            {
-                info.hubIdx = static_cast<int8>(h);
-                ++hubCounts[h];
-                break;
-            }
-        }
-        for (size_t s = 0; s < s_NumStartingAreas; ++s)
-        {
-            if (IsInArea(bot, s_StartingAreas[s]))
-            {
-                info.inStarting = true;
-                break;
-            }
-        }
-        allBots.push_back(info);
-
-        // Active city strategy synchronization for bots residing in hubs:
-        if (g_ManageCityStrategies && info.hubIdx >= 0)
-        {
-            if (!BotEngineAdapter::HasStrategy(bot, "rpg"))
-            {
-                BotEngineAdapter::ApplyCityStrategies(bot, g_CityStripStrategies, g_CityStrategies);
-                if (g_BotDistFullDebugMode)
-                {
-                    sLog.outString("[BotLevelBrackets] HubPopulate: Residing bot '%s' in hub %d missing 'rpg' - applied city strategies.",
-                        bot->GetName(), info.hubIdx);
-                }
-            }
-        }
-        else if (g_WorldTeleportResetStrategies && info.hubIdx < 0)
-        {
-            // If the bot is out in the open world but still retains city-only strategies, reset both NC and CO
-            if (BotEngineAdapter::HasStrategy(bot, "sit") ||
-                BotEngineAdapter::HasStrategy(bot, "emote") ||
-                !BotEngineAdapter::HasStrategy(bot, "grind"))
-            {
-                BotEngineAdapter::ResetDefaultStrategies(bot);
-                if (g_BotDistFullDebugMode)
-                {
-                    sLog.outString("[BotLevelBrackets] HubPopulate: Wild bot '%s' outside hubs had stale city strategies - reset NC & CO strategies.",
-                        bot->GetName());
-                }
-            }
-        }
-    }
-
-    if (allBots.empty())
-        return;
-
-    uint32 totalAllianceBots = 0;
-    uint32 totalHordeBots    = 0;
-    for (const auto& itr : players)
-    {
-        Player* p = itr.second;
-        if (!p || !p->IsInWorld() || ShouldExcludeBot(p))
-            continue;
-        if (p->GetTeamId() == TEAM_ALLIANCE)
-            ++totalAllianceBots;
-        else if (p->GetTeamId() == TEAM_HORDE)
-            ++totalHordeBots;
-    }
+    HubCensus census = BuildHubCensus();
+    const auto& allBots = census.candidates;
+    const uint32 totalAllianceBots = census.alliance, totalHordeBots = census.horde;
+    for (const auto& info : allBots)
+        if (IsTeleportEligible(info.bot))
+            SyncOwnedCityStrategies(info.bot, info.hubIdx >= 0);
 
     struct HubEval
     {
@@ -1324,7 +1412,7 @@ static void ProcessHubPopulate()
         const HubArea& hub = s_HubAreas[hubIdx];
         uint32 factionTotal = (hub.teamId == TEAM_ALLIANCE) ? totalAllianceBots : totalHordeBots;
         uint32 quota = GetHubQuota(hubIdx, factionTotal);
-        int32 effectiveCount = static_cast<int32>(hubCounts[hubIdx] + pendingInbound[hubIdx]);
+        int32 effectiveCount = EffectiveHubPopulation(census, hubIdx);
         uint32 minimum = GetHubMinimum(quota);
 
         HubImbalanceDirection dir = HubImbalanceDirection::Neutral;
@@ -1375,27 +1463,25 @@ static void ProcessHubPopulate()
     }
 
     std::unordered_set<ObjectGuid> alreadyProcessed;
+    const size_t firstHub = g_NextHubStart;
+    g_NextHubStart = (g_NextHubStart + 1) % s_NumHubAreas;
 
     // Part A: Disperse wrong-level and excess bots from hubs
-    for (size_t hubIdx = 0; hubIdx < s_NumHubAreas && processed < g_HubDisperseBotsPerCycle; ++hubIdx)
+    for (size_t step = 0; step < s_NumHubAreas && processed < g_HubDisperseBotsPerCycle; ++step)
     {
+        const size_t hubIdx = (firstHub + step) % s_NumHubAreas;
         const HubArea& hub = s_HubAreas[hubIdx];
         const HubEval& eval = hubEvals[hubIdx];
 
-        std::vector<const BotInfo*> botsInHub;
-        botsInHub.reserve(30);
-
-        for (const auto& info : allBots)
-        {
-            if (info.hubIdx == static_cast<int8>(hubIdx))
-                botsInHub.push_back(&info);
-        }
+        std::vector<const HubBotInfo*> botsInHub;
+        for (size_t index : census.byHub[hubIdx])
+            botsInHub.push_back(&allBots[index]);
 
         if (botsInHub.empty())
             continue;
 
         // Disperse wrong-level bots (if configured on hub)
-        for (const BotInfo* info : botsInHub)
+        for (const HubBotInfo* info : botsInHub)
         {
             if (processed >= g_HubDisperseBotsPerCycle)
                 break;
@@ -1415,7 +1501,8 @@ static void ProcessHubPopulate()
             if (!IsBotSafeForTeleport(info->bot))
                 continue;
 
-            EnqueuePendingTeleport(info->bot, level, info->bot->GetTeamId(), TELEPORT_SOURCE_HUB);
+            if (!EnqueuePendingTeleport(info->bot, level, info->bot->GetTeamId(), TELEPORT_SOURCE_HUB))
+                continue;
             alreadyProcessed.insert(info->bot->GetObjectGuid());
             ++processed;
         }
@@ -1424,19 +1511,13 @@ static void ProcessHubPopulate()
         if (eval.dir != HubImbalanceDirection::Overpopulated || !eval.stabilityPermitted)
             continue;
 
-        uint32 remaining = 0;
-        for (const BotInfo* info : botsInHub)
-        {
-            if (alreadyProcessed.count(info->bot->GetObjectGuid()) > 0)
-                continue;
-            ++remaining;
-        }
-
-        if (remaining <= eval.quota)
+        int32 remaining = eval.effectiveCount;
+        for (const HubBotInfo* info : botsInHub)
+            if (alreadyProcessed.count(info->bot->GetObjectGuid())) --remaining;
+        if (remaining <= static_cast<int32>(eval.quota))
             continue;
-
-        uint32 toDisperse = remaining - eval.quota;
-        for (const BotInfo* info : botsInHub)
+        uint32 toDisperse = static_cast<uint32>(remaining) - eval.quota;
+        for (const HubBotInfo* info : botsInHub)
         {
             if (processed >= g_HubDisperseBotsPerCycle || toDisperse == 0)
                 break;
@@ -1452,7 +1533,8 @@ static void ProcessHubPopulate()
             if (!IsBotSafeForTeleport(info->bot))
                 continue;
 
-            EnqueuePendingTeleport(info->bot, info->bot->GetLevel(), info->bot->GetTeamId(), TELEPORT_SOURCE_HUB);
+            if (!EnqueuePendingTeleport(info->bot, info->bot->GetLevel(), info->bot->GetTeamId(), TELEPORT_SOURCE_HUB))
+                continue;
             alreadyProcessed.insert(info->bot->GetObjectGuid());
             ++processed;
             --toDisperse;
@@ -1460,8 +1542,9 @@ static void ProcessHubPopulate()
     }
 
     // Part B: Fill hubs below quota by pulling idle bots from the wild
-    for (size_t hubIdx = 0; hubIdx < s_NumHubAreas && processed < g_HubDisperseBotsPerCycle; ++hubIdx)
+    for (size_t step = 0; step < s_NumHubAreas && processed < g_HubDisperseBotsPerCycle; ++step)
     {
+        const size_t hubIdx = (firstHub + step) % s_NumHubAreas;
         const HubArea& hub = s_HubAreas[hubIdx];
         const HubEval& eval = hubEvals[hubIdx];
 
@@ -1482,7 +1565,8 @@ static void ProcessHubPopulate()
                 return false;
             }
 
-            if (!IsBotSafeForTeleport(candidateBot))
+            if (!IsBotSafeForTeleport(candidateBot) || (candidateBot->GetMap() &&
+                (candidateBot->GetMap()->IsDungeon() || candidateBot->GetMap()->IsRaid())))
                 return false;
 
             float angle  = static_cast<float>(rand_norm()) * 2.0f * static_cast<float>(M_PI);
@@ -1490,7 +1574,8 @@ static void ProcessHubPopulate()
             float dx = hub.cx + std::cos(angle) * offset;
             float dy = hub.cy + std::sin(angle) * offset;
 
-            EnqueuePendingHubTeleport(candidateBot, hub.mapId, dx, dy, hub.cz, angle, TELEPORT_SOURCE_HUB);
+            if (!EnqueuePendingHubTeleport(candidateBot, hub.mapId, dx, dy, hub.cz, angle, TELEPORT_SOURCE_HUB))
+                return false;
             alreadyProcessed.insert(candidateBot->GetObjectGuid());
             ++processed;
             --needed;
@@ -1498,8 +1583,9 @@ static void ProcessHubPopulate()
         };
 
         // Fill the lower target with eligible wild bots, regardless of bracket.
-        for (const auto& info : allBots)
+        for (size_t index : census.wildByFaction[hub.teamId == TEAM_ALLIANCE ? 0 : 1])
         {
+            const auto& info = allBots[index];
             if (processed >= g_HubDisperseBotsPerCycle || needed == 0)
                 break;
             if (alreadyProcessed.count(info.bot->GetObjectGuid()) > 0)
@@ -1562,7 +1648,8 @@ static void ProcessStartingZoneDisperse()
             if (!IsBotSafeForTeleport(bot))
                 break;
 
-            EnqueuePendingTeleport(bot, level, bot->GetTeamId(), TELEPORT_SOURCE_STARTING_ZONE);
+            if (!EnqueuePendingTeleport(bot, level, bot->GetTeamId(), TELEPORT_SOURCE_STARTING_ZONE))
+                break;
             ++processed;
             if (g_BotDistFullDebugMode)
             {
@@ -1610,7 +1697,8 @@ static void ProcessWrongMapDisperse()
         if (!IsBotSafeForTeleport(bot))
             continue;
 
-        EnqueuePendingTeleport(bot, bot->GetLevel(), bot->GetTeamId(), TELEPORT_SOURCE_WRONG_MAP);
+        if (!EnqueuePendingTeleport(bot, bot->GetLevel(), bot->GetTeamId(), TELEPORT_SOURCE_WRONG_MAP))
+            continue;
         ++processed;
         if (g_BotDistFullDebugMode)
         {
@@ -1684,18 +1772,38 @@ static void DeletePendingFromDB(ObjectGuid guid)
 static bool EnqueuePendingReset(ObjectGuid guid, int targetRange, uint8 teamId)
 {
     std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
-    if (g_MaxPendingQueueSize > 0 && g_PendingLevelResets.size() >= g_MaxPendingQueueSize)
+    // A15: Count active online jobs against capacity so retained offline jobs do not permanently lock the queue
+    if (g_MaxPendingQueueSize > 0)
     {
-        if (g_BotDistFullDebugMode || g_BotDistLiteDebugMode)
+        uint32 activeOnlineCount = 0;
+        for (const auto& kv : g_PendingLevelResets)
         {
-            sLog.outString("[BotLevelBrackets] Pending reset queue is full (%u/%u). Bot " UI64FMTD " not enqueued.",
-                (uint32)g_PendingLevelResets.size(), g_MaxPendingQueueSize, guid.GetRawValue());
+            Player* p = sObjectAccessor.FindPlayer(kv.first);
+            if (p && p->IsInWorld())
+                ++activeOnlineCount;
         }
-        return false;
+        if (activeOnlineCount >= g_MaxPendingQueueSize)
+        {
+            if (g_BotDistFullDebugMode || g_BotDistLiteDebugMode)
+            {
+                sLog.outString("[BotLevelBrackets] Pending reset queue active online limit reached (%u/%u). Bot " UI64FMTD " not enqueued.",
+                    activeOnlineCount, g_MaxPendingQueueSize, guid.GetRawValue());
+            }
+            return false;
+        }
+    }
+
+    // A09: Bind job to intended bracket level bounds to survive layout changes
+    uint8 minL = 0, maxL = 0;
+    std::vector<LevelRangeConfig> const* factionRanges = (teamId == TEAM_ALLIANCE ? &g_AllianceLevelRanges : &g_HordeLevelRanges);
+    if (factionRanges && targetRange >= 0 && static_cast<size_t>(targetRange) < factionRanges->size())
+    {
+        minL = (*factionRanges)[targetRange].lower;
+        maxL = (*factionRanges)[targetRange].upper;
     }
 
     uint32 now = static_cast<uint32>(time(nullptr));
-    auto res = g_PendingLevelResets.emplace(guid, PendingResetEntry{guid, targetRange, teamId, now});
+    auto res = g_PendingLevelResets.emplace(guid, PendingResetEntry{guid, targetRange, teamId, now, minL, maxL});
     if (!res.second)
     {
         if (g_BotDistFullDebugMode)
@@ -1707,18 +1815,6 @@ static bool EnqueuePendingReset(ObjectGuid guid, int targetRange, uint8 teamId)
         "REPLACE INTO bot_level_brackets_pending_resets (bot_guid, target_range, is_alliance, enqueued_at) VALUES (" UI64FMTD ", %d, %u, %u)",
         guid.GetRawValue(), targetRange, (teamId == TEAM_ALLIANCE ? 1 : 0), now);
     return true;
-}
-
-static void RemoveBotFromPendingResets(Player* bot)
-{
-    if (!bot)
-        return;
-    ObjectGuid guid = bot->GetObjectGuid();
-    {
-        std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
-        g_PendingLevelResets.erase(guid);
-    }
-    DeletePendingFromDB(guid);
 }
 
 static void LoadPendingResetsFromDB()
@@ -1740,7 +1836,14 @@ static void LoadPendingResetsFromDB()
 
         ObjectGuid guid(rawGuid);
         uint8 teamId = (isAlliance != 0) ? TEAM_ALLIANCE : TEAM_HORDE;
-        g_PendingLevelResets.emplace(guid, PendingResetEntry{guid, targetRange, teamId, enqueuedAt});
+        uint8 minL = 0, maxL = 0;
+        std::vector<LevelRangeConfig> const* factionRanges = (teamId == TEAM_ALLIANCE ? &g_AllianceLevelRanges : &g_HordeLevelRanges);
+        if (factionRanges && targetRange >= 0 && static_cast<size_t>(targetRange) < factionRanges->size())
+        {
+            minL = (*factionRanges)[targetRange].lower;
+            maxL = (*factionRanges)[targetRange].upper;
+        }
+        g_PendingLevelResets.emplace(guid, PendingResetEntry{guid, targetRange, teamId, enqueuedAt, minL, maxL});
     } while (result->NextRow());
 
     delete result;
@@ -1773,7 +1876,7 @@ static void ProcessPendingLevelResets()
             if (g_FlaggedProcessLimit > 0 && candidates.size() >= g_FlaggedProcessLimit)
                 break;
 
-            if (g_PendingQueueTTL > 0 && (now - it->second.enqueuedAt) > g_PendingQueueTTL)
+            if (g_PendingQueueTTL > 0 && now >= it->second.enqueuedAt && (now - it->second.enqueuedAt) > g_PendingQueueTTL)
             {
                 if (g_BotDistFullDebugMode)
                 {
@@ -1788,27 +1891,57 @@ static void ProcessPendingLevelResets()
             Player* bot = sObjectAccessor.FindPlayer(it->first);
             if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
             {
-                DeletePendingFromDB(it->first);
-                it = g_PendingLevelResets.erase(it);
+                ++it; // Durable work waits for login, subject to the configured TTL.
                 continue;
             }
 
-            if (IsBotExcluded(bot) ||
-                (g_IgnoreGuildBotsWithRealPlayers && BotInGuildWithRealPlayer(bot)) ||
-                (g_IgnoreFriendListed && BotInFriendList(bot)) ||
-                (g_IgnoreArenaTeamBots && BotInArenaTeam(bot)) ||
-                BotHasRealPlayerMaster(bot))
+            if (ShouldExcludeBot(bot))
             {
                 DeletePendingFromDB(it->first);
                 it = g_PendingLevelResets.erase(it);
                 continue;
             }
 
-            if (it->second.targetRange < 0 || static_cast<uint32>(it->second.targetRange) >= g_NumRanges)
+            const auto* ranges = GetFactionRanges(bot);
+            if (!ranges || it->second.targetRange < 0 || static_cast<uint32>(it->second.targetRange) >= ranges->size() ||
+                (*ranges)[it->second.targetRange].lower > (*ranges)[it->second.targetRange].upper)
             {
                 DeletePendingFromDB(it->first);
                 it = g_PendingLevelResets.erase(it);
                 continue;
+            }
+
+            // A09: If bracket layout shifted, ensure targetRange still matches the originally intended level bounds.
+            if (it->second.minLevel > 0 || it->second.maxLevel > 0)
+            {
+                const auto& currentTarget = (*ranges)[it->second.targetRange];
+                if (currentTarget.lower != it->second.minLevel || currentTarget.upper != it->second.maxLevel)
+                {
+                    int matchingRange = -1;
+                    for (size_t r = 0; r < ranges->size(); ++r)
+                    {
+                        if ((*ranges)[r].lower == it->second.minLevel && (*ranges)[r].upper == it->second.maxLevel)
+                        {
+                            matchingRange = static_cast<int>(r);
+                            break;
+                        }
+                    }
+                    if (matchingRange >= 0)
+                    {
+                        it->second.targetRange = matchingRange;
+                    }
+                    else
+                    {
+                        if (g_BotDistFullDebugMode)
+                        {
+                            sLog.outString("[BotLevelBrackets] Pending reset for bot " UI64FMTD " intended [%u..%u], which no longer exists. Dropping.",
+                                it->first.GetRawValue(), it->second.minLevel, it->second.maxLevel);
+                        }
+                        DeletePendingFromDB(it->first);
+                        it = g_PendingLevelResets.erase(it);
+                        continue;
+                    }
+                }
             }
 
             if (IsBotSafeForLevelReset(bot))
@@ -1831,12 +1964,16 @@ static void ProcessPendingLevelResets()
         if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
             continue;
 
+        if (ShouldExcludeBot(bot) || !IsBotSafeForLevelReset(bot))
+            continue;
         if (AdjustBotToRange(bot, cand.targetRange))
         {
             processed.push_back(cand.guid);
+            g_CityStrategyOwners.erase(cand.guid); // Provisioning replaced the AI's previous strategy state.
             g_StatsBotsAdjusted.fetch_add(1, std::memory_order_relaxed);
+            RemoveBotFromPendingTeleports(bot);
             if (g_TeleportOnLevelChange)
-                EnqueuePendingTeleport(bot, bot->GetLevel(), cand.teamId);
+                EnqueuePendingTeleport(bot, bot->GetLevel(), bot->GetTeamId());
         }
     }
 
@@ -1863,20 +2000,25 @@ static void LoadSocialFriendList()
         "INNER JOIN characters c ON c.guid = cs.guid "
         "WHERE (cs.flags & 1) <> 0");
 
-    std::unordered_set<uint32> tempSet;
-    if (result)
+    if (!result)
     {
-        do
-        {
-            Field* fields = result->Fetch();
-            uint32 friendGuid = fields[0].GetUInt32();
-            uint32 ownerAccount = fields[1].GetUInt32();
-            if (!BotEngineAdapter::IsInRandomAccountList(ownerAccount))
-                tempSet.insert(friendGuid);
-        } while (result->NextRow());
-
-        delete result;
+        // A12: Retain last-known-good cache if query fails or returns empty
+        if (g_BotDistFullDebugMode)
+            sLog.outString("[BotLevelBrackets] LoadSocialFriendList: query returned null; preserving cached protections.");
+        return;
     }
+
+    std::unordered_set<uint32> tempSet;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 friendGuid = fields[0].GetUInt32();
+        uint32 ownerAccount = fields[1].GetUInt32();
+        if (!BotEngineAdapter::IsInRandomAccountList(ownerAccount))
+            tempSet.insert(friendGuid);
+    } while (result->NextRow());
+
+    delete result;
 
     {
         std::lock_guard<std::mutex> lock(g_SocialDataMutex);
@@ -1890,7 +2032,7 @@ static void LoadSocialFriendList()
     }
 }
 
-static void LoadPersistentGuildTracker(bool force = false)
+static void LoadPersistentGuildTracker(bool force)
 {
     if (!force && !g_IgnoreGuildBotsWithRealPlayers)
         return;
@@ -1898,18 +2040,23 @@ static void LoadPersistentGuildTracker(bool force = false)
     QueryResult* result = CharacterDatabase.Query(
         "SELECT guild_id FROM bot_level_brackets_guild_tracker WHERE has_real_players = 1");
 
-    std::unordered_set<uint32> tempSet;
-    if (result)
+    if (!result)
     {
-        do
-        {
-            Field* fields = result->Fetch();
-            uint32 guildId = fields[0].GetUInt32();
-            tempSet.insert(guildId);
-        } while (result->NextRow());
-
-        delete result;
+        // A12: Retain last-known-good cache if query fails or returns empty
+        if (g_BotDistFullDebugMode)
+            sLog.outString("[BotLevelBrackets] LoadPersistentGuildTracker: query returned null; preserving cached guilds.");
+        return;
     }
+
+    std::unordered_set<uint32> tempSet;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 guildId = fields[0].GetUInt32();
+        tempSet.insert(guildId);
+    } while (result->NextRow());
+
+    delete result;
 
     {
         std::lock_guard<std::mutex> lock(g_SocialDataMutex);
@@ -1970,26 +2117,31 @@ static void CleanupGuildTracker()
 {
     LoadPersistentGuildTracker(true);
 
-    std::unordered_set<uint32> guildsWithHumanAccountMembers;
     QueryResult* members = CharacterDatabase.Query(
         "SELECT DISTINCT gm.guildid, c.account "
         "FROM guild_member gm "
         "INNER JOIN characters c ON c.guid = gm.guid "
         "INNER JOIN bot_level_brackets_guild_tracker t ON t.guild_id = gm.guildid "
         "WHERE t.has_real_players = 1");
-    if (members)
-    {
-        do
-        {
-            Field* fields = members->Fetch();
-            uint32 guildId = fields[0].GetUInt32();
-            uint32 accountId = fields[1].GetUInt32();
-            if (!BotEngineAdapter::IsInRandomAccountList(accountId))
-                guildsWithHumanAccountMembers.insert(guildId);
-        } while (members->NextRow());
 
-        delete members;
+    // A12: If query failed, abort destructive cleanup to prevent wiping all tracked guilds
+    if (!members)
+    {
+        sLog.outError("[BotLevelBrackets] CleanupGuildTracker: Query returned null (database error or empty result). Aborting cleanup.");
+        return;
     }
+
+    std::unordered_set<uint32> guildsWithHumanAccountMembers;
+    do
+    {
+        Field* fields = members->Fetch();
+        uint32 guildId = fields[0].GetUInt32();
+        uint32 accountId = fields[1].GetUInt32();
+        if (!BotEngineAdapter::IsInRandomAccountList(accountId))
+            guildsWithHumanAccountMembers.insert(guildId);
+    } while (members->NextRow());
+
+    delete members;
 
     std::vector<uint32> guildsToRemove;
     {
@@ -2315,26 +2467,29 @@ static void RunDistributionCycle(ChatHandler* handler)
         Player* player = itr.second;
         if (!player || !player->IsInWorld() || ShouldExcludeBot(player))
             continue;
-
-        if (IsAlliancePlayerBot(player))
+        const bool alliance = IsAlliancePlayerBot(player);
+        if (!alliance && !IsHordePlayerBot(player)) continue;
+        auto& counts = alliance ? allianceActualCounts : hordeActualCounts;
+        auto& byRange = alliance ? allianceBotsByRange : hordeBotsByRange;
+        uint32& total = alliance ? totalAllianceBots : totalHordeBots;
+        int rangeIdx = GetOrFlagPlayerBracket(player);
+        bool pending = false;
         {
-            totalAllianceBots++;
-            int rangeIdx = GetOrFlagPlayerBracket(player);
-            if (rangeIdx >= 0)
+            std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
+            auto it = g_PendingLevelResets.find(player->GetObjectGuid());
+            if (it != g_PendingLevelResets.end() && it->second.targetRange >= 0 &&
+                static_cast<uint32>(it->second.targetRange) < g_NumRanges)
             {
-                allianceActualCounts[rangeIdx]++;
-                allianceBotsByRange[rangeIdx].push_back(player);
+                const auto& ranges = alliance ? g_AllianceLevelRanges : g_HordeLevelRanges;
+                if (ranges[it->second.targetRange].lower <= ranges[it->second.targetRange].upper)
+                { rangeIdx = it->second.targetRange; pending = true; }
             }
         }
-        else if (IsHordePlayerBot(player))
+        ++total;
+        if (rangeIdx >= 0)
         {
-            totalHordeBots++;
-            int rangeIdx = GetOrFlagPlayerBracket(player);
-            if (rangeIdx >= 0)
-            {
-                hordeActualCounts[rangeIdx]++;
-                hordeBotsByRange[rangeIdx].push_back(player);
-            }
+            ++counts[rangeIdx];
+            if (!pending) byRange[rangeIdx].push_back(player);
         }
     }
 
@@ -2408,11 +2563,18 @@ public:
 
     void OnUpdate(uint32 diff) override
     {
-        if (!g_BotLevelBracketsEnabled || BotEngineAdapter::IsRandomLevelsDisabled())
+        DrainBotBracketsCommands();
+        if (!g_BotLevelBracketsEnabled)
             return;
 
-        m_timer             += diff;
-        m_flaggedTimer      += diff;
+        // A16: IsRandomLevelsDisabled only pauses level redistribution passes,
+        // allowing hub population, teleports, and social/guild updates to continue.
+        const bool randomLevelsDisabled = BotEngineAdapter::IsRandomLevelsDisabled();
+        if (!randomLevelsDisabled)
+        {
+            m_timer        += diff;
+            m_flaggedTimer += diff;
+        }
         m_guildTrackerTimer += diff;
         m_socialListTimer   += diff;
         m_teleportTimer     += diff;
@@ -2529,10 +2691,17 @@ public:
 
     void OnLogout(Player* player) override
     {
-        RemoveBotFromPendingResets(player);
+        // Saved resets survive logout; teleport intents are transient.
         RemoveBotFromPendingTeleports(player);
         if (player)
         {
+            {
+                std::lock_guard<std::mutex> lock(g_CommandMutex);
+                const ObjectGuid guid = player->GetObjectGuid();
+                g_LoggedOutGuids.insert(guid);
+                g_PendingCommands.erase(std::remove_if(g_PendingCommands.begin(), g_PendingCommands.end(),
+                    [guid](const PendingCommand& command) { return command.requester == guid; }), g_PendingCommands.end());
+            }
             std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
             g_HubBotCooldowns.erase(player->GetObjectGuid());
         }
@@ -2623,298 +2792,324 @@ public:
 
     bool CanExecuteCommand(ChatHandler* handler, char const* command, char const* args) override
     {
-        if (!handler || !command)
+        if (!command) return true;
+        std::string root = command;
+        ToLowerInPlace(root);
+        if (root != "blb" && root != "botbrackets" && root != "botlevelbrackets")
             return true;
-
-        std::string rootCommand = command;
-        ToLowerInPlace(rootCommand);
-        if (rootCommand != "blb" && rootCommand != "botbrackets" && rootCommand != "botlevelbrackets")
-            return true;
-
-        std::string subcommand = args ? args : "";
-        size_t first = subcommand.find_first_not_of(' ');
-        if (first == std::string::npos)
-            subcommand.clear();
-        else
-        {
-            subcommand.erase(0, first);
-            size_t end = subcommand.find(' ');
-            if (end != std::string::npos)
-                subcommand.erase(end);
-            ToLowerInPlace(subcommand);
-        }
-
+        if (!handler) return false;
         WorldSession* session = handler->GetSession();
-        auto hasSecurity = [session](AccountTypes security)
+        Player* requester = session ? session->GetPlayer() : nullptr;
+        if (!requester) // Console/RA handlers run on the world thread.
+            return ExecuteBotBracketsCommand(handler, args);
+        if (session->GetSecurity() < SEC_MODERATOR)
         {
-            return !session || session->GetSecurity() >= security;
-        };
-
-        if (subcommand == "reload")
-        {
-            if (!hasSecurity(SEC_ADMINISTRATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            LoadBotLevelBracketsConfig();
-            handler->SendSysMessage("[BotBrackets] Configuration reloaded successfully.");
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
         }
-        else if (subcommand == "cleanup" || subcommand == "guildcleanup")
-        {
-            if (!hasSecurity(SEC_ADMINISTRATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            size_t before;
-            {
-                std::lock_guard<std::mutex> lock(g_SocialDataMutex);
-                before = g_PersistentRealPlayerGuildIds.size();
-            }
-            CleanupGuildTracker();
-            size_t after;
-            {
-                std::lock_guard<std::mutex> lock(g_SocialDataMutex);
-                after = g_PersistentRealPlayerGuildIds.size();
-            }
-            handler->PSendSysMessage("[BotBrackets] Guild cleanup complete. Removed %u guild(s). %u guild(s) remain tracked.",
-                (uint32)(before - after), (uint32)after);
-        }
-        else if (subcommand == "force")
-        {
-            if (!hasSecurity(SEC_ADMINISTRATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            handler->SendSysMessage("[BotBrackets] Forcing full distribution cycle...");
-            RunDistributionCycle(handler);
-            handler->SendSysMessage("[BotBrackets] Full distribution cycle complete.");
-        }
-        else if (subcommand == "status")
-        {
-            if (!hasSecurity(SEC_MODERATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            if (!g_BotLevelBracketsEnabled)
-            {
-                handler->SendSysMessage("[BotBrackets] Module is disabled.");
-                return false;
-            }
-
-            uint32 totalAlliance = 0, totalHorde = 0;
-            std::vector<int> allianceCounts(g_NumRanges, 0);
-            std::vector<int> hordeCounts(g_NumRanges, 0);
-
-            HashMapHolder<Player>::MapType const& allPlayers = sObjectAccessor.GetPlayers();
-            for (const auto& itr : allPlayers)
-            {
-                Player* player = itr.second;
-                if (!player || !player->IsInWorld() || ShouldExcludeBot(player))
-                    continue;
-
-                int rangeIndex = GetLevelRangeIndex(player->GetLevel(), player->GetTeamId());
-                if (IsAlliancePlayerBot(player))
-                {
-                    totalAlliance++;
-                    if (rangeIndex >= 0) allianceCounts[rangeIndex]++;
-                }
-                else if (IsHordePlayerBot(player))
-                {
-                    totalHorde++;
-                    if (rangeIndex >= 0) hordeCounts[rangeIndex]++;
-                }
-            }
-
-            handler->PSendSysMessage("[BotBrackets] Status (%s) - Alliance: %u bots, Horde: %u bots",
-                BotEngineAdapter::GetEngineName(), totalAlliance, totalHorde);
-            handler->SendSysMessage("Idx  Range    A.Des  A.Act  H.Des  H.Act");
-
-            for (uint32 i = 0; i < g_NumRanges; ++i)
-            {
-                int aDes = (totalAlliance > 0)
-                    ? static_cast<int>(std::round((g_AllianceLevelRanges[i].desiredPercent / 100.0) * totalAlliance))
-                    : 0;
-                int hDes = (totalHorde > 0)
-                    ? static_cast<int>(std::round((g_HordeLevelRanges[i].desiredPercent / 100.0) * totalHorde))
-                    : 0;
-
-                handler->PSendSysMessage("%-4u %2u-%-5u %-6d %-6d %-6d %-6d",
-                    i + 1,
-                    g_AllianceLevelRanges[i].lower,
-                    g_AllianceLevelRanges[i].upper,
-                    aDes,
-                    allianceCounts[i],
-                    hDes,
-                    hordeCounts[i]);
-            }
-
-            size_t pendingResets = 0, pendingTeleports = 0;
-            {
-                std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
-                pendingResets = g_PendingLevelResets.size();
-            }
-            {
-                std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
-                pendingTeleports = g_PendingTeleports.size();
-            }
-            handler->PSendSysMessage("[BotBrackets] Pending Resets: %u, Pending Teleports: %u",
-                (uint32)pendingResets, (uint32)pendingTeleports);
-            handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Safeguards (Hysteresis:%u bots, Stability:%us, Cooldown:%us)",
-                (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
-                g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
-            handler->PSendSysMessage("[BotBrackets] Hub Population Limits: %s, Min=%u, Max=%u per hub",
-                (g_HubDispersePopulationLimitsEnabled ? "Enabled" : "Disabled"), g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
-            handler->PSendSysMessage("[BotBrackets] Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
-                GetHubQuota(0, totalAlliance), GetHubQuota(1, totalAlliance), GetHubQuota(2, totalAlliance), GetHubQuota(3, totalAlliance),
-                GetHubQuota(4, totalHorde), GetHubQuota(5, totalHorde), GetHubQuota(6, totalHorde), GetHubQuota(7, totalHorde));
-        }
-        else if (subcommand == "pending")
-        {
-            if (!hasSecurity(SEC_MODERATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            size_t resetQueueSize = 0, teleportQueueSize = 0;
-            uint32 oldest = std::numeric_limits<uint32>::max();
-            uint32 newest = 0;
-            {
-                std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
-                resetQueueSize = g_PendingLevelResets.size();
-                for (const auto& kv : g_PendingLevelResets)
-                {
-                    if (kv.second.enqueuedAt < oldest) oldest = kv.second.enqueuedAt;
-                    if (kv.second.enqueuedAt > newest) newest = kv.second.enqueuedAt;
-                }
-            }
-            {
-                std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
-                teleportQueueSize = g_PendingTeleports.size();
-            }
-
-            handler->PSendSysMessage("[BotBrackets] Pending Resets Queue: %u entries (Cap: %u, TTL: %us)",
-                (uint32)resetQueueSize, g_MaxPendingQueueSize, g_PendingQueueTTL);
-            handler->PSendSysMessage("[BotBrackets] Pending Teleports Queue: %u entries", (uint32)teleportQueueSize);
-
-            if (resetQueueSize > 0)
-            {
-                uint32 now = static_cast<uint32>(time(nullptr));
-                handler->PSendSysMessage("[BotBrackets] Oldest reset: %us ago. Newest reset: %us ago.",
-                    now - oldest, now - newest);
-            }
-        }
-        else if (subcommand == "stats")
-        {
-            if (!hasSecurity(SEC_MODERATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            handler->SendSysMessage("[BotBrackets] Cumulative Statistics Since Startup:");
-            handler->PSendSysMessage("  Cycles Run:        %u", (uint32)g_StatsCyclesRun.load());
-            handler->PSendSysMessage("  Bots Adjusted:     %u", (uint32)g_StatsBotsAdjusted.load());
-            handler->PSendSysMessage("  Bots Teleported:   %u", (uint32)g_StatsBotsTeleported.load());
-            handler->PSendSysMessage("  Bots Skipped:      %u", (uint32)g_StatsBotsSkipped.load());
-            handler->PSendSysMessage("  Cooldown Skips:    %u", (uint32)g_StatsCooldownSkips.load());
-
-            size_t resetCount = 0, teleportCount = 0, cooldownCount = 0;
-            {
-                std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
-                resetCount = g_PendingLevelResets.size();
-            }
-            {
-                std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
-                teleportCount = g_PendingTeleports.size();
-            }
-            {
-                std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
-                cooldownCount = g_HubBotCooldowns.size();
-            }
-            handler->PSendSysMessage("  Active Queue:      Resets=%u, Teleports=%u, BotCooldowns=%u",
-                (uint32)resetCount, (uint32)teleportCount, (uint32)cooldownCount);
-        }
-        else if (subcommand == "hubs" || subcommand == "hub")
-        {
-            if (!hasSecurity(SEC_MODERATOR))
-            {
-                handler->SendSysMessage("You are not allowed to do that.");
-                return false;
-            }
-
-            uint32 totalAlliance = 0, totalHorde = 0;
-            HashMapHolder<Player>::MapType const& allPlayers = sObjectAccessor.GetPlayers();
-            for (const auto& itr : allPlayers)
-            {
-                Player* player = itr.second;
-                if (!player || !player->IsInWorld() || ShouldExcludeBot(player))
-                    continue;
-                if (IsAlliancePlayerBot(player))
-                    totalAlliance++;
-                else if (IsHordePlayerBot(player))
-                    totalHorde++;
-            }
-
-            static const char* hubNames[8] = {
-                "Stormwind", "Ironforge", "Darnassus", "Alah'Thalas",
-                "Orgrimmar", "Undercity", "Thunder Bluff", "Sparkwater"
-            };
-
-            int64 now = GetSteadySeconds();
-            handler->PSendSysMessage("[BotBrackets] Capital Hub Diagnostics (Hysteresis: %u bots, Stability: %us, Cooldown: %us | Min/Max per Hub: %u/%u):",
-                g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds,
-                g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
-            handler->SendSysMessage("Hub            Team  Min/Max EffPop  State           Duration  Status");
-
-            for (size_t i = 0; i < s_NumHubAreas; ++i)
-            {
-                uint32 factionTotal = (s_HubAreas[i].teamId == TEAM_ALLIANCE) ? totalAlliance : totalHorde;
-                uint32 quota = GetHubQuota(i, factionTotal);
-                const HubStabilityRecord& stab = g_HubStability[i];
-
-                const char* stateStr = "Neutral";
-                if (stab.currentDirection == HubImbalanceDirection::Underpopulated)
-                    stateStr = "Deficit";
-                else if (stab.currentDirection == HubImbalanceDirection::Overpopulated)
-                    stateStr = "Surplus";
-
-                int64 duration = (stab.imbalanceStartTime > 0) ? (now - stab.imbalanceStartTime) : 0;
-                const char* statusStr = "Balanced";
-                if (stab.currentDirection != HubImbalanceDirection::Neutral)
-                {
-                    if (duration >= static_cast<int64>(g_HubDisperseStabilitySeconds))
-                        statusStr = "Actionable";
-                    else
-                        statusStr = "Waiting";
-                }
-
-                handler->PSendSysMessage("%-14s %-5s %u/%u %-7d %-15s %-9d %s",
-                    hubNames[i],
-                    (s_HubAreas[i].teamId == TEAM_ALLIANCE ? "Alli" : "Horde"),
-                    GetHubMinimum(quota), quota,
-                    stab.lastEffectivePopulation,
-                    stateStr,
-                    (int32)duration,
-                    statusStr);
-            }
-        }
+        std::lock_guard<std::mutex> lock(g_CommandMutex);
+        if (g_PendingCommands.size() >= kCommandQueueLimit)
+            handler->SendSysMessage("[BotBrackets] Command queue full; try again shortly.");
+        else if (args && std::strlen(args) > 1024)
+            handler->SendSysMessage("[BotBrackets] Command is too long.");
         else
-        {
-            handler->SendSysMessage("Usage: .blb <reload | status | force | pending | cleanup | stats | hubs>");
-        }
-
+            g_PendingCommands.push_back({requester->GetObjectGuid(), args ? args : ""});
         return false;
     }
 };
+
+static bool ExecuteBotBracketsCommand(ChatHandler* handler, char const* args)
+{
+    std::string subcommand = args ? args : "";
+    size_t first = subcommand.find_first_not_of(' ');
+    if (first == std::string::npos)
+        subcommand.clear();
+    else
+    {
+        subcommand.erase(0, first);
+        size_t end = subcommand.find(' ');
+        if (end != std::string::npos)
+            subcommand.erase(end);
+        ToLowerInPlace(subcommand);
+    }
+
+    WorldSession* session = handler->GetSession();
+    auto hasSecurity = [session](AccountTypes security)
+    {
+        return !session || session->GetSecurity() >= security;
+    };
+
+    if (subcommand == "reload")
+    {
+        if (!hasSecurity(SEC_ADMINISTRATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        Config freshConfig;
+        if (!freshConfig.SetSource(sConfig.GetFilename().c_str()) || !freshConfig.LoadModulesConfigs())
+        {
+            handler->SendSysMessage("[BotBrackets] Configuration reload failed; check the server log.");
+            return false;
+        }
+        LoadBotLevelBracketsConfig(freshConfig);
+        LoadSocialFriendList();
+        LoadPersistentGuildTracker();
+        handler->SendSysMessage("[BotBrackets] Configuration reloaded successfully.");
+    }
+    else if (subcommand == "cleanup" || subcommand == "guildcleanup")
+    {
+        if (!hasSecurity(SEC_ADMINISTRATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        size_t before;
+        {
+            std::lock_guard<std::mutex> lock(g_SocialDataMutex);
+            before = g_PersistentRealPlayerGuildIds.size();
+        }
+        CleanupGuildTracker();
+        size_t after;
+        {
+            std::lock_guard<std::mutex> lock(g_SocialDataMutex);
+            after = g_PersistentRealPlayerGuildIds.size();
+        }
+        handler->PSendSysMessage("[BotBrackets] Guild cleanup complete. Removed %u guild(s). %u guild(s) remain tracked.",
+            (uint32)(before - after), (uint32)after);
+    }
+    else if (subcommand == "force")
+    {
+        if (!hasSecurity(SEC_ADMINISTRATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        handler->SendSysMessage("[BotBrackets] Forcing full distribution cycle...");
+        RunDistributionCycle(handler);
+        handler->SendSysMessage("[BotBrackets] Full distribution cycle complete.");
+    }
+    else if (subcommand == "status")
+    {
+        if (!hasSecurity(SEC_MODERATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        if (!g_BotLevelBracketsEnabled)
+        {
+            handler->SendSysMessage("[BotBrackets] Module is disabled.");
+            return false;
+        }
+
+        uint32 totalAlliance = 0, totalHorde = 0;
+        std::vector<int> allianceCounts(g_NumRanges, 0);
+        std::vector<int> hordeCounts(g_NumRanges, 0);
+
+        HashMapHolder<Player>::MapType const& allPlayers = sObjectAccessor.GetPlayers();
+        for (const auto& itr : allPlayers)
+        {
+            Player* player = itr.second;
+            if (!player || !player->IsInWorld() || ShouldExcludeBot(player))
+                continue;
+
+            int rangeIndex = GetLevelRangeIndex(player->GetLevel(), player->GetTeamId());
+            if (IsAlliancePlayerBot(player))
+            {
+                totalAlliance++;
+                if (rangeIndex >= 0) allianceCounts[rangeIndex]++;
+            }
+            else if (IsHordePlayerBot(player))
+            {
+                totalHorde++;
+                if (rangeIndex >= 0) hordeCounts[rangeIndex]++;
+            }
+        }
+
+        handler->PSendSysMessage("[BotBrackets] Status (%s) - Alliance: %u bots, Horde: %u bots",
+            BotEngineAdapter::GetEngineName(), totalAlliance, totalHorde);
+        handler->SendSysMessage("Idx  Range    A.Des  A.Act  H.Des  H.Act");
+
+        const auto allianceDesired = CalculateDesiredCounts(totalAlliance, g_AllianceLevelRanges);
+        const auto hordeDesired = CalculateDesiredCounts(totalHorde, g_HordeLevelRanges);
+        for (uint32 i = 0; i < g_NumRanges; ++i)
+        {
+            int aDes = allianceDesired[i];
+            int hDes = hordeDesired[i];
+
+            handler->PSendSysMessage("%-4u %2u-%-5u %-6d %-6d %-6d %-6d",
+                i + 1,
+                g_AllianceLevelRanges[i].lower,
+                g_AllianceLevelRanges[i].upper,
+                aDes,
+                allianceCounts[i],
+                hDes,
+                hordeCounts[i]);
+        }
+
+        size_t pendingResets = 0, pendingTeleports = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
+            pendingResets = g_PendingLevelResets.size();
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+            pendingTeleports = g_PendingTeleports.size();
+        }
+        handler->PSendSysMessage("[BotBrackets] Pending Resets: %u, Pending Teleports: %u",
+            (uint32)pendingResets, (uint32)pendingTeleports);
+        handler->PSendSysMessage("[BotBrackets] Hub Mode: %s | Safeguards (Hysteresis:%u bots, Stability:%us, Cooldown:%us)",
+            (g_HubDisperseQuotaMode == 1 ? "Headcount" : "Percentage"),
+            g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
+        handler->PSendSysMessage("[BotBrackets] Hub Population Limits: %s, Min=%u, Max=%u per hub",
+            (g_HubDispersePopulationLimitsEnabled ? "Enabled" : "Disabled"), g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub);
+        const HubCensus hubCensus = BuildHubCensus();
+        handler->PSendSysMessage("[BotBrackets] Hub denominator (online random bots): Alliance=%u, Horde=%u",
+            hubCensus.alliance, hubCensus.horde);
+        handler->PSendSysMessage("[BotBrackets] Quotas (SW:%u IF:%u DA:%u AT:%u | OR:%u UC:%u TB:%u SP:%u)",
+            GetHubQuota(0, hubCensus.alliance), GetHubQuota(1, hubCensus.alliance), GetHubQuota(2, hubCensus.alliance), GetHubQuota(3, hubCensus.alliance),
+            GetHubQuota(4, hubCensus.horde), GetHubQuota(5, hubCensus.horde), GetHubQuota(6, hubCensus.horde), GetHubQuota(7, hubCensus.horde));
+    }
+    else if (subcommand == "pending")
+    {
+        if (!hasSecurity(SEC_MODERATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        size_t resetQueueSize = 0, teleportQueueSize = 0;
+        uint32 oldest = std::numeric_limits<uint32>::max();
+        uint32 newest = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
+            resetQueueSize = g_PendingLevelResets.size();
+            for (const auto& kv : g_PendingLevelResets)
+            {
+                if (kv.second.enqueuedAt < oldest) oldest = kv.second.enqueuedAt;
+                if (kv.second.enqueuedAt > newest) newest = kv.second.enqueuedAt;
+            }
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+            teleportQueueSize = g_PendingTeleports.size();
+        }
+
+        handler->PSendSysMessage("[BotBrackets] Pending Resets Queue: %u entries (Cap: %u, TTL: %us)",
+            (uint32)resetQueueSize, g_MaxPendingQueueSize, g_PendingQueueTTL);
+        handler->PSendSysMessage("[BotBrackets] Pending Teleports Queue: %u entries", (uint32)teleportQueueSize);
+
+        if (resetQueueSize > 0)
+        {
+            uint32 now = static_cast<uint32>(time(nullptr));
+            handler->PSendSysMessage("[BotBrackets] Oldest reset: %us ago. Newest reset: %us ago.",
+                now - oldest, now - newest);
+        }
+    }
+    else if (subcommand == "stats")
+    {
+        if (!hasSecurity(SEC_MODERATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        handler->SendSysMessage("[BotBrackets] Cumulative Statistics Since Startup:");
+        handler->PSendSysMessage("  Cycles Run:        %u", (uint32)g_StatsCyclesRun.load());
+        handler->PSendSysMessage("  Bots Adjusted:     %u", (uint32)g_StatsBotsAdjusted.load());
+        handler->PSendSysMessage("  Bots Teleported:   %u", (uint32)g_StatsBotsTeleported.load());
+        handler->PSendSysMessage("  Bots Skipped:      %u", (uint32)g_StatsBotsSkipped.load());
+        handler->PSendSysMessage("  Cooldown Skips:    %u", (uint32)g_StatsCooldownSkips.load());
+        handler->PSendSysMessage("  Teleport failures=" UI64FMTD ", cancelled=" UI64FMTD ", execution limit=%u, max attempts=%u",
+            g_StatsTeleportFailures, g_StatsTeleportCancelled, g_TeleportExecutionLimit, g_TeleportMaxAttempts);
+        handler->PSendSysMessage("  City strategy applies=" UI64FMTD ", restores=" UI64FMTD ", owned bots=%u",
+            g_StatsCityStrategyApplies, g_StatsCityStrategyRestores, (uint32)g_CityStrategyOwners.size());
+        handler->PSendSysMessage("  Hub cycle last/max microseconds=" UI64FMTD "/" UI64FMTD,
+            g_LastHubCycleMicros, g_MaxHubCycleMicros);
+
+        size_t resetCount = 0, teleportCount = 0, cooldownCount = 0;
+        {
+            std::lock_guard<std::mutex> lock(g_PendingLevelResetsMutex);
+            resetCount = g_PendingLevelResets.size();
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_PendingTeleportsMutex);
+            teleportCount = g_PendingTeleports.size();
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_HubCooldownMutex);
+            cooldownCount = g_HubBotCooldowns.size();
+        }
+        handler->PSendSysMessage("  Active Queue:      Resets=%u, Teleports=%u, BotCooldowns=%u",
+            (uint32)resetCount, (uint32)teleportCount, (uint32)cooldownCount);
+    }
+    else if (subcommand == "hubs" || subcommand == "hub")
+    {
+        if (!hasSecurity(SEC_MODERATOR))
+        {
+            handler->SendSysMessage("You are not allowed to do that.");
+            return false;
+        }
+
+        const HubCensus census = BuildHubCensus();
+        static const char* hubNames[8] = {
+            "Stormwind", "Ironforge", "Darnassus", "Alah'Thalas",
+            "Orgrimmar", "Undercity", "Thunder Bluff", "Sparkwater"
+        };
+        handler->PSendSysMessage("[BotBrackets] Hub mode=%u, bounds=%s, Min=%u, Max=%u; online random bots A=%u H=%u",
+            g_HubDisperseQuotaMode, g_HubDispersePopulationLimitsEnabled ? "on" : "off",
+            g_HubDisperseMinBotsPerHub, g_HubDisperseMaxBotsPerHub, census.alliance, census.horde);
+        handler->SendSysMessage("City: value / raw / target | residents / movable / pending-in / pending-out / effective");
+        for (size_t h = 0; h < s_NumHubAreas; ++h)
+        {
+            uint32 total = s_HubAreas[h].teamId == TEAM_ALLIANCE ? census.alliance : census.horde;
+            uint32 value = static_cast<uint32>(std::max(0, g_HubCityPcts[h]));
+            uint32 raw = g_HubDisperseQuotaMode == 1 ? value :
+                static_cast<uint32>((static_cast<uint64>(total) * value + 50) / 100);
+            handler->PSendSysMessage("%s: %u / %u / %u | %u / %u / %u / %u / %d",
+                hubNames[h], value, raw, GetHubQuota(h, total), census.residents[h], census.movable[h],
+                census.inbound[h], census.outbound[h], EffectiveHubPopulation(census, h));
+        }
+        handler->PSendSysMessage("[BotBrackets] Hysteresis=%u bots, stability=%us, cooldown=%us. Protected residents count but cannot move.",
+            g_HubDisperseHysteresisBots, g_HubDisperseStabilitySeconds, g_HubDisperseCooldownSeconds);
+    }
+    else
+    {
+        handler->SendSysMessage("Usage: .blb <reload | status | force | pending | cleanup | stats | hubs>");
+    }
+
+    return false;
+}
+
+static void DrainBotBracketsCommands()
+{
+    std::deque<PendingCommand> commands;
+    std::unordered_set<ObjectGuid> loggedOut;
+    {
+        std::lock_guard<std::mutex> lock(g_CommandMutex);
+        loggedOut.swap(g_LoggedOutGuids);
+        for (size_t n = 0; n < kCommandsPerTick && !g_PendingCommands.empty(); ++n)
+        {
+            commands.push_back(std::move(g_PendingCommands.front()));
+            g_PendingCommands.pop_front();
+        }
+    }
+    for (const auto& guid : loggedOut)
+        g_CityStrategyOwners.erase(guid);
+    for (const auto& command : commands)
+    {
+        Player* player = sObjectAccessor.FindPlayer(command.requester);
+        if (loggedOut.count(command.requester) || !player || !player->GetSession() || player->GetSession()->isLogingOut())
+            continue;
+        ChatHandler handler(player->GetSession());
+        ExecuteBotBracketsCommand(&handler, command.args.c_str());
+    }
+}
+
 
 // -----------------------------------------------------------------------------
 // ENTRY POINT: Register All Scripts

@@ -10,6 +10,8 @@
 #include "Log.h"
 
 #include <string>
+#include <vector>
+#include <sstream>
 
 // -----------------------------------------------------------------------------
 // ENGINE SELECTION & CONDITIONAL HEADERS
@@ -104,7 +106,7 @@ public:
 #if defined(HAVE_TORTOISEBOTS)
         return TortoiseBots::BotManager::Instance().IsBot(player->GetObjectGuid());
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
-        return GetBotAI(player) != nullptr;
+        return ::GetBotAI(player) != nullptr;
 #else
         return false;
 #endif
@@ -147,7 +149,7 @@ public:
 
         return false;
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
-        PlayerbotAI* ai = GetBotAI(bot);
+        PlayerbotAI* ai = ::GetBotAI(bot);
         return ai && ai->HasRealPlayerMaster();
 #else
         if (Group* group = bot->GetGroup())
@@ -210,6 +212,7 @@ public:
 #if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
         return sPlayerbotAIConfig.IsInRandomAccountList(accountId);
 #else
+        (void)accountId;
         return false;
 #endif
     }
@@ -300,6 +303,14 @@ public:
         return bot->TeleportTo(mapId, x, y, z, o);
     }
 
+    struct StrategyChange
+    {
+        std::string name;
+        bool before;
+        bool applied;
+    };
+    using StrategySnapshot = std::vector<StrategyChange>;
+
     /**
      * Retrieves the PlayerbotAI instance for a bot player entity, if available.
      */
@@ -310,20 +321,22 @@ public:
             return nullptr;
 #if defined(HAVE_TORTOISEBOTS)
         return PlayerbotAIStorage::Instance().GetAI(bot);
-#else
+#elif defined(GET_PLAYERBOT_AI)
         return GET_PLAYERBOT_AI(bot);
+#else
+        return ::GetBotAI(bot);
 #endif
     }
 
     /**
-     * Checks if a bot currently has a specific strategy active in a given engine state.
+     * Checks whether a non-combat strategy is active without exposing engine types.
      */
-    static bool HasStrategy(Player* bot, const std::string& name, BotState type = BotState::BOT_STATE_NON_COMBAT)
+    static bool HasStrategy(Player* bot, const std::string& name)
     {
         if (!bot)
             return false;
         PlayerbotAI* ai = GetBotAI(bot);
-        return ai && ai->HasStrategy(name, type);
+        return ai && ai->HasStrategy(name, BotState::BOT_STATE_NON_COMBAT);
     }
 
     /**
@@ -344,26 +357,126 @@ public:
             ai->ChangeStrategy(addStr, BotState::BOT_STATE_NON_COMBAT);
     }
 
-    /**
-     * Resets both combat (CO) and non-combat (NC) strategies back to pristine engine defaults when entering open world.
-     */
-    static void ResetDefaultStrategies(Player* bot)
+    // Capture only strategies this module touches. Do not rebuild the AI's engines.
+    // Supports '+', '-', '~' (toggle), and bare name strategy tokens (A18).
+    // Tracks cascaded sub-strategies (e.g. 'rpg' -> 'rpg quest', etc.) to avoid losing behavior (A11).
+    static StrategySnapshot ApplyOwnedCityStrategies(Player* bot, const std::string& strip,
+        const std::string& add)
     {
-        if (!bot)
-            return;
+        StrategySnapshot snapshot;
+        if (!GetBotAI(bot))
+            return snapshot;
+
+        static const char* const s_RpgSubStrategies[] = {
+            "rpg quest", "rpg vendor", "rpg explore", "rpg maintenance"
+        };
+
+        auto recordStrategy = [&](const std::string& sname) {
+            if (sname.empty())
+                return;
+            for (const auto& entry : snapshot)
+                if (entry.name == sname)
+                    return;
+            snapshot.push_back({sname, HasStrategy(bot, sname), false});
+        };
+
+        std::istringstream tokens(strip + "," + add);
+        std::string token;
+        while (std::getline(tokens, token, ','))
+        {
+            const size_t begin = token.find_first_not_of(" 	");
+            if (begin == std::string::npos)
+                continue;
+
+            char prefix = token[begin];
+            std::string name;
+            if (prefix == '+' || prefix == '-' || prefix == '~')
+            {
+                const size_t end = token.find_last_not_of(" 	");
+                name = token.substr(begin + 1, end - begin);
+            }
+            else
+            {
+                const size_t end = token.find_last_not_of(" 	");
+                name = token.substr(begin, end - begin + 1);
+            }
+
+            if (name.empty())
+                continue;
+
+            recordStrategy(name);
+
+            // A11: When 'rpg' strategy is modified, also snapshot known sub-strategies
+            // to guard against TortoiseBots RpgStrategy::OnStrategyRemoved cascading deletions
+            if (name == "rpg")
+            {
+                for (const char* sub : s_RpgSubStrategies)
+                    recordStrategy(sub);
+            }
+        }
+
+        ApplyCityStrategies(bot, strip, add);
+
+        for (auto& entry : snapshot)
+            entry.applied = HasStrategy(bot, entry.name);
+
+        return snapshot;
+    }
+
+    static void RestoreOwnedCityStrategies(Player* bot, const StrategySnapshot& snapshot)
+    {
         PlayerbotAI* ai = GetBotAI(bot);
         if (!ai)
             return;
 
-        // ResetStrategies(true) wipes all engines (combat, non-combat, dead, reaction)
-        // and reloads default kits from AiFactory and database preferences.
-        ai->ResetStrategies(true);
+        // Record pre-restoration state of each tracked strategy
+        std::vector<bool> preState;
+        preState.reserve(snapshot.size());
+        for (const auto& entry : snapshot)
+            preState.push_back(HasStrategy(bot, entry.name));
+
+        // Phase 1: Remove strategies that this module added (and user/AI didn't disable)
+        for (size_t i = 0; i < snapshot.size(); ++i)
+        {
+            const auto& entry = snapshot[i];
+            bool current = preState[i];
+            // If the module turned it from inactive to active, and it is currently active:
+            if (!entry.before && entry.applied && current)
+            {
+                ai->ChangeStrategy("-" + entry.name, BotState::BOT_STATE_NON_COMBAT);
+            }
+        }
+
+        // Phase 2: Restore strategies that were originally active but are currently inactive
+        // (either stripped by module initial strip, or stripped by engine callback cascade like -rpg)
+        for (size_t i = 0; i < snapshot.size(); ++i)
+        {
+            const auto& entry = snapshot[i];
+            if (!entry.before)
+                continue;
+
+            // If it is already active, nothing to restore
+            if (HasStrategy(bot, entry.name))
+                continue;
+
+            // If we left it active on entry (entry.applied == true), but before Phase 1
+            // it was already inactive (!preState[i]), the user or AI explicitly disabled it.
+            // Do not override user/AI intent.
+            if (entry.applied && !preState[i])
+                continue;
+
+            // Otherwise, it was either stripped by our initial strip, or stripped by the Phase 1
+            // cascade (e.g. -rpg stripping rpg quest). Restore it.
+            ai->ChangeStrategy("+" + entry.name, BotState::BOT_STATE_NON_COMBAT);
+        }
     }
+
 #else
     static void* GetBotAI(Player* /*bot*/) { return nullptr; }
     static bool HasStrategy(Player* /*bot*/, const std::string& /*name*/) { return false; }
     static void ApplyCityStrategies(Player* /*bot*/, const std::string& /*stripStr*/, const std::string& /*addStr*/) {}
-    static void ResetDefaultStrategies(Player* /*bot*/) {}
+    static StrategySnapshot ApplyOwnedCityStrategies(Player*, const std::string&, const std::string&) { return {}; }
+    static void RestoreOwnedCityStrategies(Player*, const StrategySnapshot&) {}
 #endif
 };
 

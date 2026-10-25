@@ -31,7 +31,7 @@ Every `BotLevelBrackets.CheckFrequency` seconds (default: 300s / 5 minutes), the
 2. **Exclusion Filtering:** Excludes bots in guilds with real players, on real player friend lists, in active combat, in groups with real players, or in Arena/Battleground queues.
 3. **Quota Calculation:** Computes the desired bot count for each bracket based on configured percentage allocations (or dynamic real-player clusters).
 4. **Surplus Identification:** Calculates $\Delta = \text{Actual} - \text{Desired}$. If $\Delta > \text{MinBracketChangeThreshold}$, surplus bots are flagged for reassignment.
-5. **Asynchronous Reset Queue:** Flagged bots are placed in a persistent queue (`bot_level_brackets_pending_resets`). A throttled background ticker re-levels bots in batches (`FlaggedProcessLimit = 5` every 15s) to guarantee zero server lag or database spikes.
+5. **Asynchronous Reset Queue:** Flagged bots are placed in a persistent queue (`bot_level_brackets_pending_resets`). A throttled background ticker re-levels bots in batches (`FlaggedProcessLimit = 5` every 15s) to limit work per pass; server latency must still be measured.
 6. **Automated Dismount & Teleportation:** Once a bot is safely adjusted, it is dismounted (`bot->Unmount()`) and enqueued for teleportation directly to a level-appropriate questing hub.
 
 ```mermaid
@@ -56,7 +56,7 @@ flowchart TD
 Turtle WoW features a custom **Blood Ring Arena** on Map 26 alongside the classic **Gurubashi Arena** in Stranglethorn Vale. When `BotLevelBrackets.IgnoreArenaTeamBots` is enabled (`1`):
 * Bots inside Blood Ring (`bot->InArena()`) or Gurubashi Arena (`bot->InGurubashiArena()`) are completely protected.
 * Bots queued for Arenas or Battlegrounds (`bot->InBattleGroundQueue()`) will never be level-adjusted or teleported out.
-* If a bot is already queued for a pending level reset and subsequently enters an Arena or Battleground, its pending reset is immediately canceled and cleared from the database.
+* If a bot is already queued for a pending level reset and subsequently enters an Arena or Battleground, its pending reset is cancelled when the pending queue next checks its eligibility (or waits safely if the optional arena exclusion is disabled).
 
 ---
 
@@ -90,8 +90,8 @@ In **Mode 2 (Default)**, quotas scale dynamically with server population up to t
 
 ### 2.4 Starting Zone Evacuation & Racial Starter Routing
 
-1. **Evacuation (`StartingZoneDisperse`):** Scans all 8 starting valleys every 15 seconds. Any bot that has outgrown the starter area ($\text{Level} > 9$) is teleported out to mid-level questing zones.
-2. **Racial Starter Routing:** When a bot is adjusted into Bracket 0 (Levels 1–9), it is not blindly dumped in Goldshire or Valley of Trials. Instead, it is routed directly to its native racial valley:
+1. **Evacuation (`StartingZoneDisperse`):** Scans all 8 starting valleys every 120 seconds by default. Any bot that has outgrown the starter area ($\text{Level} > 9$) is teleported out to mid-level questing zones.
+2. **Racial Starter Routing:** When a bot is adjusted to Levels 1–9, it is not blindly dumped in Goldshire or Valley of Trials. Instead, it is routed directly to its native racial valley:
    * **High Elf:** Thalassian Highlands (Map 0, `3322.0, -2448.0, 107.2`)
    * **Goblin:** Blackstone Island (Map 1, `-275.6, -7474.6, 73.2`)
    * **Human:** Goldshire (Map 0, `-9464.0, 62.0, 56.0`)
@@ -105,7 +105,7 @@ In **Mode 2 (Default)**, quotas scale dynamically with server population up to t
 
 ### 2.5 Wrong-Map Dispersal (`WrongMapDisperse`)
 
-Every 60 seconds, detects bots stranded on non-continental test maps or invalid coordinates while recognizing and preserving:
+Every 180 seconds by default, detects bots stranded on non-continental test maps or invalid coordinates while recognizing and preserving:
 * Dungeons, Raids, and Battlegrounds (`IsDungeon() || IsBattleGround() || IsRaid()`)
 * Continents: Map 0 (Eastern Kingdoms) and Map 1 (Kalimdor)
 * Turtle WoW custom open-world maps: Map 815 (Gilneas City), Map 816 (Kamio / Tel'Abim), Map 813 (Winter Veil Vale), Map 369 (Deeprun Tram)
@@ -157,7 +157,7 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | `BotLevelBrackets.IgnoreGuildBotsWithRealPlayers` | Boolean | `1` | Protects bots belonging to guilds containing at least one real human player (online or offline). |
 | `BotLevelBrackets.IgnoreArenaTeamBots` | Boolean | `1` | Protects bots in Blood Ring Arena, Gurubashi Arena, Sunnyglade Valley, or active PvP queues. |
 | `BotLevelBrackets.GuildTrackerUpdateFrequency` | Integer | `600` | Frequency in seconds (10 minutes) at which the persistent guild tracker table is refreshed. |
-| `BotLevelBrackets.ExcludeBotNames` | String | `""` | Comma-delimited list of bot character names permanently exempt from redistribution (e.g. `"Bankbot,Auctioneer,Vendor"`). |
+| `BotLevelBrackets.ExcludeNames` | String | `""` | Comma-delimited list of bot character names permanently exempt from redistribution (e.g. `"Bankbot,Auctioneer,Vendor"`). |
 
 ---
 
@@ -177,15 +177,15 @@ All settings reside in `mod_twow_bot_level_brackets.conf` (template: `conf/mod_t
 | `BotLevelBrackets.HubDisperse.UndercityPct` | Integer | `5` | Mode 1 bot count / mode 2 percentage for Undercity (Horde classic capital). |
 | `BotLevelBrackets.HubDisperse.ThunderBluffPct` | Integer | `4` | Mode 1 bot count / mode 2 percentage for Thunder Bluff (Horde classic capital). |
 | `BotLevelBrackets.HubDisperse.SparkwaterPct` | Integer | `4` | Mode 1 bot count / mode 2 percentage for Sparkwater Port (Horde Goblin port). |
-| `BotLevelBrackets.HubPopulate.Frequency` | Integer | `90` (template; code fallback: `30`) | Frequency in seconds at which capital city hub population and dispersal runs. |
-| `BotLevelBrackets.StartingZoneDisperse.Frequency` | Integer | `120` (template; code fallback: `15`) | Frequency in seconds at which over-leveled bots (> Lvl 9) are dispersed from starter valleys. |
-| `BotLevelBrackets.WrongMapDisperse.Frequency` | Integer | `180` (template; code fallback: `60`) | Frequency in seconds at which bots stranded on invalid maps are evacuated to leveling zones. |
+| `BotLevelBrackets.HubPopulate.Frequency` | Integer | `90` | Frequency in seconds at which capital city hub population and dispersal runs. |
+| `BotLevelBrackets.StartingZoneDisperse.Frequency` | Integer | `120` | Frequency in seconds at which over-leveled bots (> Lvl 9) are dispersed from starter valleys. |
+| `BotLevelBrackets.WrongMapDisperse.Frequency` | Integer | `180` | Frequency in seconds at which bots stranded on invalid maps are evacuated to leveling zones. |
 
 ---
 
 ### 3.6 Bracket Definition
 
-Brackets are configured per faction using `.Lower`, `.Upper`, and `.Pct` keys for each range index from 1 to `NumRanges`:
+Brackets use the numbered `RangeN.Lower`, `RangeN.Upper`, and `RangeN.Pct` keys for each range index from 1 to `NumRanges`:
 
 ```ini
 BotLevelBrackets.NumRanges = 7
@@ -202,6 +202,8 @@ BotLevelBrackets.Horde.Range1.Upper = 9
 BotLevelBrackets.Horde.Range1.Pct   = 16
 # ... through Range7 (Range1 - Range7)
 ```
+
+Configure the remaining numbered ranges using the full shipped template. Destination selection uses actual bot level, independently of these bracket indices.
 
 * Percentages are automatically normalized to 100% on reload.
 * The module dynamically supports any number of brackets ($N$ ranges).
@@ -262,3 +264,22 @@ The module utilizes two non-intrusive tables in the character database (`tw_char
 | `BotLevelBrackets.HubDisperse.PopulationLimitsEnabled` | `1` | Apply both target bounds in either quota mode; `0` ignores both. |
 | `BotLevelBrackets.HubDisperse.MinBotsPerHub` | `0` | Lower target bound, 0–500; `0` means no floor. |
 | `BotLevelBrackets.HubDisperse.MaxBotsPerHub` | `50` | Upper target bound, 0–500; `0` targets empty hubs when bounds are enabled. |
+
+### Audit hardening: execution, ownership and diagnostics
+
+See [Audit fixes and validation](AUDIT_FIXES.md) for the complete behavior changes, regression coverage and server validation checklist.
+
+- `BotLevelBrackets.Teleport.ExecutionLimit = 25`: total attempts across all teleport sources per 2-second executor tick, range 1–500. Scheduling budgets are separate.
+- `BotLevelBrackets.Teleport.MaxAttempts = 3`: bounded retries, range 1–10, delayed by `2 * attempts` seconds. Fresh entries are considered before retries. A future scheduler pass can create new work.
+- Saved level resets survive offline periods, logout and restart. `PendingQueueTTL = 0` means no expiry; positive TTL includes offline time. Invalid or newly protected online entries are cancelled.
+- Execution rechecks identity, random-pool membership, name/social/guild/master protections and movement safety. Teleports queued before a configuration reload are cancelled so the scheduler can recompute them.
+- Mode 2 uses all online random faction bots as its denominator, including protected and name-excluded bots. All online random city residents count toward population. Only eligible bots move, so protected residents can keep a city above its target.
+- Hub census is built in 1 player pass, with candidates grouped by hub and faction. Pending inbound and outbound actions affect effective population. City priority rotates each pass. Bracket redistribution counts pending resets at their valid destination bracket.
+- Outdoor routing uses actual level, independent of custom bracket indices. Level 60 routes to existing outdoor faction destinations. Hub evacuation checks hub overlap; a racial starter overlapping a hub uses the faction's low-level outdoor fallback for that evacuation only.
+- City strategy settings are applied once per owned entry. Leaving restores only configured non-combat strategy changes that still match what the module applied. Unrelated strategies and observable later changes are preserved. The existing `WorldTeleport.ResetStrategies` key controls this restoration; combat/dead/reaction engines are not reset. Ownership is transient and cleared after logout or level reprovisioning; changing strategy configuration affects new entries.
+- In-game `.blb` commands are queued by requester GUID, limited to 256 queued requests and 16 executions per world tick. Command text is limited to 1024 bytes. Security is checked again on execution, and pending requests are discarded on logout. Console requests execute inline on the world thread.
+- `.blb reload` stages the main configuration and module files in a separate core `Config` object, then applies this module's values after successful loading. It does not reload the AI engine's own configuration. Reload remains available while this module is disabled.
+- `.blb hubs` displays each city value, raw calculated target, final target, residents, currently safe movable residents, pending inbound/outbound and effective count. Movable counts do not guarantee immediate relocation: cooldown and stability still apply.
+- `.blb stats` includes teleport failure/cancellation counts, owned strategy applications/restorations, and last/maximum hub-cycle durations in microseconds. These measurements are not benchmark claims.
+
+The Max/Min values bound targets; they are not instantaneous population guarantees. Existing hysteresis and stability/cooldown safeguards still apply.

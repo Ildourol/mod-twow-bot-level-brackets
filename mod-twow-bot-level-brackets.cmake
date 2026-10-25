@@ -12,26 +12,30 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
   # 1. Check for TortoiseBots (Native Modular Companion Engine for tortoise-wow)
   # ---------------------------------------------------------------------------
   set(TORTOISEBOTS_FOUND FALSE)
-  set(TORTOISEBOTS_SEARCH_PATHS
-    "${CMAKE_SOURCE_DIR}/modules/TortoiseBots"
-    "${CMAKE_SOURCE_DIR}/../TortoiseBots"
-    "${CMAKE_CURRENT_LIST_DIR}/../TortoiseBots"
-  )
-  foreach(SEARCH_PATH ${TORTOISEBOTS_SEARCH_PATHS})
-    if(EXISTS "${SEARCH_PATH}/runtime/BotManager.h")
-      set(TORTOISEBOTS_ROOT "${SEARCH_PATH}")
-      set(TORTOISEBOTS_FOUND TRUE)
-      break()
-    endif()
-  endforeach()
+  if(NOT DEFINED MODULE_TORTOISEBOTS OR NOT "${MODULE_TORTOISEBOTS}" STREQUAL "disabled")
+    set(TORTOISEBOTS_SEARCH_PATHS
+      "${CMAKE_SOURCE_DIR}/modules/TortoiseBots"
+      "${CMAKE_SOURCE_DIR}/../TortoiseBots"
+      "${CMAKE_CURRENT_LIST_DIR}/../TortoiseBots"
+    )
+    foreach(SEARCH_PATH ${TORTOISEBOTS_SEARCH_PATHS})
+      if(EXISTS "${SEARCH_PATH}/runtime/BotManager.h")
+        set(TORTOISEBOTS_ROOT "${SEARCH_PATH}")
+        set(TORTOISEBOTS_FOUND TRUE)
+        break()
+      endif()
+    endforeach()
+  endif()
 
   # ---------------------------------------------------------------------------
   # 2. Check for Legacy PlayerBots (vendored in older cores like tortoise-wow-mantech-turtle)
   # ---------------------------------------------------------------------------
   set(LEGACY_PLAYERBOTS_FOUND FALSE)
-  if(EXISTS "${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/RandomPlayerbotMgr.h")
-    set(LEGACY_PLAYERBOTS_ROOT "${CMAKE_SOURCE_DIR}/src/modules/PlayerBots")
-    set(LEGACY_PLAYERBOTS_FOUND TRUE)
+  if(NOT DEFINED MODULE_PLAYERBOTS OR NOT "${MODULE_PLAYERBOTS}" STREQUAL "disabled")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/src/modules/PlayerBots/playerbot/RandomPlayerbotMgr.h")
+      set(LEGACY_PLAYERBOTS_ROOT "${CMAKE_SOURCE_DIR}/src/modules/PlayerBots")
+      set(LEGACY_PLAYERBOTS_FOUND TRUE)
+    endif()
   endif()
 
   # ---------------------------------------------------------------------------

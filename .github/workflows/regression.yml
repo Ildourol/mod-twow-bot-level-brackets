@@ -1,0 +1,17 @@
+name: Module regression checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  behavior:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configuration defaults and quota policy
+        run: |
+          python3 tests/test_config_defaults.py
+          python3 tests/test_hub_population.py
+      - name: Native, legacy and generic module behavior
+        run: python3 tests/test_module_behavior.py --sanitize
+      - name: Patch whitespace
+        run: git diff --check

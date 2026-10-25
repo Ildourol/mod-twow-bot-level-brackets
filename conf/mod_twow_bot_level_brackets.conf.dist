@@ -11,6 +11,7 @@
 #
 # BotLevelBrackets.Enabled
 # Enables or disables the Bot Level Brackets module.
+# Queued admin commands still drain while disabled, allowing .blb reload to enable it.
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.Enabled = 1
@@ -68,7 +69,9 @@ BotLevelBrackets.MaxPendingQueueSize = 0
 # BotLevelBrackets.PendingQueueTTL
 # Maximum time (in seconds) a bot can remain in the pending level reset queue.
 # If a bot has not been processed within this time, its entry is dropped from the queue.
-# 0 = no TTL (entries remain indefinitely until processed or the bot logs out).
+# 0 = no TTL (saved resets wait through logout/restart until processed or cancelled).
+# Offline saved resets wait for login. Transient teleport intents are removed on logout.
+# Safety and eligibility are rechecked before either kind of action executes.
 # Default: 0
 #
 BotLevelBrackets.PendingQueueTTL = 0
@@ -141,6 +144,25 @@ BotLevelBrackets.GuildTrackerUpdateFrequency = 600
 #
 BotLevelBrackets.TeleportOnLevelChange = 1
 
+#
+# BotLevelBrackets.Teleport.ExecutionLimit
+# Shared maximum number of actual teleport attempts per 2-second executor tick.
+# Applies to level resets, hub gathering/dispersal, starter and wrong-map queues together.
+# Scheduling BotsPerCycle limits still apply separately; unsafe bots wait without
+# consuming attempts. Failed attempts count toward this execution budget.
+# Range: 1 - 500; Default: 25
+#
+BotLevelBrackets.Teleport.ExecutionLimit = 25
+
+#
+# BotLevelBrackets.Teleport.MaxAttempts
+# Maximum attempts for a queued teleport before dropping it. Failures retry after
+# 2 * attempts seconds, behind fresh work. A later scheduler cycle may create new work.
+# Offline, protected, expired or superseded intents are cancelled instead of retried.
+# Range: 1 - 10; Default: 3
+#
+BotLevelBrackets.Teleport.MaxAttempts = 3
+
 
 ###############################################################################
 # 5. CAPITAL CITY HUB GATHERING, QUOTAS & POPULATION LIMITS
@@ -195,7 +217,9 @@ BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 # Target 5 becomes 10; target 70 becomes 50. Min/Max bound the target,
 # rather than creating an idle population band between the two limits.
 # 0 = target 0 when limits are enabled; it does NOT mean unlimited.
-# Targets cannot exceed online faction bots. Only eligible bots move; no bots spawn.
+# Targets cannot exceed online random faction bots, including protected/excluded bots.
+# All online random residents count toward the city population, even if protected.
+# Only eligible bots move; no bots spawn. Protected residents can leave a city above target.
 # Hysteresis, stability, cooldown, level restrictions and per-cycle limits still apply.
 # Range: 0 - 500; Default: 50
 #
@@ -269,8 +293,9 @@ BotLevelBrackets.HubDisperse.CooldownSeconds = 180
 
 #
 # BotLevelBrackets.HubDisperse.ManageCityStrategies
-# When enabled, bots teleported to or residing in capital city hubs automatically drop
-# open-world grind/loot locks and gain active city social, trade, RPG, and wander strategies.
+# When enabled, eligible idle bots entering a city receive its configured strategies once.
+# The module records the previous state of each strategy it changes, rather than
+# repeatedly resetting or overriding bots already in a city.
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.HubDisperse.ManageCityStrategies = 1
@@ -293,9 +318,10 @@ BotLevelBrackets.HubDisperse.CityStripStrategies = -grind,-wander,-loot,-tfish
 
 #
 # BotLevelBrackets.WorldTeleport.ResetStrategies
-# When enabled, resets both Non-Combat (NC) and Combat (CO) strategies back to pristine engine
-# defaults whenever a bot is teleported out to the open world (including hub-to-world dispersal,
-# starter zone dispersal, wrong-map rescue, or world-to-world level bracket relocation).
+# When enabled, restores the non-combat strategy changes owned by this module when
+# the bot leaves a city. Keeps unrelated strategies and observable later changes.
+# Does not reset combat/dead/reaction engines or bots without a module-owned snapshot.
+# The existing key name is retained for compatibility. No full AI reset is performed.
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.WorldTeleport.ResetStrategies = 1
@@ -308,7 +334,7 @@ BotLevelBrackets.WorldTeleport.ResetStrategies = 1
 #
 # BotLevelBrackets.HubPopulate.Frequency
 # Frequency (in seconds) at which capital city hub population and dispersal runs.
-# Default: 30 (built-in fallback; recommended template: 90)
+# Default: 90 (code fallback and template)
 #
 BotLevelBrackets.HubPopulate.Frequency = 90
 
@@ -317,7 +343,7 @@ BotLevelBrackets.HubPopulate.Frequency = 90
 # Frequency (in seconds) at which over-leveled bots are dispersed from starting areas
 # (Northshire, Coldridge, Shadowglen, Thalassian Highlands [High Elf], Valley of Trials,
 # Red Cloud Mesa, Deathknell, Blackstone Island [Goblin]).
-# Default: 15 (built-in fallback; recommended template: 120)
+# Default: 120 (code fallback and template)
 #
 BotLevelBrackets.StartingZoneDisperse.Frequency = 120
 
@@ -325,7 +351,7 @@ BotLevelBrackets.StartingZoneDisperse.Frequency = 120
 # BotLevelBrackets.WrongMapDisperse.Frequency
 # Frequency (in seconds) at which bots stranded on invalid or non-continental maps
 # are dispersed to their appropriate leveling zones.
-# Default: 60 (built-in fallback; recommended template: 180)
+# Default: 180 (code fallback and template)
 #
 BotLevelBrackets.WrongMapDisperse.Frequency = 180
 
