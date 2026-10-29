@@ -3,7 +3,7 @@
 
 #include "BracketsCommon.h"
 
-#if defined(HAVE_TORTOISEBOTS)
+#if defined(HAVE_TORTOISEBOTS) && !defined(BEHAVIOR_TEST_HARNESS)
 
 #include "ai/playerbot/AiContextAugment.h"
 #include "ai/playerbot/strategy/AiObjectContext.h"

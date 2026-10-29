@@ -100,7 +100,7 @@ inline uint32 urand(uint32 a,uint32){return a;} inline double rand_norm(){return
 // AI doubles only exist in the engine builds. Generic mode intentionally has no BotState.
 #if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
 enum class BotState {BOT_STATE_NON_COMBAT};
-struct PlayerbotAI {Player* player=nullptr; void UpdateTalentSpec(){} void ResetStrategies(bool=true){player->strategies={"grind","loot"};}
+struct PlayerbotAI {Player* player=nullptr; Player* GetBot() { return player; } void UpdateTalentSpec(){} void ResetStrategies(bool=true){player->strategies={"grind","loot"};}
  bool HasRealPlayerMaster(){return player->master;} bool HasStrategy(const std::string&n,BotState){return player->strategies.count(n);}
  void ChangeStrategy(const std::string&str,BotState){size_t a=0;while(a<str.size()){size_t b=str.find(',',a);if(b==std::string::npos)b=str.size();auto t=str.substr(a,b-a);if(t.size()>1){if(t[0]=='+')player->strategies.insert(t.substr(1));else if(t[0]=='-')player->strategies.erase(t.substr(1));}a=b+1;}}
 };

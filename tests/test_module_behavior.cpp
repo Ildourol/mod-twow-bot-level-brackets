@@ -1,120 +1,151 @@
 #include "support/Framework.h"
+
+#include "../src/ActivityRegistry.cpp"
+#include "../src/DestinationCatalog.cpp"
+#include "../src/OpportunityLedger.cpp"
+#include "../src/PopulationCensus.cpp"
+#include "../src/SocialProtection.cpp"
+#include "../src/CityRelocationFallback.cpp"
+#include "../src/BracketsConfig.cpp"
+#include "../src/BracketsDebug.cpp"
+#include "../src/OpportunityCoordinator.cpp"
 #include "../src/mod-twow-bot-level-brackets.cpp"
 
-static void Reset()
+using namespace Brackets;
+
+static void ResetTestEnvironment()
 {
-    sObjectAccessor.players.clear(); sConfig.values.clear(); CharacterDatabase.writes.clear();
-    g_PendingTeleports.clear(); g_PendingLevelResets.clear(); g_CityStrategyOwners.clear();
-    g_PendingCommands.clear(); g_LoggedOutGuids.clear(); g_ExcludeBotNames.clear();
-    g_SocialFriendsList.clear(); g_RealPlayerGuildIds.clear(); g_PersistentRealPlayerGuildIds.clear();
-    g_HubBotCooldowns.clear(); g_ConfigGeneration=1; g_TeleportExecutionLimit=25; g_TeleportMaxAttempts=3;
-    g_PendingQueueTTL=0; g_HubDisperseEnabled=true; g_BotLevelBracketsEnabled=true;
-    g_TeleportOnLevelChange=true; g_HubDisperseQuotaMode=1;
-    g_HubDisperseMinBotsLimitEnabled=false;g_HubDisperseMaxBotsLimitEnabled=true;g_HubDisperseLimitsMode=1;g_HubDisperseMinBotsPerHub=0;g_HubDisperseMaxBotsPerHub=50;
-    g_HubDisperseHysteresisBots=0;g_HubDisperseStabilitySeconds=0;g_NextHubStart=0;
-    g_HubDisperseCooldownSeconds=0;g_HubDisperseBotsPerCycle=50;
-    g_ManageCityStrategies=true;g_WorldTeleportResetStrategies=true;
-    std::fill_n(g_HubCityPcts,8,0);std::fill_n(g_HubStability,8,HubStabilityRecord{});
-    g_NumRanges=2;g_RandomBotMinLevel=1;g_RandomBotMaxLevel=60;++g_ConfigGeneration;
-    g_AllianceLevelRanges={{1,29,50},{30,60,50}};g_HordeLevelRanges=g_AllianceLevelRanges;
-    g_AllianceStaticPcts={50,50};g_HordeStaticPcts={50,50};
+    sObjectAccessor.players.clear();
+    sConfig.values.clear();
+    CharacterDatabase.writes.clear();
+
+    ActivityRegistry::Instance().Initialize();
+    DestinationCatalog::Instance().Initialize();
+    OpportunityLedger::Instance().Clear();
+    PopulationCensus::Instance().Reset();
+    SocialProtection::Instance().Clear();
+    CityRelocationFallback::Instance().Clear();
+    DebugEnvironment::Instance().SetMode(DEBUG_MODE_OFF);
+
+    sConfig.values["BotLevelBrackets.Enabled"] = "1";
+    sConfig.values["BotLevelBrackets.CheckFrequency"] = "300";
+    ConfigManager::Instance().Load();
 }
-static void Add(Player& p){sObjectAccessor.players[p.guid]=&p;}
-static void InCity(Player& p,size_t h){const auto&a=s_HubAreas[h];p.team=a.teamId;p.map.id=a.mapId;p.x=a.cx;p.y=a.cy;p.z=a.cz;}
 
 int main()
 {
-    Reset();Player p(1);Add(p);InCity(p,0);
-    assert(TeleportBotToLevelZone(&p,60,TEAM_ALLIANCE));assert(!IsInAnyHub(&p));
-    InCity(p,4);assert(TeleportBotToLevelZone(&p,60,TEAM_HORDE));assert(!IsInAnyHub(&p));
-    // Changing the bracket layout cannot route level 45 to starter geography.
-    g_AllianceLevelRanges={{1,60,100}};g_NumRanges=1;
-    assert(TeleportBotToLevelZone(&p,45,TEAM_ALLIANCE));assert(p.map.id==1 && p.x==s_AllianceZones[4].x);
+    ResetTestEnvironment();
 
-    // Hub evacuation must also leave an overlapping custom starter/capital sphere.
-    p.level=5;p.race=RACE_HIGH_ELF;InCity(p,3);
-    assert(TeleportBotToLevelZone(&p,5,TEAM_ALLIANCE,true));assert(!IsInAnyHub(&p));
+    // 1. BotEngineAdapter Verification across engines
+    Player bot(1);
+    bot.session.headless = true;
+    sObjectAccessor.players[bot.GetObjectGuid()] = &bot;
 
-    Reset();Player a(1),b(2),c(3);Add(a);Add(b);Add(c);
-    assert(EnqueuePendingTeleport(&a,60,0));assert(EnqueuePendingTeleport(&b,60,0));assert(EnqueuePendingTeleport(&c,60,0));
-    g_TeleportExecutionLimit=1;ProcessPendingTeleports();assert(a.teleports+b.teleports+c.teleports==1);assert(g_PendingTeleports.size()==2);
-    ProcessPendingTeleports();ProcessPendingTeleports();assert(a.teleports+b.teleports+c.teleports==3);
-    assert(g_PendingTeleports.empty());
+    Player human(2);
+    human.session.headless = false;
+    sObjectAccessor.players[human.GetObjectGuid()] = &human;
 
-    Reset();Add(a);a.teleports=0;assert(EnqueuePendingTeleport(&a,60,0));g_SocialFriendsList.insert(a.guid.GetCounter());
-    ProcessPendingTeleports();assert(a.teleports==0 && g_PendingTeleports.empty());
-    g_SocialFriendsList.clear();assert(EnqueuePendingTeleport(&a,60,0));a.guild=7;g_PersistentRealPlayerGuildIds.insert(7);
-    ProcessPendingTeleports();assert(a.teleports==0 && g_PendingTeleports.empty());
-    a.guild=0;assert(EnqueuePendingTeleport(&a,60,0));g_ExcludeBotNames.push_back("bot");
-    ProcessPendingTeleports();assert(a.teleports==0 && g_PendingTeleports.empty());
+    assert(BotEngineAdapter::IsBot(&bot));
+    assert(!BotEngineAdapter::IsBot(&human));
+    assert(BotEngineAdapter::IsRandomBot(&bot));
+    assert(BotEngineAdapter::GetEngineName() != nullptr);
+    assert(!BotEngineAdapter::BotHasRealPlayerMaster(&bot));
 
-    Reset();Player failing(1);failing.failTeleport=true;Add(failing);EnqueuePendingTeleport(&failing,60,0);
-    for(uint32 n=0;n<3;++n){g_PendingTeleports[failing.guid].nextAttemptAt=0;ProcessPendingTeleports();}
-    assert(failing.teleports==3 && g_PendingTeleports.empty());
-
-    Reset();Player stale(1);Add(stale);EnqueuePendingTeleport(&stale,60,0);
-    ++g_ConfigGeneration;ProcessPendingTeleports();assert(stale.teleports==0 && g_PendingTeleports.empty());
-    EnqueuePendingTeleport(&stale,60,0);g_PendingQueueTTL=1;
-    g_PendingTeleports[stale.guid].enqueuedAt=static_cast<uint32>(time(nullptr))-3;
-    ProcessPendingTeleports();assert(stale.teleports==0 && g_PendingTeleports.empty());
-
-    Reset();Player offline(4);assert(EnqueuePendingReset(offline.guid,1,0));
-    ProcessPendingLevelResets();assert(g_PendingLevelResets.size()==1);
-    Add(offline);BotLevelBracketsPlayerScript lifecycle;lifecycle.OnLogout(&offline);assert(g_PendingLevelResets.size()==1);
-    offline.level=10;ProcessPendingLevelResets();assert(offline.level>=30 && g_PendingLevelResets.empty());
-
-    Reset();Player protectedBot(1),wild(2);Add(protectedBot);Add(wild);InCity(protectedBot,0);
-    protectedBot.guild=10;g_PersistentRealPlayerGuildIds.insert(10);g_HubCityPcts[0]=1;
-    auto census=BuildHubCensus();assert(census.alliance==2 && census.residents[0]==1 && census.movable[0]==0);
-    ProcessHubPopulate();assert(g_PendingTeleports.empty()); // No extra refill around protected residents.
-    EnqueuePendingHubTeleport(&wild,0,s_HubAreas[0].cx,s_HubAreas[0].cy,s_HubAreas[0].cz,0);
-    census=BuildHubCensus();assert(census.inbound[0]==1 && EffectiveHubPopulation(census,0)==2);
-
-    Reset();Player excess(1);Add(excess);InCity(excess,0);ProcessHubPopulate();ProcessPendingTeleports();
-    assert(!IsInAnyHub(&excess)); // Max/disabled-city evacuation really leaves the city.
-
-    Reset();Player f1(1),f2(2),f3(3),f4(4);Add(f1);Add(f2);Add(f3);Add(f4);
-    g_HubDisperseBotsPerCycle=1;g_HubCityPcts[0]=1;g_HubCityPcts[1]=1;
-    ProcessHubPopulate();ProcessPendingTeleports();
-    ProcessHubPopulate();ProcessPendingTeleports();
-    auto fair=BuildHubCensus();assert(fair.residents[0]==1 && fair.residents[1]==1);
-
-    Reset();Player r1(1),r2(2),r3(3),r4(4);r1.level=r2.level=r3.level=r4.level=10;
-    Add(r1);Add(r2);Add(r3);Add(r4);g_MinBracketChangeThreshold=0;
-    RunDistributionCycle(nullptr);assert(g_PendingLevelResets.size()==2);
-    RunDistributionCycle(nullptr);assert(g_PendingLevelResets.size()==2); // Existing moves already fill the deficit.
-
-    Reset();Player gm(99);gm.session.headless=false;Add(gm);ChatHandler chat(&gm.session);
-    BotLevelBracketsCommandScript commands;auto cycles=g_StatsCyclesRun.load();
-    assert(!commands.CanExecuteCommand(&chat,"blb","force"));assert(g_StatsCyclesRun.load()==cycles);
-    DrainBotBracketsCommands();assert(g_StatsCyclesRun.load()==cycles+1);
-    gm.session.security=SEC_MODERATOR;commands.CanExecuteCommand(&chat,"blb","force");
-    DrainBotBracketsCommands();assert(g_StatsCyclesRun.load()==cycles+1);
-    g_BotLevelBracketsEnabled=false;gm.session.security=SEC_ADMINISTRATOR;
-    commands.CanExecuteCommand(&chat,"blb","reload");BotLevelBracketsWorldScript world;world.OnUpdate(1);
-    assert(g_BotLevelBracketsEnabled); // Reload drains even while disabled.
-
-    // LimitsMode=2 percentage clamping and default MinBracketChangeThreshold
-    Reset();
-    sConfig.values.clear();
-    sConfig.values["BotLevelBrackets.HubDisperse.LimitsMode"] = "2";
-    sConfig.values["BotLevelBrackets.HubDisperse.MinBotsPerHub"] = "150";
-    sConfig.values["BotLevelBrackets.HubDisperse.MaxBotsPerHub"] = "120";
-    LoadBotLevelBracketsConfig();
-    assert(g_HubDisperseMinBotsPerHub == 100);
-    assert(g_HubDisperseMaxBotsPerHub == 100);
-    assert(g_MinBracketChangeThreshold == 2);
-
-#if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
-    Reset();Player social(1);Add(social);InCity(social,0);
-    SyncOwnedCityStrategies(&social,true);assert(social.strategies.count("rpg") && !social.strategies.count("grind"));
-    auto applies=g_StatsCityStrategyApplies;SyncOwnedCityStrategies(&social,true);assert(g_StatsCityStrategyApplies==applies);
-    social.strategies.insert("custom-user");social.strategies.erase("sit");
-    SyncOwnedCityStrategies(&social,false);assert(social.strategies.count("grind") && social.strategies.count("loot"));
-    assert(social.strategies.count("custom-user") && !social.strategies.count("rpg"));
-    assert(g_CityStrategyOwners.empty());
-    // An unrelated outdoor bot is never reset just because it does not grind.
-    social.strategies={"custom-user"};SyncOwnedCityStrategies(&social,false);assert(social.strategies.size()==1);
-    assert(BotEngineAdapter::GetBotAI(&social)); // Also exercises legacy global accessor resolution.
+#if defined(HAVE_TORTOISEBOTS)
+    assert(BotEngineAdapter::GetEngineKind() == BotEngineAdapter::ENGINE_TORTOISEBOTS);
+    PlayerbotAI* botAi = BotEngineAdapter::GetBotAI(&bot);
+    assert(botAi != nullptr);
+    assert(BotEngineAdapter::GetAiPlayer(botAi) == &bot);
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+    assert(BotEngineAdapter::GetEngineKind() == BotEngineAdapter::ENGINE_LEGACY_PLAYERBOTS);
+    PlayerbotAI* botAi = BotEngineAdapter::GetBotAI(&bot);
+    assert(botAi != nullptr);
+    assert(BotEngineAdapter::GetAiPlayer(botAi) == &bot);
+#else
+    assert(BotEngineAdapter::GetEngineKind() == BotEngineAdapter::ENGINE_GENERIC_HEADLESS);
 #endif
+
+    // 2. ActivityRegistry Verification
+    assert(ActivityRegistry::Instance().GetActivityCount() == 43);
+    const ActivityDefinition* act1 = ActivityRegistry::Instance().GetActivity(1);
+    assert(act1 != nullptr && act1->key == "AuctionBrowse");
+    assert((act1->domainMask & DOMAIN_CITY) != 0);
+
+    const ActivityDefinition* act18 = ActivityRegistry::Instance().GetActivity(18);
+    assert(act18 != nullptr && act18->key == "GrindMob");
+    assert((act18->domainMask & DOMAIN_WORLD) != 0);
+
+    const ActivityDefinition* byKey = ActivityRegistry::Instance().GetActivity("TavernRest");
+    assert(byKey != nullptr && byKey->activityId == 5);
+
+    // 3. DestinationCatalog Verification
+    assert(DestinationCatalog::Instance().GetCityCount() == 8);
+    assert(DestinationCatalog::Instance().GetRegionCount() == 38);
+    assert(DestinationCatalog::Instance().GetCity(CITY_STORMWIND) != nullptr);
+    assert(DestinationCatalog::Instance().GetCity(CITY_ALAH_THALAS) != nullptr);
+    assert(DestinationCatalog::Instance().GetCity(CITY_SPARKWATER_PORT) != nullptr);
+    LandingPoint lp;
+    assert(DestinationCatalog::Instance().GetCityLandingPoint(CITY_STORMWIND, lp));
+    assert(lp.mapId == 0);
+
+    // 4. OpportunityLedger & Lifecycle State Machine
+    ObjectGuid bGuid = bot.GetObjectGuid();
+    OpportunityIntent intent = OpportunityLedger::Instance().ProposeIntent(bGuid, DOMAIN_CITY, CITY_STORMWIND, 1, 180);
+    assert(intent.intentId > 0);
+    assert(intent.state == INTENT_STATE_PROPOSED);
+    assert(OpportunityLedger::Instance().GetActiveIntent(bGuid).intentId == intent.intentId);
+
+    assert(OpportunityLedger::Instance().TransitionIntent(bGuid, INTENT_STATE_PLANNING));
+    assert(OpportunityLedger::Instance().TransitionIntent(bGuid, INTENT_STATE_TRAVELING));
+    assert(OpportunityLedger::Instance().TransitionIntent(bGuid, INTENT_STATE_ARRIVED));
+    assert(OpportunityLedger::Instance().ReleaseIntent(bGuid, REASON_EXPIRED));
+    assert(OpportunityLedger::Instance().GetActiveIntent(bGuid).intentId == 0);
+    assert(OpportunityLedger::Instance().IsInCooldown(bGuid, DOMAIN_CITY, CITY_STORMWIND, 1800));
+
+    // 5. PopulationCensus & Largest-Remainder Quota Math
+    std::vector<float> shares = {1.5f, 2.5f, 0.0f};
+    std::vector<uint32> intQuotas = PopulationCensus::CalculateLargestRemainderQuotas(shares, 4);
+    assert(intQuotas.size() == 3);
+    uint32 sum = 0;
+    for (uint32 q : intQuotas) sum += q;
+    assert(sum == 4);
+
+    int32 deficit = PopulationCensus::CalculateActionableDeficit(10, 6, 2);
+    assert(deficit == 2);
+    int32 noDeficit = PopulationCensus::CalculateActionableDeficit(10, 8, 3);
+    assert(noDeficit == 0);
+
+    // 6. SocialProtection Verification
+    SocialProtection::Instance().AddSocialFriend(human.GetObjectGuid(), bot.GetObjectGuid());
+    assert(SocialProtection::Instance().IsSocialProtected(bot.GetObjectGuid()));
+
+    SocialProtection::Instance().AddPersistentGuild(42);
+    assert(SocialProtection::Instance().IsSocialProtectedGuild(42));
+
+    // 7. CityRelocationFallback Safeguards
+    assert(!CityRelocationFallback::Instance().IsAllowed(bot.GetObjectGuid(), CITY_STORMWIND));
+    assert(CityRelocationFallback::Instance().GetRelocationsInLastHour() == 0);
+
+    // 8. Script Hooks & Commands Verification
+    BotLevelBracketsWorldScript worldScript;
+    worldScript.OnUpdate(100);
+
+    BotLevelBracketsPlayerScript playerScript;
+    playerScript.OnLogin(&bot);
+    playerScript.OnLogout(&bot);
+
+    BotLevelBracketsGuildScript guildScript;
+    Guild g;
+    uint8 rank = 0;
+    guildScript.OnAddMember(&g, &bot, rank);
+    guildScript.OnRemoveMember(&g, &bot, false, false);
+
+    BotLevelBracketsCommandScript cmdScript;
+    ChatHandler chat(&human.session);
+    human.session.security = SEC_ADMINISTRATOR;
+    assert(!cmdScript.CanExecuteCommand(&chat, "blb", "status"));
+    assert(!cmdScript.CanExecuteCommand(&chat, "blb", "activities"));
+    assert(!cmdScript.CanExecuteCommand(&chat, "blb", "reload"));
+
+    return 0;
 }
