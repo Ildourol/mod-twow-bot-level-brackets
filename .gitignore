@@ -1,12 +1,13 @@
-# Workspace and internal architecture documentation (local only)
+# Workspace, agent, testing, and internal verification files (Local Only - Never Push to GitHub)
 AGENTS.md
 .agents/
-tests/__pycache__/
-tests/.pytest_cache/
-docs/ARCHITECTURE.md
-docs/CORE_PORTABILITY_GUIDE.md
-docs/FEATURE_PORT_REPORT.md
-docs/TORTOISEBOTS_ADAPTER_SPEC.md
+tests/
+t/
+test_*
+docs/
+!docs/images/
+!docs/images/**
+.github/
 
 # Build artifacts and editor directories
 build/
