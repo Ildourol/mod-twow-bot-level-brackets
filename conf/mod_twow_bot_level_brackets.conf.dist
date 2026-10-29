@@ -1,495 +1,808 @@
 [BotLevelBrackets]
 #
-# Module: Bot Level Brackets for Turtle WoW (VMaNGOS)
-# Comprehensive Autonomous Bot Level Distribution, Capital Hub Gathering & Dispersal
+# Module: Bot Level Brackets Extended for Turtle WoW (vMaNGOS)
+# Unified City & Outdoor World Native Opportunities, Capital Hub Ambiance & Diagnostics
 #
 
 ###############################################################################
-# 1. CORE MODULE & DIAGNOSTICS
+# 1. CORE MASTER SWITCHES & DOMAINS
 ###############################################################################
 
 #
 # BotLevelBrackets.Enabled
-# Enables or disables the Bot Level Brackets module.
-# Queued admin commands still drain while disabled, allowing .blb reload to enable it.
+# Enables or disables the Bot Level Brackets Extended module.
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.Enabled = 1
 
 #
-# BotLevelBrackets.FullDebugMode
-# Enables full debug logging in the server console/logs.
-# Default: 0 (Disabled)
+# BotLevelBrackets.City.Enabled
+# Enables Option 2 capital city opportunity generation.
+# Default: 1 (Enabled)
 #
-BotLevelBrackets.FullDebugMode = 0
+BotLevelBrackets.City.Enabled = 1
 
 #
-# BotLevelBrackets.LiteDebugMode
-# Enables lite debug logging (summary only).
-# Default: 0 (Disabled)
+# BotLevelBrackets.World.Enabled
+# Enables Option 2 outdoor world opportunity generation.
+# Default: 1 (Enabled)
 #
-BotLevelBrackets.LiteDebugMode = 0
+BotLevelBrackets.World.Enabled = 1
+
+#
+# BotLevelBrackets.City.ActivationMode
+# Method used to attach extension AI contexts to bots.
+# Values: Augmenter (external AiContextAugment seam)
+# Default: Augmenter
+#
+BotLevelBrackets.City.ActivationMode = Augmenter
 
 
 ###############################################################################
-# 2. RUNTIME FREQUENCIES & BATCH PROCESSING
+# 2. SHARED SCHEDULING BUDGETS & OPPORTUNITY CADENCE
 ###############################################################################
 
 #
-# BotLevelBrackets.CheckFrequency
-# Frequency (in seconds) at which the bot level distribution check is performed.
-# Default: 300 (5 minutes)
+# BotLevelBrackets.Opportunities.CheckSeconds
+# Cadence (in seconds) between distribution scheduling evaluations.
+# Default: 90
 #
-BotLevelBrackets.CheckFrequency = 300
+BotLevelBrackets.Opportunities.CheckSeconds = 90
 
 #
-# BotLevelBrackets.CheckFlaggedFrequency
-# Frequency (in seconds) at which level resets are processed for flagged bots.
-# Default: 15 (15 seconds)
+# BotLevelBrackets.Opportunities.StabilitySeconds
+# Deficit persistence and proposed opportunity TTL (in seconds).
+# Default: 60
 #
-BotLevelBrackets.CheckFlaggedFrequency = 15
+BotLevelBrackets.Opportunities.StabilitySeconds = 60
 
 #
-# BotLevelBrackets.FlaggedProcessLimit
-# Maximum number of flagged bots to process per pending reset step (0 = unlimited).
+# BotLevelBrackets.Opportunities.MaxAdmissionsPerCycle
+# Maximum combined opportunities (City + World + Fallback) admitted per cycle.
 # Default: 5
 #
-BotLevelBrackets.FlaggedProcessLimit = 5
+BotLevelBrackets.Opportunities.MaxAdmissionsPerCycle = 5
 
 #
-# BotLevelBrackets.MaxPendingQueueSize
-# Maximum number of bots that can be in the pending level reset queue at once.
-# When the limit is reached, new bots are not enqueued until slots become available.
-# 0 = unlimited (no cap on queue size).
-# Default: 0
+# BotLevelBrackets.Opportunities.MaxOutstandingPerFaction
+# Maximum combined active and pending opportunities per faction.
+# Default: 10
 #
-BotLevelBrackets.MaxPendingQueueSize = 0
+BotLevelBrackets.Opportunities.MaxOutstandingPerFaction = 10
 
 #
-# BotLevelBrackets.PendingQueueTTL
-# Maximum time (in seconds) a bot can remain in the pending level reset queue.
-# If a bot has not been processed within this time, its entry is dropped from the queue.
-# 0 = no TTL (saved resets wait through logout/restart until processed or cancelled).
-# Offline saved resets wait for login. Transient teleport intents are removed on logout.
-# Safety and eligibility are rechecked before either kind of action executes.
-# Default: 0
+# BotLevelBrackets.Opportunities.CrossDomainCooldownSeconds
+# Minimum cooldown before a bot may transition between City and World domains.
+# Prevents rapid oscillation between field questing and capital visits.
+# Default: 1800 (30 minutes)
 #
-BotLevelBrackets.PendingQueueTTL = 0
+BotLevelBrackets.Opportunities.CrossDomainCooldownSeconds = 1800
 
 #
-# BotLevelBrackets.MinBracketChangeThreshold
-# Minimum number of surplus bots a bracket must have before redistribution moves
-# any bots out of it. Prevents constant churn in near-balanced brackets where surplus
-# is only 1-2 bots.
-# 0 = disabled (always redistribute, even for a surplus of 1).
-# Default: 2
-#
-BotLevelBrackets.MinBracketChangeThreshold = 2
-
-
-###############################################################################
-# 3. REAL PLAYER SOCIAL PROTECTION & GUILD ISOLATION
-###############################################################################
-
-#
-# BotLevelBrackets.SocialListRefreshFrequency
-# Frequency (in seconds) at which human-player friends lists are refreshed from the database.
-# Runs independently of the main distribution check frequency.
-# Default: 300 (5 minutes)
-#
-BotLevelBrackets.SocialListRefreshFrequency = 300
-
-#
-# BotLevelBrackets.IgnoreFriendListed
-# Excludes bots that are on human-account characters' friends lists from bracket adjustments.
-# Default: 1 (Enabled)
-#
-BotLevelBrackets.IgnoreFriendListed = 1
-
-#
-# BotLevelBrackets.IgnoreGuildBotsWithRealPlayers
-# Excludes bots in a guild containing at least one human-account character,
-# including while that character is offline. `.blb cleanup` removes tracker
-# entries only after the guild no longer contains any human-account character.
-# Default: 1 (Enabled)
-#
-BotLevelBrackets.IgnoreGuildBotsWithRealPlayers = 1
-
-#
-# BotLevelBrackets.IgnoreArenaTeamBots
-# Excludes bots participating in Arenas (Blood Ring Map 26, Gurubashi Arena),
-# Battlegrounds (WSG, AB, AV, Sunnyglade Valley), or active PvP queues from bracket adjustments.
-# Default: 1 (Enabled)
-#
-BotLevelBrackets.IgnoreArenaTeamBots = 1
-
-#
-# BotLevelBrackets.GuildTrackerUpdateFrequency
-# Frequency (in seconds) at which the persistent guild tracker table is refreshed.
+# BotLevelBrackets.Opportunities.FailureBackoffSeconds
+# Backoff interval after a failed destination search or execution error.
 # Default: 600 (10 minutes)
 #
-BotLevelBrackets.GuildTrackerUpdateFrequency = 600
+BotLevelBrackets.Opportunities.FailureBackoffSeconds = 600
 
 
 ###############################################################################
-# 4. TELEPORTATION & RACIAL STARTER ZONE ROUTING
+# 3. OUTDOOR WORLD DISTRIBUTION & FIELD RESERVE
 ###############################################################################
 
 #
-# BotLevelBrackets.TeleportOnLevelChange
-# When enabled, bots are safely dismounted and teleported to an appropriate leveling zone
-# or capital hub after their level is adjusted. Level 1-9 bots are routed to their native
-# racial starter zones (including Thalassian Highlands for High Elves and Blackstone Island for Goblins).
-# Default: 1 (Enabled)
+# BotLevelBrackets.World.FieldReservePct
+# Minimum intended non-city bot supply share (0-100%).
+# City demand cannot draw below this guaranteed outdoor population reserve.
+# Default: 70 (70% of bots reserved for open world)
 #
-BotLevelBrackets.TeleportOnLevelChange = 1
+BotLevelBrackets.World.FieldReservePct = 70
 
 #
-# BotLevelBrackets.Teleport.ExecutionLimit
-# Shared maximum number of actual teleport attempts per 2-second executor tick.
-# Applies to level resets, hub gathering/dispersal, starter and wrong-map queues together.
-# Scheduling BotsPerCycle limits still apply separately; unsafe bots wait without
-# consuming attempts. Failed attempts count toward this execution budget.
-# Range: 1 - 500; Default: 25
+# BotLevelBrackets.World.MaxInboundPerRegion
+# Maximum inbound bot travel reservations allowed per outdoor region.
+# Default: 3
 #
-BotLevelBrackets.Teleport.ExecutionLimit = 25
+BotLevelBrackets.World.MaxInboundPerRegion = 3
 
 #
-# BotLevelBrackets.Teleport.MaxAttempts
-# Maximum attempts for a queued teleport before dropping it. Failures retry after
-# 2 * attempts seconds, behind fresh work. A later scheduler cycle may create new work.
-# Offline, protected, expired or superseded intents are cancelled instead of retried.
-# Range: 1 - 10; Default: 3
+# BotLevelBrackets.World.FollowHumanLocations
+# Whether to bias outdoor destination demand toward zones with active human players.
+# Default: 0 (Disabled)
 #
-BotLevelBrackets.Teleport.MaxAttempts = 3
+BotLevelBrackets.World.FollowHumanLocations = 0
+
+#
+# BotLevelBrackets.World.RegionConfig
+# Optional external path to custom region policy configuration file.
+# Default: ""
+#
+BotLevelBrackets.World.RegionConfig = ""
 
 
 ###############################################################################
-# 5. CAPITAL CITY HUB GATHERING, QUOTAS & POPULATION LIMITS
+# 4. LEVEL POLICY & ADVISORY REPORTING
 ###############################################################################
 
 #
-# BotLevelBrackets.HubDisperse.Enabled
-# When enabled, capital city ambiance gatherings and starting-zone dispersals are active.
-# Default: 1 (Enabled)
+# BotLevelBrackets.LevelPolicy.Mode
+# Policy for level distribution. In Option 2, character levels progress naturally.
+# Values: ObserveNative (advisory observation of native login ladder)
+# Default: ObserveNative
 #
-BotLevelBrackets.HubDisperse.Enabled = 1
+BotLevelBrackets.LevelPolicy.Mode = ObserveNative
+
+#
+# BotLevelBrackets.LevelPolicy.ReportDesiredTargets
+# Whether to include desired vs actual bracket targets in status reports.
+# Default: 1
+#
+BotLevelBrackets.LevelPolicy.ReportDesiredTargets = 1
+
+#
+# BotLevelBrackets.LevelPolicy.MinChangeThreshold
+# Damping threshold for dynamic bracket quota adjustments.
+# Default: 1
+#
+BotLevelBrackets.LevelPolicy.MinChangeThreshold = 1
+
+#
+# BotLevelBrackets.LevelPolicy.RealPlayerWeight
+# Multiplier weighting real human player level locations in dynamic blend.
+# Formula: alpha = RealPlayerWeight / (1 + RealPlayerWeight)
+# Default: 1.0
+#
+BotLevelBrackets.LevelPolicy.RealPlayerWeight = 1.0
+
+#
+# BotLevelBrackets.LevelPolicy.SyncFactions
+# Synchronize level bracket demand across Alliance and Horde.
+# Default: 0
+#
+BotLevelBrackets.LevelPolicy.SyncFactions = 0
+
+
+###############################################################################
+# 5. CAPITAL CITY HUB QUOTAS & LIMITS
+###############################################################################
 
 #
 # BotLevelBrackets.HubDisperse.QuotaMode
-# Quota calculation mode for capital city hub ambiance populations:
-#   1 = Total number (each city setting is an absolute bot count)
-#   2 = Percentage (each city setting is a percentage of online faction bots)
-# Default: 2 (Percentage mode)
+# Method for computing city target headcounts.
+# 1 = Fixed bot headcount
+# 2 = Percentage of online faction bots
+# Default: 2
 #
 BotLevelBrackets.HubDisperse.QuotaMode = 2
 
 #
-# BotLevelBrackets.HubDisperse.BotsPerCycle
-# Maximum number of bots to process per cycle for any teleport scheduler.
-# Default: 50
+# BotLevelBrackets.HubDisperse.LimitsMode
+# Method for bounding city targets.
+# 0 = Disabled
+# 1 = Fixed headcount limits (MinBotsPerHub / MaxBotsPerHub)
+# 2 = Percentage limits
+# Default: 1
 #
-BotLevelBrackets.HubDisperse.BotsPerCycle = 50
+BotLevelBrackets.HubDisperse.LimitsMode = 1
 
 #
 # BotLevelBrackets.HubDisperse.MinBotsLimitEnabled
-# Enables or disables the minimum population floor (MinBotsPerHub) across all capital cities.
-# When enabled (1), any active/nonzero city target that calculates to fewer bots than MinBotsPerHub
-# will be elevated up to the minimum floor.
-# When disabled (0), no minimum floor is enforced; city targets remain at their calculated values
-# regardless of how low they are.
-# Disabled cities (city setting 0) are NEVER forced to have bots, even when this limit is enabled.
-# Default: 0 (Disabled)
+# Enforce a minimum population bound for each city.
+# Default: 0
 #
 BotLevelBrackets.HubDisperse.MinBotsLimitEnabled = 0
 
 #
 # BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled
-# Enables or disables the maximum population ceiling (MaxBotsPerHub) across all capital cities.
-# When enabled (1), any city target that calculates to more bots than MaxBotsPerHub
-# will be capped down to the maximum ceiling.
-# When disabled (0), no maximum ceiling is enforced; city targets can grow as high as calculated
-# by the quota formula (up to the faction's total available online bot count).
-# Default: 1 (Enabled)
+# Enforce a maximum population ceiling for each city.
+# Default: 1
 #
 BotLevelBrackets.HubDisperse.MaxBotsLimitEnabled = 1
 
 #
-# BotLevelBrackets.HubDisperse.LimitsMode
-# Determines how MinBotsPerHub and MaxBotsPerHub are interpreted:
-#   1 = Total number (absolute bot headcount, e.g. Min 10 bots, Max 50 bots)
-#   2 = Percentage (percentage of total online faction bots, e.g. Min 5%, Max 25%)
-# Operates independently of QuotaMode: you may use percentage city targets with headcount limits,
-# or headcount city targets with percentage limits.
-# Default: 1 (Total number mode)
-#
-BotLevelBrackets.HubDisperse.LimitsMode = 1
-
-#
 # BotLevelBrackets.HubDisperse.MinBotsPerHub
-# Lower bound value for each nonzero city target when MinBotsLimitEnabled = 1.
-#   LimitsMode = 1: Treated as an absolute bot headcount (e.g., 10 = minimum 10 bots).
-#   LimitsMode = 2: Treated as a percentage of online faction bots (e.g., 5 = minimum 5% of faction bots).
-# If MaxBotsLimitEnabled = 1 and MinBotsPerHub exceeds MaxBotsPerHub, Min is automatically clamped
-# to Max with a warning.
-# Range: 0 - 500; Default: 0
+# Minimum bound value (headcount or percent).
+# Default: 0
 #
 BotLevelBrackets.HubDisperse.MinBotsPerHub = 0
 
 #
 # BotLevelBrackets.HubDisperse.MaxBotsPerHub
-# Upper bound value for each city target when MaxBotsLimitEnabled = 1.
-#   LimitsMode = 1: Treated as an absolute bot headcount (e.g., 50 = maximum 50 bots).
-#   LimitsMode = 2: Treated as a percentage of online faction bots (e.g., 20 = maximum 20% of faction bots).
-# Prevents capital cities from accumulating too many bots and draining leveling presence from
-# the open world.
-# Example: with Max 50 (Mode 1), a calculated city target of 70 is capped at 50 bots.
-# City targets can never exceed total online faction bots. All online random residents count toward
-# occupancy, including protected bots. Only safe, eligible bots are moved.
-# Range: 0 - 500; Default: 50
+# Maximum bound value (headcount or percent).
+# Default: 50
 #
 BotLevelBrackets.HubDisperse.MaxBotsPerHub = 50
 
 #
-# Per-City Targets (the existing Pct key names are retained in BOTH modes):
-# QuotaMode = 1: read each value as an absolute bot count, range 0 - 500.
-# QuotaMode = 2: read each value as a percentage, range 0 - 100.
-# Example: StormwindPct = 20 means 20 bots in mode 1, 20% in mode 2.
-# Specifies the exact percentage of total faction bots that should populate each capital city.
-# Defaults are balanced for a 100-bot faction (~20% across all 4 cities, leaving 80% out leveling in the world):
-#   - Primary trade capitals (Stormwind, Orgrimmar): 7% (~7 bots per 100 bots)
-#   - Secondary capitals (Ironforge, Undercity): 5% (~5 bots per 100 bots)
-#   - Regional & custom capitals (Darnassus, Alah'Thalas, Thunder Bluff, Sparkwater Port): 4% (~4 bots per 100 bots)
-# Set to 0 to disable bot gatherings in that specific capital city.
-#
-BotLevelBrackets.HubDisperse.StormwindPct     = 7
-BotLevelBrackets.HubDisperse.IronforgePct     = 5
-BotLevelBrackets.HubDisperse.DarnassusPct     = 4
-BotLevelBrackets.HubDisperse.AlahThalasPct    = 4
-
-BotLevelBrackets.HubDisperse.OrgrimmarPct     = 7
-BotLevelBrackets.HubDisperse.UndercityPct     = 5
-BotLevelBrackets.HubDisperse.ThunderBluffPct  = 4
-BotLevelBrackets.HubDisperse.SparkwaterPct    = 4
-
-
-###############################################################################
-# 6. CAPITAL CITY HUB SAFEGUARDS (HYSTERESIS, STABILITY & COOLDOWNS)
-###############################################################################
-
-#
 # BotLevelBrackets.HubDisperse.HysteresisBots
-# Defines the population deadband around a hub's lower and upper targets.
-# Hub relocation will only trigger if the deviation strictly exceeds this threshold.
-# Example: bounded city target 30, Hysteresis 2 -> counts 28 to 32 trigger no movement.
-# 0 = React immediately to any nonzero deviation (disables hysteresis).
-# Range: 0 - 100
+# Deadband threshold to prevent admission churn on marginal deficits.
 # Default: 2
 #
 BotLevelBrackets.HubDisperse.HysteresisBots = 2
 
-#
-# BotLevelBrackets.HubDisperse.StabilitySeconds
-# Number of consecutive seconds a hub population imbalance (deficit or surplus)
-# must persist before the system permits corrective bot relocation.
-# Prevents responding to temporary player logins, logouts, or brief travel spikes.
-# 0 = React immediately on the next cycle (disables stability delay).
-# Range: 0 - 3600 (Up to 1 hour)
-# Default: 60
-#
-BotLevelBrackets.HubDisperse.StabilitySeconds = 60
+# Capital City Target Quotas (Alliance: Stormwind, Ironforge, Darnassus, Alah'Thalas)
+BotLevelBrackets.HubDisperse.StormwindPct = 7
+BotLevelBrackets.HubDisperse.IronforgePct = 5
+BotLevelBrackets.HubDisperse.DarnassusPct = 4
+BotLevelBrackets.HubDisperse.AlahThalasPct = 4
 
-#
-# BotLevelBrackets.HubDisperse.CooldownSeconds
-# Minimum number of seconds before an individual bot can be relocated again
-# by the hub redistribution system (both inbound and outbound).
-# Prevents the same bot from being rapidly shuffled between city hubs and the wild.
-# Does NOT restrict wrong-map rescues, bracket re-leveling, or GM commands.
-# 0 = No individual cooldown (disables bot relocation cooldown).
-# Range: 0 - 86400 (Up to 24 hours)
-# Default: 180 (3 minutes)
-#
-BotLevelBrackets.HubDisperse.CooldownSeconds = 180
+# Capital City Target Quotas (Horde: Orgrimmar, Undercity, Thunder Bluff, Sparkwater)
+BotLevelBrackets.HubDisperse.OrgrimmarPct = 7
+BotLevelBrackets.HubDisperse.UndercityPct = 5
+BotLevelBrackets.HubDisperse.ThunderBluffPct = 4
+BotLevelBrackets.HubDisperse.SparkwaterPct = 4
 
 
 ###############################################################################
-# 7. CAPITAL CITY & OPEN-WORLD STRATEGY MANAGEMENT
+# 6. OPTION 3 RESTRICTED CITY RELOCATION FALLBACK
 ###############################################################################
 
 #
-# BotLevelBrackets.HubDisperse.ManageCityStrategies
-# When enabled, eligible idle bots entering a city receive its configured strategies once.
-# The module records the previous state of each strategy it changes, rather than
-# repeatedly resetting or overriding bots already in a city.
-# Default: 1 (Enabled)
+# BotLevelBrackets.City.Fallback.Enabled
+# Explicit opt-in for restricted city relocation fallback.
+# OFF by default. Never triggered by slow travel, retries, or timeouts.
+# Default: 0
 #
-BotLevelBrackets.HubDisperse.ManageCityStrategies = 1
+BotLevelBrackets.City.Fallback.Enabled = 0
 
 #
-# BotLevelBrackets.HubDisperse.CityStrategies
-# Non-combat strategies applied to bots when inside a capital city hub.
-# Promotes active movement to auctioneers, vendors, trainers, innkeepers, greeting players, and roleplay actions.
-# Default: +rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say
+# BotLevelBrackets.City.Fallback.Cities
+# Comma-separated allowlist of city names permitted for fallback relocation.
+# Default: ""
 #
-BotLevelBrackets.HubDisperse.CityStrategies = +rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+emote,+sit,+custom::say
+BotLevelBrackets.City.Fallback.Cities = ""
 
 #
-# BotLevelBrackets.HubDisperse.CityStripStrategies
-# Non-combat strategies stripped from bots when entering a capital city hub to prevent idle lock.
-# Stripping 'wander' prevents masterless bots from getting stuck in repetitive 'stop follow' halts.
-# Default: -grind,-wander,-loot,-tfish
+# BotLevelBrackets.City.Fallback.AllowedReason
+# Only allowlisted automated reason permitted for preflight fallback.
+# Default: NativeRouteUnsupportedBeforeStart
 #
-BotLevelBrackets.HubDisperse.CityStripStrategies = -grind,-wander,-loot,-tfish
+BotLevelBrackets.City.Fallback.AllowedReason = NativeRouteUnsupportedBeforeStart
 
 #
-# BotLevelBrackets.WorldTeleport.ResetStrategies
-# When enabled, restores the non-combat strategy changes owned by this module when
-# the bot leaves a city. Keeps unrelated strategies and observable later changes.
-# Does not reset combat/dead/reaction engines or bots without a module-owned snapshot.
-# The existing key name is retained for compatibility. No full AI reset is performed.
-# Default: 1 (Enabled)
+# BotLevelBrackets.City.Fallback.MaxPerCycle
+# Maximum fallback transfers permitted per scheduling cycle.
+# Default: 1
 #
-BotLevelBrackets.WorldTeleport.ResetStrategies = 1
-
-
-###############################################################################
-# 8. AUTONOMOUS WORLD SCHEDULER FREQUENCIES
-###############################################################################
+BotLevelBrackets.City.Fallback.MaxPerCycle = 1
 
 #
-# BotLevelBrackets.HubPopulate.Frequency
-# Frequency (in seconds) at which capital city hub population and dispersal runs.
-# Default: 90 (code fallback and template)
+# BotLevelBrackets.City.Fallback.MaxPerHour
+# Rolling global limit on fallback transfers per hour.
+# Default: 2
 #
-BotLevelBrackets.HubPopulate.Frequency = 90
+BotLevelBrackets.City.Fallback.MaxPerHour = 2
 
 #
-# BotLevelBrackets.StartingZoneDisperse.Frequency
-# Frequency (in seconds) at which over-leveled bots are dispersed from starting areas
-# (Northshire, Coldridge, Shadowglen, Thalassian Highlands [High Elf], Valley of Trials,
-# Red Cloud Mesa, Deathknell, Blackstone Island [Goblin]).
-# Default: 120 (code fallback and template)
+# BotLevelBrackets.City.Fallback.MaxSharePct
+# Maximum share (0-100%) of total admissions that can be fallback relocations.
+# Default: 10
 #
-BotLevelBrackets.StartingZoneDisperse.Frequency = 120
+BotLevelBrackets.City.Fallback.MaxSharePct = 10
 
 #
-# BotLevelBrackets.WrongMapDisperse.Frequency
-# Frequency (in seconds) at which bots stranded on invalid or non-continental maps
-# are dispersed to their appropriate leveling zones.
-# Default: 180 (code fallback and template)
+# BotLevelBrackets.City.Fallback.CooldownSeconds
+# Repeat relocation cooldown per bot per city.
+# Default: 7200 (2 hours)
 #
-BotLevelBrackets.WrongMapDisperse.Frequency = 180
-
-
-###############################################################################
-# 9. DYNAMIC REAL-PLAYER LEVEL DISTRIBUTION
-###############################################################################
+BotLevelBrackets.City.Fallback.CooldownSeconds = 7200
 
 #
-# BotLevelBrackets.Dynamic.UseDynamicDistribution
-# Dynamically adjusts bracket distribution percentages based on real player level clusters.
-# Default: 0 (Disabled)
+# BotLevelBrackets.City.Fallback.EarlyDepartureSeconds
+# Observation window to detect early departures after arrival.
+# Default: 120
 #
-BotLevelBrackets.Dynamic.UseDynamicDistribution = 0
+BotLevelBrackets.City.Fallback.EarlyDepartureSeconds = 120
 
 #
-# BotLevelBrackets.Dynamic.RealPlayerWeight
-# Controls how strongly bots follow real player concentrations.
-# Default: 1.0
+# BotLevelBrackets.City.Fallback.EarlyDepartureBackoffSeconds
+# Penalty backoff applied when a relocated bot leaves immediately.
+# Default: 21600 (6 hours)
 #
-BotLevelBrackets.Dynamic.RealPlayerWeight = 1.0
-
-#
-# BotLevelBrackets.Dynamic.SyncFactions
-# Synchronizes real player influence and bracket logic across Alliance and Horde.
-# Default: 0 (Disabled)
-#
-BotLevelBrackets.Dynamic.SyncFactions = 0
+BotLevelBrackets.City.Fallback.EarlyDepartureBackoffSeconds = 21600
 
 
 ###############################################################################
-# 10. BRACKET COUNTS & EXCLUSIONS
+# 7. SOCIAL PROTECTION & EXCLUSIONS
 ###############################################################################
-
-#
-# BotLevelBrackets.NumRanges
-# Number of level brackets configured. Default for Vanilla (1-60) is 7 ranges.
-# Default: 7
-#
-BotLevelBrackets.NumRanges = 7
 
 #
 # BotLevelBrackets.ExcludeNames
-# Comma-separated list of case-insensitive bot names to exclude from adjustments.
-# Example: "Botone,Bottwo"
+# Comma-separated list of bot character names permanently exempt from redistribution.
 # Default: ""
 #
 BotLevelBrackets.ExcludeNames = ""
 
+#
+# BotLevelBrackets.ProtectFriends
+# Protect bots on real human players' friend lists from scheduled opportunities.
+# Default: 1
+#
+BotLevelBrackets.ProtectFriends = 1
+
+#
+# BotLevelBrackets.ProtectGuilds
+# Protect bots belonging to guilds containing real human players.
+# Default: 1
+#
+BotLevelBrackets.ProtectGuilds = 1
+
+#
+# BotLevelBrackets.ProtectOfflineHumans
+# Persist guild protection even when human guild members are offline.
+# Default: 1
+#
+BotLevelBrackets.ProtectOfflineHumans = 1
+
+#
+# BotLevelBrackets.SocialCacheRefreshSeconds
+# Cadence (in seconds) for refreshing social friend lists and guild tracking caches.
+# Default: 120
+#
+BotLevelBrackets.SocialCacheRefreshSeconds = 120
+
 
 ###############################################################################
-# 11. ALLIANCE LEVEL BRACKETS CONFIGURATION (Percentages must sum to 100)
+# 8. NATIVE ACTIVITIES CATALOG CONTROLS (43 ACTIVITIES)
 ###############################################################################
 
+#
+# BotLevelBrackets.Activities.Enabled
+# Master switch for activities framework.
+# Default: 1
+#
+BotLevelBrackets.Activities.Enabled = 1
+
+#
+# BotLevelBrackets.Activities.RequireSupported
+# Reject policy atomically if an unsupported activity is enabled.
+# Default: 0
+#
+BotLevelBrackets.Activities.RequireSupported = 0
+
+# 1. QuestAccept
+BotLevelBrackets.Activities.QuestAccept.Enabled = 1
+BotLevelBrackets.Activities.QuestAccept.CityEnabled = 1
+BotLevelBrackets.Activities.QuestAccept.WorldEnabled = 1
+BotLevelBrackets.Activities.QuestAccept.Weight = 1.0
+BotLevelBrackets.Activities.QuestAccept.CooldownSeconds = 300
+BotLevelBrackets.Activities.QuestAccept.MaxOutstandingPerFaction = 2
+
+# 2. QuestObjective
+BotLevelBrackets.Activities.QuestObjective.Enabled = 1
+BotLevelBrackets.Activities.QuestObjective.CityEnabled = 0
+BotLevelBrackets.Activities.QuestObjective.WorldEnabled = 1
+BotLevelBrackets.Activities.QuestObjective.Weight = 1.0
+BotLevelBrackets.Activities.QuestObjective.CooldownSeconds = 300
+BotLevelBrackets.Activities.QuestObjective.MaxOutstandingPerFaction = 2
+
+# 3. QuestTurnIn
+BotLevelBrackets.Activities.QuestTurnIn.Enabled = 1
+BotLevelBrackets.Activities.QuestTurnIn.CityEnabled = 1
+BotLevelBrackets.Activities.QuestTurnIn.WorldEnabled = 1
+BotLevelBrackets.Activities.QuestTurnIn.Weight = 1.0
+BotLevelBrackets.Activities.QuestTurnIn.CooldownSeconds = 300
+BotLevelBrackets.Activities.QuestTurnIn.MaxOutstandingPerFaction = 2
+
+# 4. QuestRepeat
+BotLevelBrackets.Activities.QuestRepeat.Enabled = 0
+BotLevelBrackets.Activities.QuestRepeat.CityEnabled = 0
+BotLevelBrackets.Activities.QuestRepeat.WorldEnabled = 0
+BotLevelBrackets.Activities.QuestRepeat.Weight = 0.5
+BotLevelBrackets.Activities.QuestRepeat.CooldownSeconds = 600
+BotLevelBrackets.Activities.QuestRepeat.MaxOutstandingPerFaction = 1
+
+# 5. Grinding
+BotLevelBrackets.Activities.Grinding.Enabled = 1
+BotLevelBrackets.Activities.Grinding.CityEnabled = 0
+BotLevelBrackets.Activities.Grinding.WorldEnabled = 1
+BotLevelBrackets.Activities.Grinding.Weight = 1.0
+BotLevelBrackets.Activities.Grinding.CooldownSeconds = 300
+BotLevelBrackets.Activities.Grinding.MaxOutstandingPerFaction = 3
+
+# 6. Exploration
+BotLevelBrackets.Activities.Exploration.Enabled = 1
+BotLevelBrackets.Activities.Exploration.CityEnabled = 1
+BotLevelBrackets.Activities.Exploration.WorldEnabled = 1
+BotLevelBrackets.Activities.Exploration.Weight = 0.8
+BotLevelBrackets.Activities.Exploration.CooldownSeconds = 600
+BotLevelBrackets.Activities.Exploration.MaxOutstandingPerFaction = 2
+
+# 7. GenericRpg
+BotLevelBrackets.Activities.GenericRpg.Enabled = 1
+BotLevelBrackets.Activities.GenericRpg.CityEnabled = 1
+BotLevelBrackets.Activities.GenericRpg.WorldEnabled = 1
+BotLevelBrackets.Activities.GenericRpg.Weight = 1.0
+BotLevelBrackets.Activities.GenericRpg.CooldownSeconds = 300
+BotLevelBrackets.Activities.GenericRpg.MaxOutstandingPerFaction = 2
+
+# 8. VendorSell
+BotLevelBrackets.Activities.VendorSell.Enabled = 1
+BotLevelBrackets.Activities.VendorSell.CityEnabled = 1
+BotLevelBrackets.Activities.VendorSell.WorldEnabled = 1
+BotLevelBrackets.Activities.VendorSell.Weight = 1.0
+BotLevelBrackets.Activities.VendorSell.CooldownSeconds = 300
+BotLevelBrackets.Activities.VendorSell.MaxOutstandingPerFaction = 2
+
+# 9. VendorBuy
+BotLevelBrackets.Activities.VendorBuy.Enabled = 1
+BotLevelBrackets.Activities.VendorBuy.CityEnabled = 1
+BotLevelBrackets.Activities.VendorBuy.WorldEnabled = 1
+BotLevelBrackets.Activities.VendorBuy.Weight = 1.0
+BotLevelBrackets.Activities.VendorBuy.CooldownSeconds = 300
+BotLevelBrackets.Activities.VendorBuy.MaxOutstandingPerFaction = 2
+
+# 10. Repair
+BotLevelBrackets.Activities.Repair.Enabled = 1
+BotLevelBrackets.Activities.Repair.CityEnabled = 1
+BotLevelBrackets.Activities.Repair.WorldEnabled = 1
+BotLevelBrackets.Activities.Repair.Weight = 1.0
+BotLevelBrackets.Activities.Repair.CooldownSeconds = 300
+BotLevelBrackets.Activities.Repair.MaxOutstandingPerFaction = 2
+
+# 11. ClassTraining
+BotLevelBrackets.Activities.ClassTraining.Enabled = 1
+BotLevelBrackets.Activities.ClassTraining.CityEnabled = 1
+BotLevelBrackets.Activities.ClassTraining.WorldEnabled = 1
+BotLevelBrackets.Activities.ClassTraining.Weight = 1.0
+BotLevelBrackets.Activities.ClassTraining.CooldownSeconds = 600
+BotLevelBrackets.Activities.ClassTraining.MaxOutstandingPerFaction = 2
+
+# 12. ProfessionTraining
+BotLevelBrackets.Activities.ProfessionTraining.Enabled = 1
+BotLevelBrackets.Activities.ProfessionTraining.CityEnabled = 1
+BotLevelBrackets.Activities.ProfessionTraining.WorldEnabled = 1
+BotLevelBrackets.Activities.ProfessionTraining.Weight = 0.8
+BotLevelBrackets.Activities.ProfessionTraining.CooldownSeconds = 600
+BotLevelBrackets.Activities.ProfessionTraining.MaxOutstandingPerFaction = 2
+
+# 13. MountTraining
+BotLevelBrackets.Activities.MountTraining.Enabled = 0
+BotLevelBrackets.Activities.MountTraining.CityEnabled = 0
+BotLevelBrackets.Activities.MountTraining.WorldEnabled = 0
+BotLevelBrackets.Activities.MountTraining.Weight = 0.5
+BotLevelBrackets.Activities.MountTraining.CooldownSeconds = 1800
+BotLevelBrackets.Activities.MountTraining.MaxOutstandingPerFaction = 1
+
+# 14. MountPurchase
+BotLevelBrackets.Activities.MountPurchase.Enabled = 0
+BotLevelBrackets.Activities.MountPurchase.CityEnabled = 0
+BotLevelBrackets.Activities.MountPurchase.WorldEnabled = 0
+BotLevelBrackets.Activities.MountPurchase.Weight = 0.5
+BotLevelBrackets.Activities.MountPurchase.CooldownSeconds = 1800
+BotLevelBrackets.Activities.MountPurchase.MaxOutstandingPerFaction = 1
+
+# 15. ReagentPurchase
+BotLevelBrackets.Activities.ReagentPurchase.Enabled = 1
+BotLevelBrackets.Activities.ReagentPurchase.CityEnabled = 1
+BotLevelBrackets.Activities.ReagentPurchase.WorldEnabled = 1
+BotLevelBrackets.Activities.ReagentPurchase.Weight = 1.0
+BotLevelBrackets.Activities.ReagentPurchase.CooldownSeconds = 600
+BotLevelBrackets.Activities.ReagentPurchase.MaxOutstandingPerFaction = 2
+
+# 16. AuctionSell
+BotLevelBrackets.Activities.AuctionSell.Enabled = 1
+BotLevelBrackets.Activities.AuctionSell.CityEnabled = 1
+BotLevelBrackets.Activities.AuctionSell.WorldEnabled = 0
+BotLevelBrackets.Activities.AuctionSell.Weight = 1.0
+BotLevelBrackets.Activities.AuctionSell.CooldownSeconds = 600
+BotLevelBrackets.Activities.AuctionSell.MaxOutstandingPerFaction = 2
+
+# 17. AuctionBuy
+BotLevelBrackets.Activities.AuctionBuy.Enabled = 0
+BotLevelBrackets.Activities.AuctionBuy.CityEnabled = 0
+BotLevelBrackets.Activities.AuctionBuy.WorldEnabled = 0
+BotLevelBrackets.Activities.AuctionBuy.Weight = 0.5
+BotLevelBrackets.Activities.AuctionBuy.CooldownSeconds = 1200
+BotLevelBrackets.Activities.AuctionBuy.MaxOutstandingPerFaction = 1
+
+# 18. Mailbox
+BotLevelBrackets.Activities.Mailbox.Enabled = 1
+BotLevelBrackets.Activities.Mailbox.CityEnabled = 1
+BotLevelBrackets.Activities.Mailbox.WorldEnabled = 1
+BotLevelBrackets.Activities.Mailbox.Weight = 1.0
+BotLevelBrackets.Activities.Mailbox.CooldownSeconds = 300
+BotLevelBrackets.Activities.Mailbox.MaxOutstandingPerFaction = 2
+
+# 19. GatherHerbalism
+BotLevelBrackets.Activities.GatherHerbalism.Enabled = 1
+BotLevelBrackets.Activities.GatherHerbalism.CityEnabled = 0
+BotLevelBrackets.Activities.GatherHerbalism.WorldEnabled = 1
+BotLevelBrackets.Activities.GatherHerbalism.Weight = 1.0
+BotLevelBrackets.Activities.GatherHerbalism.CooldownSeconds = 300
+BotLevelBrackets.Activities.GatherHerbalism.MaxOutstandingPerFaction = 2
+
+# 20. GatherMining
+BotLevelBrackets.Activities.GatherMining.Enabled = 1
+BotLevelBrackets.Activities.GatherMining.CityEnabled = 0
+BotLevelBrackets.Activities.GatherMining.WorldEnabled = 1
+BotLevelBrackets.Activities.GatherMining.Weight = 1.0
+BotLevelBrackets.Activities.GatherMining.CooldownSeconds = 300
+BotLevelBrackets.Activities.GatherMining.MaxOutstandingPerFaction = 2
+
+# 21. Skinning
+BotLevelBrackets.Activities.Skinning.Enabled = 1
+BotLevelBrackets.Activities.Skinning.CityEnabled = 0
+BotLevelBrackets.Activities.Skinning.WorldEnabled = 1
+BotLevelBrackets.Activities.Skinning.Weight = 1.0
+BotLevelBrackets.Activities.Skinning.CooldownSeconds = 60
+BotLevelBrackets.Activities.Skinning.MaxOutstandingPerFaction = 2
+
+# 22. Fishing
+BotLevelBrackets.Activities.Fishing.Enabled = 0
+BotLevelBrackets.Activities.Fishing.CityEnabled = 0
+BotLevelBrackets.Activities.Fishing.WorldEnabled = 0
+BotLevelBrackets.Activities.Fishing.Weight = 0.5
+BotLevelBrackets.Activities.Fishing.CooldownSeconds = 600
+BotLevelBrackets.Activities.Fishing.MaxOutstandingPerFaction = 1
+
+# 23. Crafting
+BotLevelBrackets.Activities.Crafting.Enabled = 0
+BotLevelBrackets.Activities.Crafting.CityEnabled = 0
+BotLevelBrackets.Activities.Crafting.WorldEnabled = 0
+BotLevelBrackets.Activities.Crafting.Weight = 0.5
+BotLevelBrackets.Activities.Crafting.CooldownSeconds = 600
+BotLevelBrackets.Activities.Crafting.MaxOutstandingPerFaction = 1
+
+# 24. Gossip
+BotLevelBrackets.Activities.Gossip.Enabled = 1
+BotLevelBrackets.Activities.Gossip.CityEnabled = 1
+BotLevelBrackets.Activities.Gossip.WorldEnabled = 1
+BotLevelBrackets.Activities.Gossip.Weight = 1.0
+BotLevelBrackets.Activities.Gossip.CooldownSeconds = 120
+BotLevelBrackets.Activities.Gossip.MaxOutstandingPerFaction = 2
+
+# 25. Emote
+BotLevelBrackets.Activities.Emote.Enabled = 0
+BotLevelBrackets.Activities.Emote.CityEnabled = 0
+BotLevelBrackets.Activities.Emote.WorldEnabled = 0
+BotLevelBrackets.Activities.Emote.Weight = 0.3
+BotLevelBrackets.Activities.Emote.CooldownSeconds = 300
+BotLevelBrackets.Activities.Emote.MaxOutstandingPerFaction = 1
+
+# 26. RestSit
+BotLevelBrackets.Activities.RestSit.Enabled = 0
+BotLevelBrackets.Activities.RestSit.CityEnabled = 0
+BotLevelBrackets.Activities.RestSit.WorldEnabled = 0
+BotLevelBrackets.Activities.RestSit.Weight = 0.5
+BotLevelBrackets.Activities.RestSit.CooldownSeconds = 600
+BotLevelBrackets.Activities.RestSit.MaxOutstandingPerFaction = 1
+
+# 27. SocialHeal
+BotLevelBrackets.Activities.SocialHeal.Enabled = 0
+BotLevelBrackets.Activities.SocialHeal.CityEnabled = 0
+BotLevelBrackets.Activities.SocialHeal.WorldEnabled = 0
+BotLevelBrackets.Activities.SocialHeal.Weight = 0.5
+BotLevelBrackets.Activities.SocialHeal.CooldownSeconds = 180
+BotLevelBrackets.Activities.SocialHeal.MaxOutstandingPerFaction = 1
+
+# 28. NpcUse
+BotLevelBrackets.Activities.NpcUse.Enabled = 0
+BotLevelBrackets.Activities.NpcUse.CityEnabled = 0
+BotLevelBrackets.Activities.NpcUse.WorldEnabled = 0
+BotLevelBrackets.Activities.NpcUse.Weight = 0.5
+BotLevelBrackets.Activities.NpcUse.CooldownSeconds = 300
+BotLevelBrackets.Activities.NpcUse.MaxOutstandingPerFaction = 1
+
+# 29. FlightDiscovery
+BotLevelBrackets.Activities.FlightDiscovery.Enabled = 1
+BotLevelBrackets.Activities.FlightDiscovery.CityEnabled = 1
+BotLevelBrackets.Activities.FlightDiscovery.WorldEnabled = 1
+BotLevelBrackets.Activities.FlightDiscovery.Weight = 1.0
+BotLevelBrackets.Activities.FlightDiscovery.CooldownSeconds = 600
+BotLevelBrackets.Activities.FlightDiscovery.MaxOutstandingPerFaction = 2
+
+# 30. GuildMeeting
+BotLevelBrackets.Activities.GuildMeeting.Enabled = 0
+BotLevelBrackets.Activities.GuildMeeting.CityEnabled = 0
+BotLevelBrackets.Activities.GuildMeeting.WorldEnabled = 0
+BotLevelBrackets.Activities.GuildMeeting.Weight = 0.3
+BotLevelBrackets.Activities.GuildMeeting.CooldownSeconds = 1800
+BotLevelBrackets.Activities.GuildMeeting.MaxOutstandingPerFaction = 1
+
+# 31. GuildOrder
+BotLevelBrackets.Activities.GuildOrder.Enabled = 0
+BotLevelBrackets.Activities.GuildOrder.CityEnabled = 0
+BotLevelBrackets.Activities.GuildOrder.WorldEnabled = 0
+BotLevelBrackets.Activities.GuildOrder.Weight = 0.3
+BotLevelBrackets.Activities.GuildOrder.CooldownSeconds = 1800
+BotLevelBrackets.Activities.GuildOrder.MaxOutstandingPerFaction = 1
+
+# 32. GuildPetition
+BotLevelBrackets.Activities.GuildPetition.Enabled = 0
+BotLevelBrackets.Activities.GuildPetition.CityEnabled = 0
+BotLevelBrackets.Activities.GuildPetition.WorldEnabled = 0
+BotLevelBrackets.Activities.GuildPetition.Weight = 0.2
+BotLevelBrackets.Activities.GuildPetition.CooldownSeconds = 3600
+BotLevelBrackets.Activities.GuildPetition.MaxOutstandingPerFaction = 1
+
+# 33. PlayerTrade
+BotLevelBrackets.Activities.PlayerTrade.Enabled = 0
+BotLevelBrackets.Activities.PlayerTrade.CityEnabled = 0
+BotLevelBrackets.Activities.PlayerTrade.WorldEnabled = 0
+BotLevelBrackets.Activities.PlayerTrade.Weight = 0.2
+BotLevelBrackets.Activities.PlayerTrade.CooldownSeconds = 1800
+BotLevelBrackets.Activities.PlayerTrade.MaxOutstandingPerFaction = 1
+
+# 34. EnchantService
+BotLevelBrackets.Activities.EnchantService.Enabled = 0
+BotLevelBrackets.Activities.EnchantService.CityEnabled = 0
+BotLevelBrackets.Activities.EnchantService.WorldEnabled = 0
+BotLevelBrackets.Activities.EnchantService.Weight = 0.2
+BotLevelBrackets.Activities.EnchantService.CooldownSeconds = 1800
+BotLevelBrackets.Activities.EnchantService.MaxOutstandingPerFaction = 1
+
+# 35. Duel
+BotLevelBrackets.Activities.Duel.Enabled = 0
+BotLevelBrackets.Activities.Duel.CityEnabled = 0
+BotLevelBrackets.Activities.Duel.WorldEnabled = 0
+BotLevelBrackets.Activities.Duel.Weight = 0.2
+BotLevelBrackets.Activities.Duel.CooldownSeconds = 1800
+BotLevelBrackets.Activities.Duel.MaxOutstandingPerFaction = 1
+
+# 36. WorldPvp
+BotLevelBrackets.Activities.WorldPvp.Enabled = 0
+BotLevelBrackets.Activities.WorldPvp.CityEnabled = 0
+BotLevelBrackets.Activities.WorldPvp.WorldEnabled = 0
+BotLevelBrackets.Activities.WorldPvp.Weight = 0.4
+BotLevelBrackets.Activities.WorldPvp.CooldownSeconds = 1200
+BotLevelBrackets.Activities.WorldPvp.MaxOutstandingPerFaction = 1
+
+# 37. BossHunt
+BotLevelBrackets.Activities.BossHunt.Enabled = 0
+BotLevelBrackets.Activities.BossHunt.CityEnabled = 0
+BotLevelBrackets.Activities.BossHunt.WorldEnabled = 0
+BotLevelBrackets.Activities.BossHunt.Weight = 0.3
+BotLevelBrackets.Activities.BossHunt.CooldownSeconds = 3600
+BotLevelBrackets.Activities.BossHunt.MaxOutstandingPerFaction = 1
+
+# 38. BattlegroundQueue
+BotLevelBrackets.Activities.BattlegroundQueue.Enabled = 0
+BotLevelBrackets.Activities.BattlegroundQueue.CityEnabled = 0
+BotLevelBrackets.Activities.BattlegroundQueue.WorldEnabled = 0
+BotLevelBrackets.Activities.BattlegroundQueue.Weight = 0.0
+BotLevelBrackets.Activities.BattlegroundQueue.CooldownSeconds = 0
+BotLevelBrackets.Activities.BattlegroundQueue.MaxOutstandingPerFaction = 0
+
+# 39. DungeonQueue
+BotLevelBrackets.Activities.DungeonQueue.Enabled = 0
+BotLevelBrackets.Activities.DungeonQueue.CityEnabled = 0
+BotLevelBrackets.Activities.DungeonQueue.WorldEnabled = 0
+BotLevelBrackets.Activities.DungeonQueue.Weight = 0.0
+BotLevelBrackets.Activities.DungeonQueue.CooldownSeconds = 0
+BotLevelBrackets.Activities.DungeonQueue.MaxOutstandingPerFaction = 0
+
+# 40. HomeBind
+BotLevelBrackets.Activities.HomeBind.Enabled = 0
+BotLevelBrackets.Activities.HomeBind.CityEnabled = 0
+BotLevelBrackets.Activities.HomeBind.WorldEnabled = 0
+BotLevelBrackets.Activities.HomeBind.Weight = 0.0
+BotLevelBrackets.Activities.HomeBind.CooldownSeconds = 0
+BotLevelBrackets.Activities.HomeBind.MaxOutstandingPerFaction = 0
+
+# 41. AmbientChat
+BotLevelBrackets.Activities.AmbientChat.Enabled = 0
+BotLevelBrackets.Activities.AmbientChat.CityEnabled = 0
+BotLevelBrackets.Activities.AmbientChat.WorldEnabled = 0
+BotLevelBrackets.Activities.AmbientChat.Weight = 0.2
+BotLevelBrackets.Activities.AmbientChat.CooldownSeconds = 600
+BotLevelBrackets.Activities.AmbientChat.MaxOutstandingPerFaction = 1
+
+# 42. RandomJump
+BotLevelBrackets.Activities.RandomJump.Enabled = 0
+BotLevelBrackets.Activities.RandomJump.CityEnabled = 0
+BotLevelBrackets.Activities.RandomJump.WorldEnabled = 0
+BotLevelBrackets.Activities.RandomJump.Weight = 0.2
+BotLevelBrackets.Activities.RandomJump.CooldownSeconds = 300
+BotLevelBrackets.Activities.RandomJump.MaxOutstandingPerFaction = 1
+
+
+###############################################################################
+# 9. MODULE-LOCAL DEBUG ENVIRONMENT & TELEMETRY
+###############################################################################
+
+#
+# BotLevelBrackets.Debug.Mode
+# Operational debugging mode.
+# Values: Off, Summary, Trace, DryRun
+# Default: Off
+#
+BotLevelBrackets.Debug.Mode = Off
+
+#
+# BotLevelBrackets.Debug.Output
+# Destination sink for debug event logs.
+# Values: CoreLog, Export
+# Default: CoreLog
+#
+BotLevelBrackets.Debug.Output = CoreLog
+
+#
+# BotLevelBrackets.Debug.Categories
+# Comma-separated list of active debug categories or 'All'.
+# Default: Summary
+#
+BotLevelBrackets.Debug.Categories = Summary
+
+# Filters for scoped debugging
+BotLevelBrackets.Debug.BotGuids = ""
+BotLevelBrackets.Debug.Activities = ""
+BotLevelBrackets.Debug.Cities = ""
+BotLevelBrackets.Debug.Regions = ""
+
+# Sampling & rate limits
+BotLevelBrackets.Debug.SamplePct = 10
+BotLevelBrackets.Debug.MaxEventsPerSecond = 50
+BotLevelBrackets.Debug.RingBufferEvents = 2000
+BotLevelBrackets.Debug.RetentionSeconds = 3600
+BotLevelBrackets.Debug.Performance.Enabled = 1
+BotLevelBrackets.Debug.Assertions.Enabled = 0
+
+# JSONL Export settings
+BotLevelBrackets.Debug.Export.Enabled = 0
+BotLevelBrackets.Debug.Export.Directory = logs/bot_level_brackets
+BotLevelBrackets.Debug.Export.MaxFileMiB = 10
+BotLevelBrackets.Debug.Export.MaxFiles = 5
+BotLevelBrackets.Debug.TraceMaxSeconds = 300
+
+
+###############################################################################
+# 10. LEVEL BRACKET DEFINITIONS (ALLIANCE & HORDE)
+###############################################################################
+
+#
+# BotLevelBrackets.NumRanges
+# Number of configured level ranges per faction (1-15).
+# Default: 6
+#
+BotLevelBrackets.NumRanges = 6
+
+# Alliance Brackets
 BotLevelBrackets.Alliance.Range1.Lower = 1
 BotLevelBrackets.Alliance.Range1.Upper = 9
-BotLevelBrackets.Alliance.Range1.Pct   = 16
+BotLevelBrackets.Alliance.Range1.Pct = 16
 
 BotLevelBrackets.Alliance.Range2.Lower = 10
 BotLevelBrackets.Alliance.Range2.Upper = 19
-BotLevelBrackets.Alliance.Range2.Pct   = 14
+BotLevelBrackets.Alliance.Range2.Pct = 16
 
 BotLevelBrackets.Alliance.Range3.Lower = 20
 BotLevelBrackets.Alliance.Range3.Upper = 29
-BotLevelBrackets.Alliance.Range3.Pct   = 14
+BotLevelBrackets.Alliance.Range3.Pct = 16
 
 BotLevelBrackets.Alliance.Range4.Lower = 30
 BotLevelBrackets.Alliance.Range4.Upper = 39
-BotLevelBrackets.Alliance.Range4.Pct   = 14
+BotLevelBrackets.Alliance.Range4.Pct = 16
 
 BotLevelBrackets.Alliance.Range5.Lower = 40
 BotLevelBrackets.Alliance.Range5.Upper = 49
-BotLevelBrackets.Alliance.Range5.Pct   = 14
+BotLevelBrackets.Alliance.Range5.Pct = 16
 
 BotLevelBrackets.Alliance.Range6.Lower = 50
-BotLevelBrackets.Alliance.Range6.Upper = 59
-BotLevelBrackets.Alliance.Range6.Pct   = 14
+BotLevelBrackets.Alliance.Range6.Upper = 60
+BotLevelBrackets.Alliance.Range6.Pct = 20
 
-BotLevelBrackets.Alliance.Range7.Lower = 60
-BotLevelBrackets.Alliance.Range7.Upper = 60
-BotLevelBrackets.Alliance.Range7.Pct   = 14
-
-
-###############################################################################
-# 12. HORDE LEVEL BRACKETS CONFIGURATION (Percentages must sum to 100)
-###############################################################################
-
+# Horde Brackets
 BotLevelBrackets.Horde.Range1.Lower = 1
 BotLevelBrackets.Horde.Range1.Upper = 9
-BotLevelBrackets.Horde.Range1.Pct   = 16
+BotLevelBrackets.Horde.Range1.Pct = 16
 
 BotLevelBrackets.Horde.Range2.Lower = 10
 BotLevelBrackets.Horde.Range2.Upper = 19
-BotLevelBrackets.Horde.Range2.Pct   = 14
+BotLevelBrackets.Horde.Range2.Pct = 16
 
 BotLevelBrackets.Horde.Range3.Lower = 20
 BotLevelBrackets.Horde.Range3.Upper = 29
-BotLevelBrackets.Horde.Range3.Pct   = 14
+BotLevelBrackets.Horde.Range3.Pct = 16
 
 BotLevelBrackets.Horde.Range4.Lower = 30
 BotLevelBrackets.Horde.Range4.Upper = 39
-BotLevelBrackets.Horde.Range4.Pct   = 14
+BotLevelBrackets.Horde.Range4.Pct = 16
 
 BotLevelBrackets.Horde.Range5.Lower = 40
 BotLevelBrackets.Horde.Range5.Upper = 49
-BotLevelBrackets.Horde.Range5.Pct   = 14
+BotLevelBrackets.Horde.Range5.Pct = 16
 
 BotLevelBrackets.Horde.Range6.Lower = 50
-BotLevelBrackets.Horde.Range6.Upper = 59
-BotLevelBrackets.Horde.Range6.Pct   = 14
-
-BotLevelBrackets.Horde.Range7.Lower = 60
-BotLevelBrackets.Horde.Range7.Upper = 60
-BotLevelBrackets.Horde.Range7.Pct   = 14
-
-
+BotLevelBrackets.Horde.Range6.Upper = 60
+BotLevelBrackets.Horde.Range6.Pct = 20
