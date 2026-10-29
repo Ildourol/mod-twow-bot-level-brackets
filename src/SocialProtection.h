@@ -31,6 +31,40 @@ namespace Brackets
 
         void UpdateExcludeNames(const std::vector<std::string>& names);
 
+        void AddSocialFriend(ObjectGuid /*humanGuid*/, ObjectGuid botGuid)
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_friendsList.insert(botGuid.GetCounter());
+        }
+
+        void AddPersistentGuild(uint32 guildId)
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_persistentRealPlayerGuildIds.insert(guildId);
+        }
+
+        bool IsSocialProtected(ObjectGuid botGuid) const
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            return m_friendsList.find(botGuid.GetCounter()) != m_friendsList.end();
+        }
+
+        bool IsSocialProtectedGuild(uint32 guildId) const
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            return m_persistentRealPlayerGuildIds.find(guildId) != m_persistentRealPlayerGuildIds.end() ||
+                   m_onlineRealPlayerGuildIds.find(guildId) != m_onlineRealPlayerGuildIds.end();
+        }
+
+        void Clear()
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_friendsList.clear();
+            m_onlineRealPlayerGuildIds.clear();
+            m_persistentRealPlayerGuildIds.clear();
+            m_excludeNames.clear();
+        }
+
         size_t GetProtectedFriendsCount() const;
         size_t GetProtectedGuildsCount() const;
 

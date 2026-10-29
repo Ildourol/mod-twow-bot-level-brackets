@@ -37,6 +37,15 @@ namespace Brackets
         uint32 GetFailedRelocations() const { return m_failedRelocations; }
 
         void ResetCounters();
+        void Clear()
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_recentRelocationTimes.clear();
+            m_botCityCooldown.clear();
+            m_botEarlyDepartureBackoff.clear();
+            m_totalRelocations = 0;
+            m_failedRelocations = 0;
+        }
 
     private:
         CityRelocationFallback() = default;

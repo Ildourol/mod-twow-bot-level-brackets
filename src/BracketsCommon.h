@@ -93,6 +93,7 @@ namespace Brackets
         REASON_MODULE_DISABLED,
         REASON_LEVEL_OUTGROWN,
         REASON_STALLED,
+        REASON_FAILED,
         REASON_EARLY_DEPARTURE
     };
 
@@ -125,6 +126,7 @@ namespace Brackets
             case REASON_MODULE_DISABLED:               return "ModuleDisabled";
             case REASON_LEVEL_OUTGROWN:                return "LevelOutgrown";
             case REASON_STALLED:                       return "Stalled";
+            case REASON_FAILED:                        return "Failed";
             case REASON_EARLY_DEPARTURE:               return "EarlyDeparture";
             default:                                   return "None";
         }

@@ -89,6 +89,10 @@ namespace Brackets
 
         CensusSnapshot TakeSnapshot();
         const CensusSnapshot& GetLatestSnapshot() const { return m_latestSnapshot; }
+        void Reset() { m_latestSnapshot = CensusSnapshot{}; }
+
+        static std::vector<uint32> CalculateLargestRemainderQuotas(const std::vector<float>& shares, uint32 total);
+        static int32 CalculateActionableDeficit(uint32 target, uint32 current, uint32 hysteresis);
 
     private:
         PopulationCensus() = default;

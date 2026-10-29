@@ -53,6 +53,8 @@
  * 2. Legacy PlayerBots (Vendored monolithic engine in older vMaNGOS forks)
  * 3. Generic Headless Session Mode (Pure tortoise-wow core with zero bot headers)
  */
+class PlayerbotAI;
+
 class BotEngineAdapter
 {
 public:

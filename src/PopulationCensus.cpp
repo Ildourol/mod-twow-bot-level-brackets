@@ -349,4 +349,47 @@ namespace Brackets
         computeBlend(snap.allianceBrackets, snap.allianceBotsOnline);
         computeBlend(snap.hordeBrackets, snap.hordeBotsOnline);
     }
+
+    std::vector<uint32> PopulationCensus::CalculateLargestRemainderQuotas(const std::vector<float>& shares, uint32 total)
+    {
+        std::vector<uint32> floored(shares.size(), 0);
+        if (shares.empty() || total == 0)
+            return floored;
+
+        float sumShares = 0.0f;
+        for (float s : shares)
+            sumShares += s;
+        if (sumShares <= 0.0f)
+            sumShares = 1.0f;
+
+        std::vector<float> exact(shares.size());
+        std::vector<std::pair<float, size_t>> remainders(shares.size());
+        uint32 allocated = 0;
+
+        for (size_t i = 0; i < shares.size(); ++i)
+        {
+            exact[i] = (shares[i] / sumShares) * static_cast<float>(total);
+            floored[i] = static_cast<uint32>(std::floor(exact[i]));
+            allocated += floored[i];
+            remainders[i] = { exact[i] - static_cast<float>(floored[i]), i };
+        }
+
+        uint32 needed = (total >= allocated) ? (total - allocated) : 0;
+        std::sort(remainders.rbegin(), remainders.rend());
+        for (uint32 r = 0; r < needed && r < remainders.size(); ++r)
+            floored[remainders[r].second]++;
+
+        return floored;
+    }
+
+    int32 PopulationCensus::CalculateActionableDeficit(uint32 target, uint32 current, uint32 hysteresis)
+    {
+        if (target > current)
+        {
+            uint32 diff = target - current;
+            if (diff >= hysteresis)
+                return static_cast<int32>(diff);
+        }
+        return 0;
+    }
 }

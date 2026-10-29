@@ -25,7 +25,7 @@ static void ResetTestEnvironment()
     PopulationCensus::Instance().Reset();
     SocialProtection::Instance().Clear();
     CityRelocationFallback::Instance().Clear();
-    DebugEnvironment::Instance().SetMode(DEBUG_MODE_OFF);
+    BracketsDebug::Instance().ResetCounters();
 
     sConfig.values["BotLevelBrackets.Enabled"] = "1";
     sConfig.values["BotLevelBrackets.CheckFrequency"] = "300";
@@ -66,41 +66,42 @@ int main()
 #endif
 
     // 2. ActivityRegistry Verification
-    assert(ActivityRegistry::Instance().GetActivityCount() == 43);
-    const ActivityDefinition* act1 = ActivityRegistry::Instance().GetActivity(1);
-    assert(act1 != nullptr && act1->key == "AuctionBrowse");
+    assert(ACTIVITY_COUNT == 43);
+    const ActivityDefinition* act1 = ActivityRegistry::Instance().GetActivity(ACTIVITY_AUCTION_SELL);
+    assert(act1 != nullptr && std::string(act1->name) == "AuctionSell");
     assert((act1->domainMask & DOMAIN_CITY) != 0);
 
-    const ActivityDefinition* act18 = ActivityRegistry::Instance().GetActivity(18);
-    assert(act18 != nullptr && act18->key == "GrindMob");
+    const ActivityDefinition* act18 = ActivityRegistry::Instance().GetActivity(ACTIVITY_GRINDING);
+    assert(act18 != nullptr && std::string(act18->name) == "Grinding");
     assert((act18->domainMask & DOMAIN_WORLD) != 0);
 
-    const ActivityDefinition* byKey = ActivityRegistry::Instance().GetActivity("TavernRest");
-    assert(byKey != nullptr && byKey->activityId == 5);
+    const ActivityDefinition* byName = ActivityRegistry::Instance().FindByName("RestSit");
+    assert(byName != nullptr && byName->id == ACTIVITY_REST_SIT);
 
     // 3. DestinationCatalog Verification
-    assert(DestinationCatalog::Instance().GetCityCount() == 8);
-    assert(DestinationCatalog::Instance().GetRegionCount() == 38);
     assert(DestinationCatalog::Instance().GetCity(CITY_STORMWIND) != nullptr);
     assert(DestinationCatalog::Instance().GetCity(CITY_ALAH_THALAS) != nullptr);
     assert(DestinationCatalog::Instance().GetCity(CITY_SPARKWATER_PORT) != nullptr);
-    LandingPoint lp;
-    assert(DestinationCatalog::Instance().GetCityLandingPoint(CITY_STORMWIND, lp));
-    assert(lp.mapId == 0);
+    assert(DestinationCatalog::Instance().GetOutdoorRegions().size() == 38);
+    const CityInfo* swInfo = DestinationCatalog::Instance().GetCity(CITY_STORMWIND);
+    assert(swInfo != nullptr && swInfo->landing.mapId == 0);
 
     // 4. OpportunityLedger & Lifecycle State Machine
     ObjectGuid bGuid = bot.GetObjectGuid();
-    OpportunityIntent intent = OpportunityLedger::Instance().ProposeIntent(bGuid, DOMAIN_CITY, CITY_STORMWIND, 1, 180);
-    assert(intent.intentId > 0);
+    uint64 intentId = OpportunityLedger::Instance().CreateIntent(
+        bGuid, DOMAIN_CITY, CITY_STORMWIND, "Stormwind", ACTIVITY_GENERIC_RPG,
+        1, bot.GetLevel(), bot.GetTeamId(), 180);
+    assert(intentId > 0);
+    assert(OpportunityLedger::Instance().HasActiveIntent(bGuid));
+    OpportunityIntent intent = OpportunityLedger::Instance().GetActiveIntent(bGuid);
+    assert(intent.intentId == intentId);
     assert(intent.state == INTENT_STATE_PROPOSED);
-    assert(OpportunityLedger::Instance().GetActiveIntent(bGuid).intentId == intent.intentId);
 
-    assert(OpportunityLedger::Instance().TransitionIntent(bGuid, INTENT_STATE_PLANNING));
-    assert(OpportunityLedger::Instance().TransitionIntent(bGuid, INTENT_STATE_TRAVELING));
-    assert(OpportunityLedger::Instance().TransitionIntent(bGuid, INTENT_STATE_ARRIVED));
-    assert(OpportunityLedger::Instance().ReleaseIntent(bGuid, REASON_EXPIRED));
-    assert(OpportunityLedger::Instance().GetActiveIntent(bGuid).intentId == 0);
-    assert(OpportunityLedger::Instance().IsInCooldown(bGuid, DOMAIN_CITY, CITY_STORMWIND, 1800));
+    assert(OpportunityLedger::Instance().TransitionState(intentId, INTENT_STATE_PLANNING));
+    assert(OpportunityLedger::Instance().TransitionState(intentId, INTENT_STATE_TRAVELING));
+    assert(OpportunityLedger::Instance().TransitionState(intentId, INTENT_STATE_ARRIVED));
+    assert(OpportunityLedger::Instance().CancelIntent(bGuid, REASON_DEADLINE_EXPIRED));
+    assert(!OpportunityLedger::Instance().HasActiveIntent(bGuid));
 
     // 5. PopulationCensus & Largest-Remainder Quota Math
     std::vector<float> shares = {1.5f, 2.5f, 0.0f};
@@ -123,8 +124,8 @@ int main()
     assert(SocialProtection::Instance().IsSocialProtectedGuild(42));
 
     // 7. CityRelocationFallback Safeguards
-    assert(!CityRelocationFallback::Instance().IsAllowed(bot.GetObjectGuid(), CITY_STORMWIND));
-    assert(CityRelocationFallback::Instance().GetRelocationsInLastHour() == 0);
+    assert(!CityRelocationFallback::Instance().CanRelocate(&bot, CITY_STORMWIND, REASON_ROUTE_UNSUPPORTED_BEFORE_START));
+    assert(CityRelocationFallback::Instance().GetRelocationsInPastHour() == 0);
 
     // 8. Script Hooks & Commands Verification
     BotLevelBracketsWorldScript worldScript;

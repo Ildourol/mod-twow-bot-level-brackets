@@ -25,7 +25,7 @@ namespace Brackets
         return sConfig.GetBoolDefault(name, def);
     }
 
-    static int32 GetIntDefault(const char* name, int32 def)
+    [[maybe_unused]] static int32 GetIntDefault(const char* name, int32 def)
     {
         return sConfig.GetIntDefault(name, def);
     }
@@ -65,7 +65,7 @@ namespace Brackets
         return m_activeConfig.fallbackCityAllowlist.find(cityName) != m_activeConfig.fallbackCityAllowlist.end();
     }
 
-    bool ConfigManager::ParseAndValidate(ModuleConfiguration& staged, std::string& errorMsg)
+    bool ConfigManager::ParseAndValidate(ModuleConfiguration& staged, std::string& /*errorMsg*/)
     {
         // 1. Master & Domains
         staged.enabled = GetBoolDefault("BotLevelBrackets.Enabled", true);

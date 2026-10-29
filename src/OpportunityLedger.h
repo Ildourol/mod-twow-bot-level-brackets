@@ -86,6 +86,7 @@ namespace Brackets
 
         void InvalidateAllForReload(uint32 oldGeneration);
         void ClearAll();
+        void Clear() { ClearAll(); }
 
     private:
         OpportunityLedger() : m_nextIntentId(1) {}

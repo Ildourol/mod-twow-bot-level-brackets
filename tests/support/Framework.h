@@ -14,6 +14,8 @@
 using uint8=uint8_t; using int8=int8_t; using uint16=uint16_t;
 using uint32=uint32_t; using int32=int32_t; using uint64=uint64_t; using int64=int64_t;
 #define UI64FMTD "%llu"
+inline uint32 getMSTime() { return 1000; }
+struct WorldTimer { static uint32 getMSTime() { return 1000; } };
 enum { TEAM_ALLIANCE=0, TEAM_HORDE=1, CONFIG_UINT32_MAX_PLAYER_LEVEL=0,
  CURRENT_GENERIC_SPELL=0, CURRENT_CHANNELED_SPELL=1, PLAYER_XP=0, PLAYER_NEXT_LEVEL_XP=1,
  RACE_HUMAN=1, RACE_ORC=2, RACE_DWARF=3, RACE_NIGHTELF=4, RACE_UNDEAD=5,

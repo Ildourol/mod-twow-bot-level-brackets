@@ -120,6 +120,7 @@ namespace Brackets
         }
 
         bool LoadConfiguration(bool isReload = false);
+        void Load() { LoadConfiguration(false); }
         const ModuleConfiguration& GetConfig() const;
 
         uint32 GetGeneration() const;
