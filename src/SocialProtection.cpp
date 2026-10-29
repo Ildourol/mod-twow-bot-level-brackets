@@ -71,8 +71,8 @@ namespace Brackets
             QueryResult* result = CharacterDatabase.Query(
                 "SELECT cs.friend FROM character_social cs "
                 "JOIN characters c ON cs.guid = c.guid "
-                "JOIN account a ON c.account = a.id "
-                "WHERE a.username NOT LIKE 'BOT%' AND cs.flags & 1");
+                "JOIN `tw_logon`.`account` a ON c.account = a.id "
+                "WHERE a.username NOT LIKE 'BOT%' AND a.username NOT LIKE 'RNDBOT%' AND cs.flags & 1");
 
             if (result)
             {
