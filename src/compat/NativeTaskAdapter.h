@@ -11,6 +11,8 @@ struct ObjectGuid;
 namespace BotLevelBrackets
 {
 
+enum class TransitMode : uint8_t;
+
 enum class EngineKind : uint8_t
 {
     TortoiseBots = 0,
@@ -49,9 +51,18 @@ public:
 
     // City Visit Orchestration (Native Safe Interface)
     static TaskAdmissionResult RequestCityVisit(Player* bot, CityId cityId,
+                                                uint32_t minDwellDurationMs,
+                                                uint32_t maxDwellDurationMs,
+                                                TransitMode transitMode,
+                                                uint32_t configGeneration,
+                                                uint64_t& outRequestId);
+
+    static TaskAdmissionResult RequestCityVisit(Player* bot, CityId cityId,
                                                 uint32_t dwellDurationMs,
                                                 uint32_t configGeneration,
                                                 uint64_t& outRequestId);
+
+    static bool AreCityErrandsSatisfied(Player* bot, CityId cityId);
 
     static bool CancelCityVisit(ObjectGuid botGuid, const std::string& ownerId = "mod-twow-bot-level-brackets");
     static bool HasActiveCityVisit(ObjectGuid botGuid);

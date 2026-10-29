@@ -76,27 +76,40 @@ BotLevelBrackets.City.LimitsMode = 1
 
 # Minimum and Maximum bots per city
 BotLevelBrackets.City.MinBotsPerCity = 0
-BotLevelBrackets.City.MaxBotsPerCity = 50
+BotLevelBrackets.City.MaxBotsPerCity = 60
 
 # Hysteresis deadband before acting on population imbalance
 BotLevelBrackets.City.HysteresisBots = 2
 
+# City Transit Mode
+# 1 = Travel / Directions (Default - bot receives travel directions to walk/use flight paths to the city)
+# 2 = Teleport (Directly teleports the bot to the city center upon request, as in previous versions)
+BotLevelBrackets.City.TransitMode = 1
+
 # Desired dwell duration for bots visiting a city (in milliseconds).
-# Default: 180000 (3 minutes).
-BotLevelBrackets.City.DwellDurationMs = 180000
+# Default: 300000 (5 minutes).
+BotLevelBrackets.City.DwellDurationMs = 300000
 
-# Configured Target Allocation for Racial Capitals:
-# Alliance: Stormwind, Ironforge, Darnassus, Alah'Thalas
-# Horde: Orgrimmar, Undercity, Thunder Bluff, Sparkwater Port
-BotLevelBrackets.City.StormwindTarget = 7
-BotLevelBrackets.City.IronforgeTarget = 5
-BotLevelBrackets.City.DarnassusTarget = 4
-BotLevelBrackets.City.AlahThalasTarget = 4
+# Minimum dwell duration before bot may finish errands and depart (in milliseconds).
+# Default: 300000 (5 minutes).
+BotLevelBrackets.City.MinDwellDurationMs = 300000
 
-BotLevelBrackets.City.OrgrimmarTarget = 7
-BotLevelBrackets.City.UndercityTarget = 5
-BotLevelBrackets.City.ThunderBluffTarget = 4
-BotLevelBrackets.City.SparkwaterTarget = 4
+# Maximum dwell duration before bot is unconditionally released to open world (in milliseconds).
+# Default: 600000 (10 minutes).
+BotLevelBrackets.City.MaxDwellDurationMs = 600000
+
+# Configured Target Allocation for Racial Capitals (% of faction bots):
+# Alliance: Stormwind (10%), Ironforge (8%), Darnassus (6%), Alah'Thalas (6%) -> Total: 30%
+# Horde: Orgrimmar (10%), Undercity (8%), Thunder Bluff (6%), Sparkwater Port (6%) -> Total: 30%
+BotLevelBrackets.City.StormwindTarget = 10
+BotLevelBrackets.City.IronforgeTarget = 8
+BotLevelBrackets.City.DarnassusTarget = 6
+BotLevelBrackets.City.AlahThalasTarget = 6
+
+BotLevelBrackets.City.OrgrimmarTarget = 10
+BotLevelBrackets.City.UndercityTarget = 8
+BotLevelBrackets.City.ThunderBluffTarget = 6
+BotLevelBrackets.City.SparkwaterTarget = 6
 
 ###################################################################################################
 # OUTDOOR WORLD DISTRIBUTION

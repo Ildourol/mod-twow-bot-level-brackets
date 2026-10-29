@@ -81,18 +81,21 @@ void LoadModuleConfiguration()
     policy.SetCityMaxLimitEnabled(sConfig.GetBoolDefault("BotLevelBrackets.City.MaxLimitEnabled", true));
     policy.SetCityLimitsMode(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.LimitsMode", 1)));
     policy.SetCityMinBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinBotsPerCity", 0)));
-    policy.SetCityMaxBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxBotsPerCity", 50)));
+    policy.SetCityMaxBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxBotsPerCity", 60)));
     policy.SetCityHysteresis(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.HysteresisBots", 2)));
-    policy.SetCityDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.DwellDurationMs", 180000)));
+    policy.SetCityTransitMode(static_cast<TransitMode>(sConfig.GetIntDefault("BotLevelBrackets.City.TransitMode", 1)));
+    policy.SetCityDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.DwellDurationMs", 300000)));
+    policy.SetCityMinDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinDwellDurationMs", 300000)));
+    policy.SetCityMaxDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxDwellDurationMs", 600000)));
 
-    policy.SetCityTarget(0, sConfig.GetIntDefault("BotLevelBrackets.City.StormwindTarget", 7));
-    policy.SetCityTarget(1, sConfig.GetIntDefault("BotLevelBrackets.City.IronforgeTarget", 5));
-    policy.SetCityTarget(2, sConfig.GetIntDefault("BotLevelBrackets.City.DarnassusTarget", 4));
-    policy.SetCityTarget(3, sConfig.GetIntDefault("BotLevelBrackets.City.AlahThalasTarget", 4));
-    policy.SetCityTarget(4, sConfig.GetIntDefault("BotLevelBrackets.City.OrgrimmarTarget", 7));
-    policy.SetCityTarget(5, sConfig.GetIntDefault("BotLevelBrackets.City.UndercityTarget", 5));
-    policy.SetCityTarget(6, sConfig.GetIntDefault("BotLevelBrackets.City.ThunderBluffTarget", 4));
-    policy.SetCityTarget(7, sConfig.GetIntDefault("BotLevelBrackets.City.SparkwaterTarget", 4));
+    policy.SetCityTarget(0, sConfig.GetIntDefault("BotLevelBrackets.City.StormwindTarget", 10));
+    policy.SetCityTarget(1, sConfig.GetIntDefault("BotLevelBrackets.City.IronforgeTarget", 8));
+    policy.SetCityTarget(2, sConfig.GetIntDefault("BotLevelBrackets.City.DarnassusTarget", 6));
+    policy.SetCityTarget(3, sConfig.GetIntDefault("BotLevelBrackets.City.AlahThalasTarget", 6));
+    policy.SetCityTarget(4, sConfig.GetIntDefault("BotLevelBrackets.City.OrgrimmarTarget", 10));
+    policy.SetCityTarget(5, sConfig.GetIntDefault("BotLevelBrackets.City.UndercityTarget", 8));
+    policy.SetCityTarget(6, sConfig.GetIntDefault("BotLevelBrackets.City.ThunderBluffTarget", 6));
+    policy.SetCityTarget(7, sConfig.GetIntDefault("BotLevelBrackets.City.SparkwaterTarget", 6));
 
     // 3. Outdoor World Distribution Settings
     policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", true));

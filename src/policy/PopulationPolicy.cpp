@@ -35,17 +35,20 @@ void PopulationPolicy::LoadDefaults()
     m_dispatchTimeoutSeconds = 30;
     m_earlyDepartureBackoffSeconds = 3600;
     m_fieldReservePct = 70;
-    m_cityDwellDurationMs = 180000;
+    m_cityDwellDurationMs = 300000;
+    m_cityMinDwellDurationMs = 300000;
+    m_cityMaxDwellDurationMs = 600000;
+    m_cityTransitMode = TransitMode::Travel;
 
     m_cityQuotaMode = 2;
     m_cityMinLimitEnabled = false;
     m_cityMaxLimitEnabled = true;
     m_cityLimitsMode = 1;
     m_cityMinBots = 0;
-    m_cityMaxBots = 50;
+    m_cityMaxBots = 60;
     m_cityHysteresis = 2;
 
-    int32_t defaults[8] = { 7, 5, 4, 4, 7, 5, 4, 4 };
+    int32_t defaults[8] = { 10, 8, 6, 6, 10, 8, 6, 6 };
     for (size_t i = 0; i < 8; ++i)
         m_cityTargets[i] = defaults[i];
 

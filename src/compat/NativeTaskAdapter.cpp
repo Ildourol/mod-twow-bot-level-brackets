@@ -1,4 +1,5 @@
 #include "NativeTaskAdapter.h"
+#include "../policy/PopulationPolicy.h"
 
 #if defined(HAVE_TORTOISEBOTS)
 #include "Common.h"
@@ -177,7 +178,9 @@ struct CityVisitRecord
     CityId cityId = CityId::None;
     uint32_t requestedAt = 0;
     uint32_t arrivedAt = 0;
-    uint32_t dwellDurationMs = 0;
+    uint32_t minDwellDurationMs = 300000;
+    uint32_t maxDwellDurationMs = 600000;
+    TransitMode transitMode = TransitMode::Travel;
     uint32_t configGeneration = 0;
     enum State : uint8_t { Traveling, Visiting } state = Traveling;
 };
@@ -193,7 +196,9 @@ void NativeTaskAdapter::Clear()
 }
 
 TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId cityId,
-                                                        uint32_t dwellDurationMs,
+                                                        uint32_t minDwellDurationMs,
+                                                        uint32_t maxDwellDurationMs,
+                                                        TransitMode transitMode,
                                                         uint32_t configGeneration,
                                                         uint64_t& outRequestId)
 {
@@ -208,6 +213,7 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
     if (!def)
         return TaskAdmissionResult::UnsupportedCity;
 
+    bool isVisiting = false;
     {
         std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
         auto it = s_cityVisits.find(bot->GetObjectGuid());
@@ -221,23 +227,35 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
         rec.cityId = cityId;
         rec.requestedAt = static_cast<uint32_t>(time(nullptr));
         rec.arrivedAt = 0;
-        rec.dwellDurationMs = dwellDurationMs;
+        rec.minDwellDurationMs = minDwellDurationMs;
+        rec.maxDwellDurationMs = maxDwellDurationMs;
+        rec.transitMode = transitMode;
         rec.configGeneration = configGeneration;
 
-        if (IsBotInCity(bot, cityId))
+        if (transitMode == TransitMode::Teleport && !IsBotInCity(bot, cityId))
+        {
+            if (bot->IsMounted())
+                bot->Unmount();
+
+            bot->TeleportTo(def->mapId, def->centerX, def->centerY, def->centerZ, 0.0f);
+            rec.state = CityVisitRecord::Visiting;
+            rec.arrivedAt = rec.requestedAt;
+        }
+        else if (IsBotInCity(bot, cityId))
         {
             rec.state = CityVisitRecord::Visiting;
             rec.arrivedAt = rec.requestedAt;
-            s_cityVisits[bot->GetObjectGuid()] = rec;
         }
         else
         {
             rec.state = CityVisitRecord::Traveling;
-            s_cityVisits[bot->GetObjectGuid()] = rec;
         }
+
+        s_cityVisits[bot->GetObjectGuid()] = rec;
+        isVisiting = (rec.state == CityVisitRecord::Visiting);
     }
 
-    if (IsBotInCity(bot, cityId))
+    if (isVisiting)
     {
 #if defined(HAVE_TORTOISEBOTS)
         PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
@@ -269,6 +287,14 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
     }
 
     return TaskAdmissionResult::Accepted;
+}
+
+TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId cityId,
+                                                        uint32_t dwellDurationMs,
+                                                        uint32_t configGeneration,
+                                                        uint64_t& outRequestId)
+{
+    return RequestCityVisit(bot, cityId, dwellDurationMs, dwellDurationMs, TransitMode::Travel, configGeneration, outRequestId);
 }
 
 bool NativeTaskAdapter::CancelCityVisit(ObjectGuid botGuid, const std::string& ownerId)
@@ -383,9 +409,38 @@ void NativeTaskAdapter::Update(uint32_t diff)
         }
         else if (it->second.state == CityVisitRecord::Visiting)
         {
-            uint32_t dwellSec = it->second.dwellDurationMs / 1000;
-            if (now - it->second.arrivedAt >= dwellSec)
+            uint32_t elapsedSec = now - it->second.arrivedAt;
+            uint32_t minDwellSec = it->second.minDwellDurationMs / 1000;
+            uint32_t maxDwellSec = it->second.maxDwellDurationMs / 1000;
+
+            bool release = false;
+            if (elapsedSec >= minDwellSec)
             {
+                if (AreCityErrandsSatisfied(bot, it->second.cityId))
+                    release = true;
+                else if (elapsedSec >= maxDwellSec)
+                    release = true;
+            }
+
+            if (release)
+            {
+#if defined(HAVE_TORTOISEBOTS)
+                PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+                if (ai)
+                {
+                    ai->ChangeStrategy("-rpg", BotState::BOT_STATE_NON_COMBAT);
+                    ai->ChangeStrategy("+travel", BotState::BOT_STATE_NON_COMBAT);
+                    ai->DoSpecificAction("choose travel target", Event(), true);
+                }
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+                PlayerbotAI* ai = bot->GetPlayerbotAI();
+                if (ai)
+                {
+                    ai->ChangeStrategy("-rpg", BotState::BOT_STATE_NON_COMBAT);
+                    ai->ChangeStrategy("+travel", BotState::BOT_STATE_NON_COMBAT);
+                    ai->DoSpecificAction("choose travel target", Event(), true);
+                }
+#endif
                 it = s_cityVisits.erase(it);
                 continue;
             }
@@ -393,6 +448,46 @@ void NativeTaskAdapter::Update(uint32_t diff)
 
         ++it;
     }
+}
+
+bool NativeTaskAdapter::AreCityErrandsSatisfied(Player* bot, CityId cityId)
+{
+    if (!bot)
+        return true;
+
+    if (!IsBotInCity(bot, cityId))
+        return true;
+
+#if defined(HAVE_TORTOISEBOTS)
+    PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+    if (!ai || !ai->GetAiObjectContext())
+        return true;
+
+    TravelTarget* tt = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+    if (tt && tt->GetStatus() == TravelStatus::TRAVEL_STATUS_TRAVEL)
+        return true;
+
+    GuidPosition rpgTarget = ai->GetAiObjectContext()->GetValue<GuidPosition>("rpg target")->Get();
+    if (rpgTarget)
+        return false;
+
+    std::list<ObjectGuid> possibleTargets = ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("possible rpg targets")->Get();
+    if (possibleTargets.empty())
+        return true;
+
+    std::string nextRpgAction = ai->GetAiObjectContext()->GetValue<std::string>("next rpg action")->Get();
+    if (nextRpgAction.empty() || nextRpgAction == "choose travel target")
+        return true;
+
+    return false;
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+    PlayerbotAI* ai = bot->GetPlayerbotAI();
+    if (!ai || !ai->GetAiObjectContext())
+        return true;
+    return !ai->GetAiObjectContext()->GetValue<GuidPosition>("rpg target")->Get();
+#else
+    return true;
+#endif
 }
 
 bool NativeTaskAdapter::DispatchNativeAction(Player* bot, const std::string& actionName)

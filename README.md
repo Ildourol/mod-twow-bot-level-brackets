@@ -164,18 +164,22 @@ BotLevelBrackets.Orchestration.RejectionBackoffSeconds = 600
 BotLevelBrackets.City.Enabled = 1
 BotLevelBrackets.City.DestinationPolicy = RequireExact
 BotLevelBrackets.City.QuotaMode = 2
-BotLevelBrackets.City.DwellDurationMs = 180000
+BotLevelBrackets.City.TransitMode = 1
+BotLevelBrackets.City.DwellDurationMs = 300000
+BotLevelBrackets.City.MinDwellDurationMs = 300000
+BotLevelBrackets.City.MaxDwellDurationMs = 600000
+BotLevelBrackets.City.MaxBotsPerCity = 60
 
-# Capital Targets (Alliance: SW, IF, Darn, Alah; Horde: Org, UC, TB, Spark)
-BotLevelBrackets.City.StormwindTarget = 7
-BotLevelBrackets.City.IronforgeTarget = 5
-BotLevelBrackets.City.DarnassusTarget = 4
-BotLevelBrackets.City.AlahThalasTarget = 4
+# Capital Targets (% of faction bots: 30% total across capitals, 70% outdoors)
+BotLevelBrackets.City.StormwindTarget = 10
+BotLevelBrackets.City.IronforgeTarget = 8
+BotLevelBrackets.City.DarnassusTarget = 6
+BotLevelBrackets.City.AlahThalasTarget = 6
 
-BotLevelBrackets.City.OrgrimmarTarget = 7
-BotLevelBrackets.City.UndercityTarget = 5
-BotLevelBrackets.City.ThunderBluffTarget = 4
-BotLevelBrackets.City.SparkwaterTarget = 4
+BotLevelBrackets.City.OrgrimmarTarget = 10
+BotLevelBrackets.City.UndercityTarget = 8
+BotLevelBrackets.City.ThunderBluffTarget = 6
+BotLevelBrackets.City.SparkwaterTarget = 6
 
 # Outdoor World Distribution & Field Reserve
 BotLevelBrackets.World.Enabled = 1

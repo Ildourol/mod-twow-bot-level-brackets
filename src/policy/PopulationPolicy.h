@@ -15,6 +15,12 @@ enum class DestinationPolicy : uint8_t
     AllowNativeChoice = 1
 };
 
+enum class TransitMode : uint8_t
+{
+    Travel = 1,   // Native travel / direction (walk, flight paths)
+    Teleport = 2  // Direct instant teleport to city
+};
+
 struct LevelBracketConfig
 {
     uint8_t lower;
@@ -81,6 +87,15 @@ public:
     uint32_t GetCityDwellDurationMs() const { return m_cityDwellDurationMs; }
     void SetCityDwellDurationMs(uint32_t val) { m_cityDwellDurationMs = val; }
 
+    uint32_t GetCityMinDwellDurationMs() const { return m_cityMinDwellDurationMs; }
+    void SetCityMinDwellDurationMs(uint32_t val) { m_cityMinDwellDurationMs = val; }
+
+    uint32_t GetCityMaxDwellDurationMs() const { return m_cityMaxDwellDurationMs; }
+    void SetCityMaxDwellDurationMs(uint32_t val) { m_cityMaxDwellDurationMs = val; }
+
+    TransitMode GetCityTransitMode() const { return m_cityTransitMode; }
+    void SetCityTransitMode(TransitMode val) { m_cityTransitMode = val; }
+
     // Quota math configuration
     uint32_t GetCityQuotaMode() const { return m_cityQuotaMode; } // 1 = count, 2 = pct
     void SetCityQuotaMode(uint32_t val) { m_cityQuotaMode = val; }
@@ -143,17 +158,20 @@ private:
     uint32_t m_dispatchTimeoutSeconds = 30;
     uint32_t m_earlyDepartureBackoffSeconds = 3600;
     uint32_t m_fieldReservePct = 70;
-    uint32_t m_cityDwellDurationMs = 180000;
+    uint32_t m_cityDwellDurationMs = 300000;
+    uint32_t m_cityMinDwellDurationMs = 300000;
+    uint32_t m_cityMaxDwellDurationMs = 600000;
+    TransitMode m_cityTransitMode = TransitMode::Travel;
 
     uint32_t m_cityQuotaMode = 2; // default: 2 (percentage)
     bool m_cityMinLimitEnabled = false;
     bool m_cityMaxLimitEnabled = true;
     uint32_t m_cityLimitsMode = 1; // default: 1 (headcount)
     uint32_t m_cityMinBots = 0;
-    uint32_t m_cityMaxBots = 50;
+    uint32_t m_cityMaxBots = 60;
     uint32_t m_cityHysteresis = 2;
 
-    int32_t m_cityTargets[8] = { 7, 5, 4, 4, 7, 5, 4, 4 }; // Alliance: SW, IF, Darn, Alah; Horde: Org, UC, TB, Spark
+    int32_t m_cityTargets[8] = { 10, 8, 6, 6, 10, 8, 6, 6 }; // Alliance: SW, IF, Darn, Alah; Horde: Org, UC, TB, Spark
 
     std::vector<LevelBracketConfig> m_allianceBrackets;
     std::vector<LevelBracketConfig> m_hordeBrackets;

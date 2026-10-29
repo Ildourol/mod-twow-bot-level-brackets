@@ -198,6 +198,31 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
             continue;
         }
 
+        // Prioritize bots closest to the city: same map/continent first, then lowest distance
+        std::sort(candidates.begin(), candidates.end(), [def](Player* a, Player* b) {
+            bool aSameMap = (a->GetMapId() == def->mapId);
+            bool bSameMap = (b->GetMapId() == def->mapId);
+            if (aSameMap != bSameMap)
+                return aSameMap;
+
+            if (aSameMap)
+            {
+                float dxA = a->GetPositionX() - def->centerX;
+                float dyA = a->GetPositionY() - def->centerY;
+                float dzA = a->GetPositionZ() - def->centerZ;
+                float distSqA = dxA * dxA + dyA * dyA + dzA * dzA;
+
+                float dxB = b->GetPositionX() - def->centerX;
+                float dyB = b->GetPositionY() - def->centerY;
+                float dzB = b->GetPositionZ() - def->centerZ;
+                float distSqB = dxB * dxB + dyB * dyB + dzB * dzB;
+
+                return distSqA < distSqB;
+            }
+
+            return false;
+        });
+
         // Bounded selection: request up to c.shortfall and up to requestsRemaining
         uint32_t toRequest = std::min(c.shortfall, requestsRemaining);
         for (size_t i = 0; i < toRequest && i < candidates.size(); ++i)
@@ -227,7 +252,9 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
 
             uint64_t outNativeId = 0;
             TaskAdmissionResult res = NativeTaskAdapter::RequestCityVisit(
-                bot, c.id, policy.GetCityDwellDurationMs(),
+                bot, c.id, policy.GetCityMinDwellDurationMs(),
+                policy.GetCityMaxDwellDurationMs(),
+                policy.GetCityTransitMode(),
                 policy.GetConfigGeneration(), outNativeId);
 
             if (res == TaskAdmissionResult::Accepted)
