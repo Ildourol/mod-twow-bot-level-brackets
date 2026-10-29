@@ -73,7 +73,7 @@ namespace Brackets
                 if (pos && DestinationCatalog::Instance().IsInCity(city->id, pos->GetMapId(), pos->GetAreaId(), pos->getX(), pos->getY(), pos->getZ()))
                 {
                     uint32 dist = static_cast<uint32>(travelInfo.getPosition().distance(*pos));
-                    partitioned[dist].push_back({dest, pos});
+                    partitioned[dist].push_back({dest, pos, static_cast<float>(dist)});
                 }
             }
         }
@@ -150,7 +150,7 @@ namespace Brackets
                     (pos->GetAreaId() == reg->zoneId || reg->areaIds.find(pos->GetAreaId()) != reg->areaIds.end()))
                 {
                     uint32 dist = static_cast<uint32>(travelInfo.getPosition().distance(*pos));
-                    partitioned[dist].push_back({dest, pos});
+                    partitioned[dist].push_back({dest, pos, static_cast<float>(dist)});
                 }
             }
         }
