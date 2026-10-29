@@ -9,7 +9,10 @@ values = dict(re.findall(r'^(BotLevelBrackets\.[\w.]+)\s*=\s*(.*?)\s*$', config,
 checks = 0
 for key, default in re.findall(r'(?:ReadBoundedUInt|GetIntDefault|GetFloatDefault|GetBoolDefault|GetStringDefault)\("(BotLevelBrackets\.[\w.]+)",\s*("[^"]*"|true|false|-?[\d.]+f?)', source):
     assert key in values, f'{key}: read in code but absent from template'
-    expected = default.strip('"').removesuffix('f')
+    if default.startswith('"') and default.endswith('"'):
+        expected = default[1:-1]
+    else:
+        expected = default.removesuffix('f')
     if expected in ('true', 'false'):
         expected = '1' if expected == 'true' else '0'
     actual = values[key].strip('"')

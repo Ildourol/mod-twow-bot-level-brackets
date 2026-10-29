@@ -1,4 +1,4 @@
-# CMake configuration hook for mod-twow-bot-level-brackets
+# CMake configuration hook for mod-twow-bot-level-brackets (Option 1 Architecture)
 
 if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
 
@@ -28,7 +28,7 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
   endif()
 
   # ---------------------------------------------------------------------------
-  # 2. Check for Legacy PlayerBots (vendored in older cores like tortoise-wow-mantech-turtle)
+  # 2. Check for Legacy PlayerBots (vendored in older cores)
   # ---------------------------------------------------------------------------
   set(LEGACY_PLAYERBOTS_FOUND FALSE)
   if(NOT DEFINED MODULE_PLAYERBOTS OR NOT "${MODULE_PLAYERBOTS}" STREQUAL "disabled")
@@ -61,6 +61,14 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
         "${TORTOISEBOTS_ROOT}/runtime"
         "${CMAKE_SOURCE_DIR}/src/game/MapNodes"
         "${CMAKE_CURRENT_LIST_DIR}/src"
+        "${CMAKE_CURRENT_LIST_DIR}/src/compat"
+        "${CMAKE_CURRENT_LIST_DIR}/src/policy"
+        "${CMAKE_CURRENT_LIST_DIR}/src/world"
+        "${CMAKE_CURRENT_LIST_DIR}/src/scheduling"
+        "${CMAKE_CURRENT_LIST_DIR}/src/activities"
+        "${CMAKE_CURRENT_LIST_DIR}/src/social"
+        "${CMAKE_CURRENT_LIST_DIR}/src/commands"
+        "${CMAKE_CURRENT_LIST_DIR}/src/debug"
     )
   elseif(LEGACY_PLAYERBOTS_FOUND)
     message(STATUS "mod-twow-bot-level-brackets: Discovered Legacy PlayerBots at ${LEGACY_PLAYERBOTS_ROOT}")
@@ -82,6 +90,14 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
         "${CMAKE_SOURCE_DIR}/src/game/MapNodes"
         ${Boost_INCLUDE_DIRS}
         "${CMAKE_CURRENT_LIST_DIR}/src"
+        "${CMAKE_CURRENT_LIST_DIR}/src/compat"
+        "${CMAKE_CURRENT_LIST_DIR}/src/policy"
+        "${CMAKE_CURRENT_LIST_DIR}/src/world"
+        "${CMAKE_CURRENT_LIST_DIR}/src/scheduling"
+        "${CMAKE_CURRENT_LIST_DIR}/src/activities"
+        "${CMAKE_CURRENT_LIST_DIR}/src/social"
+        "${CMAKE_CURRENT_LIST_DIR}/src/commands"
+        "${CMAKE_CURRENT_LIST_DIR}/src/debug"
     )
   else()
     message(STATUS "mod-twow-bot-level-brackets: No PlayerBots engine found; enabling Generic Headless Session Mode.")
@@ -91,6 +107,14 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
     target_include_directories(${BLB_MODULE_TARGET}
       PUBLIC
         "${CMAKE_CURRENT_LIST_DIR}/src"
+        "${CMAKE_CURRENT_LIST_DIR}/src/compat"
+        "${CMAKE_CURRENT_LIST_DIR}/src/policy"
+        "${CMAKE_CURRENT_LIST_DIR}/src/world"
+        "${CMAKE_CURRENT_LIST_DIR}/src/scheduling"
+        "${CMAKE_CURRENT_LIST_DIR}/src/activities"
+        "${CMAKE_CURRENT_LIST_DIR}/src/social"
+        "${CMAKE_CURRENT_LIST_DIR}/src/commands"
+        "${CMAKE_CURRENT_LIST_DIR}/src/debug"
     )
   endif()
 
