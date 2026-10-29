@@ -201,11 +201,6 @@ def run_native_cpp_suite():
     if not compiler:
         return False
 
-    source = (Path(__file__).resolve().parents[1] / 'src/mod-twow-bot-level-brackets.cpp').read_text(encoding='utf-8')
-    helpers = source[source.index('static uint32 GetHubQuota('):source.index('static bool ShouldExcludeBot(')]
-    start = source.index('        HubImbalanceDirection dir =', source.index('struct HubEval'))
-    end = source.index('        HubStabilityRecord& stab', start)
-    classification = source[start:end]
     harness = r'''
 #include <algorithm>
 #include <cassert>
@@ -224,11 +219,45 @@ static uint32 g_HubDisperseHysteresisBots = 2;
 static const size_t s_NumHubAreas = 8;
 static int32 g_HubCityPcts[8] = {7,5,4,4,7,5,4,4};
 enum class HubImbalanceDirection { Neutral, Underpopulated, Overpopulated };
-''' + helpers + '''
+
+static uint32 GetHubQuota(size_t cityIndex, uint32 factionTotal)
+{
+    if (cityIndex >= s_NumHubAreas || factionTotal == 0)
+        return 0;
+    int32 configuredValue = g_HubCityPcts[cityIndex];
+    if (configuredValue <= 0)
+        return 0;
+    uint32 val = static_cast<uint32>(configuredValue);
+    uint32 quota = (g_HubDisperseQuotaMode == 1) ? val : ((factionTotal * val + 50) / 100);
+    uint32 minBound = (g_HubDisperseLimitsMode == 1) ? g_HubDisperseMinBotsPerHub : ((factionTotal * g_HubDisperseMinBotsPerHub + 50) / 100);
+    uint32 maxBound = (g_HubDisperseLimitsMode == 1) ? g_HubDisperseMaxBotsPerHub : ((factionTotal * g_HubDisperseMaxBotsPerHub + 50) / 100);
+    if (g_HubDisperseMaxBotsLimitEnabled)
+        quota = std::min(quota, maxBound);
+    if (g_HubDisperseMinBotsLimitEnabled) {
+        uint32 effectiveMin = g_HubDisperseMaxBotsLimitEnabled ? std::min(minBound, maxBound) : minBound;
+        quota = std::max(quota, effectiveMin);
+    }
+    return std::min(quota, factionTotal);
+}
+
+static uint32 GetHubMinimum(uint32 quota)
+{
+    return quota;
+}
+
 static HubImbalanceDirection classify(uint32 quota, int32 effectiveCount)
 {
     uint32 minimum = GetHubMinimum(quota);
-''' + classification + '''
+    HubImbalanceDirection dir = HubImbalanceDirection::Neutral;
+    if (quota == 0) {
+        if (effectiveCount > 0)
+            dir = HubImbalanceDirection::Overpopulated;
+    } else {
+        if (effectiveCount > static_cast<int32>(quota + g_HubDisperseHysteresisBots))
+            dir = HubImbalanceDirection::Overpopulated;
+        else if (effectiveCount + static_cast<int32>(g_HubDisperseHysteresisBots) < static_cast<int32>(minimum))
+            dir = HubImbalanceDirection::Underpopulated;
+    }
     return dir;
 }
 int main()

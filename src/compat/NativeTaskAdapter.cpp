@@ -212,6 +212,8 @@ bool NativeTaskAdapter::CancelCityVisit(ObjectGuid botGuid, const std::string& o
     return TortoiseBots::CityVisitService::Instance().CancelVisit(
         botGuid, TortoiseBots::CityVisitCancelReason::OwnerRequested, ownerId);
 #else
+    (void)botGuid;
+    (void)ownerId;
     return false;
 #endif
 }
@@ -221,6 +223,7 @@ bool NativeTaskAdapter::HasActiveCityVisit(ObjectGuid botGuid)
 #if defined(HAVE_TORTOISEBOTS)
     return TortoiseBots::CityVisitService::Instance().HasActiveVisit(botGuid);
 #else
+    (void)botGuid;
     return false;
 #endif
 }
@@ -231,6 +234,7 @@ CityId NativeTaskAdapter::GetTargetCity(ObjectGuid botGuid)
     TortoiseBots::CityId tbId = TortoiseBots::CityVisitService::Instance().GetTargetCity(botGuid);
     return static_cast<CityId>(tbId);
 #else
+    (void)botGuid;
     return CityId::None;
 #endif
 }
@@ -241,6 +245,7 @@ uint32_t NativeTaskAdapter::GetCityInboundCount(CityId cityId)
     return TortoiseBots::CityVisitService::Instance().GetInboundCount(
         static_cast<TortoiseBots::CityId>(cityId));
 #else
+    (void)cityId;
     return 0;
 #endif
 }
@@ -251,6 +256,7 @@ uint32_t NativeTaskAdapter::GetCityResidentCount(CityId cityId)
     return TortoiseBots::CityVisitService::Instance().GetResidentCount(
         static_cast<TortoiseBots::CityId>(cityId));
 #else
+    (void)cityId;
     return 0;
 #endif
 }
@@ -291,6 +297,7 @@ bool NativeTaskAdapter::DispatchNativeAction(Player* bot, const std::string& act
         return false;
     return ai->DoSpecificAction(actionName, Event(), true);
 #else
+    (void)actionName;
     return false;
 #endif
 }

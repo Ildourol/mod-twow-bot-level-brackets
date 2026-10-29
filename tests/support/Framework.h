@@ -47,6 +47,7 @@ namespace std {
 }
 
 struct Player;
+struct PlayerbotAI;
 
 struct WorldSession {
     Player* player = nullptr;
@@ -100,6 +101,7 @@ struct Player {
     ObjectGuid GetObjectGuid() const { return guid; }
     uint32 GetGUIDLow() const { return guid.GetCounter(); }
     WorldSession* GetSession() { return &session; }
+    PlayerbotAI* GetPlayerbotAI();
     bool IsInWorld() const { return inWorld; }
     bool IsAlive() const { return alive; }
     bool IsInCombat() const { return combat; }
@@ -259,6 +261,35 @@ inline double rand_norm() { return 0.25; }
 // -----------------------------------------------------------------------------
 // TortoiseBots Native Engine Doubles
 // -----------------------------------------------------------------------------
+enum class TravelStatus : uint8 {
+    TRAVEL_STATUS_NONE = 0,
+    TRAVEL_STATUS_PREPARE = 1,
+    TRAVEL_STATUS_READY = 2,
+    TRAVEL_STATUS_TRAVEL = 3,
+    TRAVEL_STATUS_WORK = 4,
+    TRAVEL_STATUS_COOLDOWN = 5,
+    TRAVEL_STATUS_EXPIRED = 6
+};
+
+struct TravelTarget {
+    TravelStatus status = TravelStatus::TRAVEL_STATUS_NONE;
+    TravelStatus GetStatus() const { return status; }
+};
+
+template<class T>
+struct UntypedValue {
+    T val{};
+    T Get() { return val; }
+};
+
+struct AiObjectContext {
+    template<class T>
+    UntypedValue<T>* GetValue(const std::string&) {
+        static UntypedValue<T> v;
+        return &v;
+    }
+};
+
 #if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
 
 struct Event {
@@ -271,6 +302,7 @@ struct PlayerbotAI {
     Player* player = nullptr;
     std::unordered_set<std::string> allowedActions{"rpg", "accept quest", "talk to quest giver", "choose travel target", "sell", "buy", "repair", "ah"};
     bool refuseAction = false;
+    AiObjectContext ctx;
 
     bool HasRealPlayerMaster() const { return player && player->master; }
     bool DoSpecificAction(const std::string& name, Event = Event(), bool = false) {
@@ -278,7 +310,7 @@ struct PlayerbotAI {
             return false;
         return allowedActions.count(name) > 0;
     }
-    void* GetAiObjectContext() { return nullptr; }
+    AiObjectContext* GetAiObjectContext() { return &ctx; }
 };
 
 inline PlayerbotAI* GetBotAI(Player* p) {
@@ -286,6 +318,10 @@ inline PlayerbotAI* GetBotAI(Player* p) {
     auto& ai = ais[p->guid];
     ai.player = p;
     return p->session.headless ? &ai : nullptr;
+}
+
+inline PlayerbotAI* Player::GetPlayerbotAI() {
+    return ::GetBotAI(this);
 }
 
 struct PlayerbotAIStorage {
@@ -424,5 +460,9 @@ struct RandomBotFacade {
 struct RandomPlayerbotMgr {
     bool IsRandomBot(Player* p) { return p && p->random; }
 } inline sRandomPlayerbotMgr;
+
+#else
+
+inline PlayerbotAI* Player::GetPlayerbotAI() { return nullptr; }
 
 #endif // HAVE_TORTOISEBOTS

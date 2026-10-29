@@ -22,6 +22,7 @@
 #include <sstream>
 #include <ctime>
 #include <algorithm>
+#include <cstring>
 
 namespace BotLevelBrackets
 {
@@ -158,6 +159,8 @@ void ProtectionCache::OnGuildMemberAdd(uint32_t guildId, bool isRealPlayer)
 
 void ProtectionCache::OnGuildMemberRemove(uint32_t guildId, bool isRealPlayer)
 {
+    (void)guildId;
+    (void)isRealPlayer;
     // On member removal, we do not immediately evict the guild to prevent race conditions;
     // the periodic DB refresh cleanly syncs it.
 }

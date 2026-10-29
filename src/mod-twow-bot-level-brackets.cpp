@@ -211,6 +211,7 @@ public:
 
     void OnLogin(Player* player) override
     {
+        (void)player;
         // On bot or player login, census updates automatically on next cycle
     }
 

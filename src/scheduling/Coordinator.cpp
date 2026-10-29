@@ -261,6 +261,7 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
 
 void Coordinator::ProcessOutdoorActivities(const CensusSnapshot& snap, uint32_t now, uint32_t& requestsRemaining)
 {
+    (void)snap;
     const auto& policy = PopulationPolicy::Instance();
     const auto& reg = ActivityRegistry::Instance();
     auto& ledger = RequestLedger::Instance();
