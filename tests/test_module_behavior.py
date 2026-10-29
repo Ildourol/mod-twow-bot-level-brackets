@@ -65,6 +65,14 @@ def run_behavior_checks(sanitize=False):
                 '-I', str(root / 'tests/support'),
                 '-I', str(root / 'tests'),
                 '-I', str(root / 'src'),
+                '-I', str(root / 'src/compat'),
+                '-I', str(root / 'src/policy'),
+                '-I', str(root / 'src/world'),
+                '-I', str(root / 'src/scheduling'),
+                '-I', str(root / 'src/activities'),
+                '-I', str(root / 'src/social'),
+                '-I', str(root / 'src/commands'),
+                '-I', str(root / 'src/debug'),
                 str(root / 'tests/test_module_behavior.cpp'),
                 '-o', str(binary)
             ]

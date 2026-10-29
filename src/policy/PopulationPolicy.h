@@ -1,7 +1,7 @@
 #ifndef MOD_TWOW_BOT_LEVEL_BRACKETS_POPULATION_POLICY_H
 #define MOD_TWOW_BOT_LEVEL_BRACKETS_POPULATION_POLICY_H
 
-#include "ReadOnlyCatalog.h"
+#include "../world/ReadOnlyCatalog.h"
 #include <cstdint>
 #include <vector>
 #include <string>
