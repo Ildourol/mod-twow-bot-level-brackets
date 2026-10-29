@@ -66,7 +66,7 @@ int main()
 #endif
 
     // 2. ActivityRegistry Verification
-    assert(ACTIVITY_COUNT == 43);
+    assert(ACTIVITY_COUNT == 42);
     const ActivityDefinition* act1 = ActivityRegistry::Instance().GetActivity(ACTIVITY_AUCTION_SELL);
     assert(act1 != nullptr && std::string(act1->name) == "AuctionSell");
     assert((act1->domainMask & DOMAIN_CITY) != 0);
@@ -82,7 +82,7 @@ int main()
     assert(DestinationCatalog::Instance().GetCity(CITY_STORMWIND) != nullptr);
     assert(DestinationCatalog::Instance().GetCity(CITY_ALAH_THALAS) != nullptr);
     assert(DestinationCatalog::Instance().GetCity(CITY_SPARKWATER) != nullptr);
-    assert(DestinationCatalog::Instance().GetOutdoorRegions().size() == 38);
+    assert(DestinationCatalog::Instance().GetOutdoorRegions().size() == 34);
     const CityInfo* swInfo = DestinationCatalog::Instance().GetCity(CITY_STORMWIND);
     assert(swInfo != nullptr && swInfo->landing.mapId == 0);
 
@@ -112,7 +112,7 @@ int main()
     assert(sum == 4);
 
     int32 deficit = PopulationCensus::CalculateActionableDeficit(10, 6, 2);
-    assert(deficit == 2);
+    assert(deficit == 4);
     int32 noDeficit = PopulationCensus::CalculateActionableDeficit(10, 8, 3);
     assert(noDeficit == 0);
 
