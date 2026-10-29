@@ -70,9 +70,6 @@ void LoadModuleConfiguration()
     policy.SetDispatchTimeoutSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.DispatchTimeoutSeconds", 30)));
     policy.SetEarlyDepartureBackoffSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.EarlyDepartureBackoffSeconds", 3600)));
 
-    std::string modeStr = sConfig.GetStringDefault("BotLevelBrackets.Orchestration.Mode", "ExistingNativeTasks");
-    std::string unkPolicyStr = sConfig.GetStringDefault("BotLevelBrackets.Orchestration.UnknownStatePolicy", "ObserveOnly");
-
     // 2. City Orchestration Settings
     policy.SetCityEnabled(sConfig.GetBoolDefault("BotLevelBrackets.City.Enabled", true));
 
@@ -104,8 +101,6 @@ void LoadModuleConfiguration()
     policy.SetFieldReservePct(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.World.FieldReservePct", 70)));
 
     // 4. Level & Population Policy Settings (Advisory)
-    std::string lvlModeStr = sConfig.GetStringDefault("BotLevelBrackets.LevelPolicy.Mode", "ObserveNative");
-    std::string popModeStr = sConfig.GetStringDefault("BotLevelBrackets.Population.Mode", "ObserveNative");
     policy.SetUseDynamicDistribution(sConfig.GetBoolDefault("BotLevelBrackets.LevelPolicy.UseDynamic", false));
     policy.SetRealPlayerWeight(sConfig.GetFloatDefault("BotLevelBrackets.LevelPolicy.HumanWeight", 1.0f));
     policy.SetSyncFactions(sConfig.GetBoolDefault("BotLevelBrackets.LevelPolicy.SyncFactions", false));
@@ -178,7 +173,7 @@ public:
     void OnStartup() override
     {
         sLog.outString("======================================================================");
-        sLog.outString("  mod-twow-bot-level-brackets: Option 1 Native-Task Orchestrator      ");
+        sLog.outString("  mod-twow-bot-level-brackets: Native-Task Population Orchestrator    ");
         sLog.outString("  Unchanged Playerbots Executes; Zero Core/Bot Modifications           ");
         sLog.outString("  Active Engine: %s", NativeTaskAdapter::GetEngineName());
         sLog.outString("======================================================================");

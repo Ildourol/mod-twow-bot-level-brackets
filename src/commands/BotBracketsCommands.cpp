@@ -82,8 +82,8 @@ bool BotBracketsCommands::HandleStatus(ChatHandler* handler)
     CensusSnapshot snap = Census::Instance().TakeSnapshot();
     const auto& policy = PopulationPolicy::Instance();
 
-    handler->PSendSysMessage("=== Turtle WoW Bot Level Brackets (Option 1 Orchestrator) ===");
-    handler->PSendSysMessage("Master Status: %s | Mode: ExistingNativeTasks | DryRun: %s",
+    handler->PSendSysMessage("=== Turtle WoW Bot Level Brackets ===");
+    handler->PSendSysMessage("Master Status: %s | DryRun: %s",
         policy.IsEnabled() ? "ENABLED" : "DISABLED", policy.IsDryRun() ? "YES" : "NO");
     handler->PSendSysMessage("Active Engine: %s", NativeTaskAdapter::GetEngineName());
     handler->PSendSysMessage("Population: Alliance Bots=%u (Field=%u), Horde Bots=%u (Field=%u)",
@@ -127,7 +127,7 @@ bool BotBracketsCommands::HandleWorld(ChatHandler* handler)
     const auto& policy = PopulationPolicy::Instance();
     const auto& catalog = ReadOnlyCatalog::Instance();
 
-    handler->SendSysMessage("=== Outdoor World Distribution (Option 1) ===");
+    handler->SendSysMessage("=== Outdoor World Distribution ===");
     handler->PSendSysMessage("Field Reserve Target: %u%% | Alliance Field: %u, Horde Field: %u",
         policy.GetFieldReservePct(), snap.allianceFieldBots, snap.hordeFieldBots);
     handler->PSendSysMessage("Outdoor Destination Policy: %s",
@@ -146,7 +146,7 @@ bool BotBracketsCommands::HandleBrackets(ChatHandler* handler)
 {
     CensusSnapshot snap = Census::Instance().TakeSnapshot();
     handler->SendSysMessage("=== Level Bracket Distribution (ADVISORY - Native Owned) ===");
-    handler->SendSysMessage("Notice: Option 1 strictly observes native level progression without character resets.");
+    handler->SendSysMessage("Notice: Module observes native level progression without character resets.");
     handler->SendSysMessage("Faction  | Bracket | Bots | Actual % | Target % | Shortage | Humans");
     handler->SendSysMessage("---------+---------+------+----------+----------+----------+-------");
 

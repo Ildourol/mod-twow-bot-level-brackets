@@ -1,5 +1,5 @@
 ###################################################################################################
-# TURTLE WOW BOT LEVEL BRACKETS CONFIGURATION (OPTION 1 ORCHESTRATION)
+# TURTLE WOW BOT LEVEL BRACKETS CONFIGURATION
 ###################################################################################################
 
 [BotLevelBrackets]
@@ -7,11 +7,6 @@
 # Master Enable switch
 # 1 = Enabled, 0 = Disabled
 BotLevelBrackets.Enabled = 1
-
-# Orchestration Mode
-# Option 1 architecture strictly uses ExistingNativeTasks.
-# Option 2 (augmentation) and Option 3 (relocation) modes are prohibited.
-BotLevelBrackets.Orchestration.Mode = ExistingNativeTasks
 
 # DryRun Simulation Mode
 # 1 = Evaluates eligibility and logs simulated proposals without calling native gameplay APIs.
@@ -53,10 +48,6 @@ BotLevelBrackets.Orchestration.DispatchTimeoutSeconds = 30
 # Cooldown applied when a bot leaves a destination prematurely (in seconds).
 # Default: 3600 (1 hour).
 BotLevelBrackets.Orchestration.EarlyDepartureBackoffSeconds = 3600
-
-# Handling of bots with ambiguous or unknown native state.
-# Valid: ObserveOnly, Reject
-BotLevelBrackets.Orchestration.UnknownStatePolicy = ObserveOnly
 
 ###################################################################################################
 # CITY ORCHESTRATION (RACIAL CAPITALS)
@@ -127,14 +118,6 @@ BotLevelBrackets.World.FieldReservePct = 70
 ###################################################################################################
 # LEVEL & POPULATION POLICIES (ADVISORY)
 ###################################################################################################
-
-# Level distribution mode.
-# ObserveNative: Level bracket percentages are observed and reported; zero forced level mutations.
-BotLevelBrackets.LevelPolicy.Mode = ObserveNative
-
-# Population headcount mode.
-# ObserveNative: Total online bot count is observed; zero independent login/logout loops.
-BotLevelBrackets.Population.Mode = ObserveNative
 
 # Dynamic Human Weighting
 # When enabled, adjusts target bracket weights based on active human player levels.

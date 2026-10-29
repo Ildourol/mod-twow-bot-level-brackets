@@ -1,7 +1,7 @@
-# Bot Level Brackets: Operator & Configuration Guide (Option 1)
+# Bot Level Brackets: Operator & Configuration Guide
 
 **Module:** `mod-twow-bot-level-brackets`  
-**Architecture:** Option 1 — Brackets Orchestrates; Unchanged Playerbots Executes  
+**Architecture:** Native-Task Population Orchestrator  
 **Target Core:** Turtle WoW Custom vMaNGOS (`tortoise-wow` targeting client 1.18.1.7272 / 1.12.1)  
 **Target Bot Engine:** `TortoiseBots` (native modular companion engine) & legacy CMaNGOS PlayerBots fallback  
 
@@ -11,7 +11,7 @@
 
 The **Bot Level Brackets** module maintains a balanced, vibrant, and lore-friendly distribution of playerbots across the entire leveling spectrum of World of Warcraft.
 
-Under **Option 1**:
+Under this architecture:
 - The native `Playerbots` engine (`TortoiseBots`) owns all gameplay tasks, route planning, mob combat, quest completion, and physical travel.
 - The module acts as an external **scheduler and population observer**: identifying population deficits in racial capitals and the open world, selecting eligible bots, and requesting **already implemented native tasks** through verified public entry points (`CityVisitService::RequestVisit`).
 - Zero teleports, zero character resets, zero synthetic XP, and zero custom strategy injections.
@@ -19,7 +19,7 @@ Under **Option 1**:
 
 ---
 
-## 2. How Option 1 Orchestration Operates
+## 2. How Orchestration Operates
 
 ### 2.1 The Unified Scheduling Cycle
 
@@ -50,8 +50,6 @@ Every `BotLevelBrackets.Orchestration.CheckSeconds` (default: 90s), the module r
 # Master switch
 BotLevelBrackets.Enabled = 1
 
-# Option 1 Mode
-BotLevelBrackets.Orchestration.Mode = ExistingNativeTasks
 BotLevelBrackets.Orchestration.DryRun = 0
 
 # Cadence & Limits

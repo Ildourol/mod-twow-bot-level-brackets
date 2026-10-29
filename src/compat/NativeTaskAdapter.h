@@ -47,7 +47,7 @@ public:
     static bool HasRealPlayerInParty(Player* player);
     static bool IsInWorldAndReady(Player* player);
 
-    // City Visit Orchestration (Option 1 Safe Interface)
+    // City Visit Orchestration (Native Safe Interface)
     static TaskAdmissionResult RequestCityVisit(Player* bot, CityId cityId,
                                                 uint32_t dwellDurationMs,
                                                 uint32_t configGeneration,

@@ -1,4 +1,4 @@
-# CMake configuration hook for mod-twow-bot-level-brackets (Option 1 Architecture)
+# CMake configuration hook for mod-twow-bot-level-brackets
 
 if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
 

@@ -1,25 +1,25 @@
-# Bot Level Brackets for Turtle WoW (Option 1 Native-Task Orchestrator)
+# Bot Level Brackets for Turtle WoW (Native-Task Population Orchestrator)
 
 ![Bot Level Brackets Banner](preview.jpg)
 
 [![Turtle WoW](https://img.shields.io/badge/Turtle_WoW-1.18.1%20%2F%201.12.1-orange.svg)](https://turtle-wow.org)
 [![Core](https://img.shields.io/badge/Core-tortoise--wow%20(vMaNGOS)-blue.svg)](https://github.com/tortoise-wow/tortoise-wow)
 [![Bot Engine](https://img.shields.io/badge/Bot%20Engine-TortoiseBots%20%7C%20PlayerBots-brightgreen.svg)](https://github.com/Sagiroth/TortoiseBots)
-[![Architecture](https://img.shields.io/badge/Architecture-Option%201%20(Native--Task%20Orchestrator)-purple.svg)](#-architecture-overview)
+[![Architecture](https://img.shields.io/badge/Architecture-Native--Task%20Orchestrator-purple.svg)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE)
 
 An intelligent, non-intrusive population orchestrator engineered for **Turtle WoW custom vMaNGOS (`tortoise-wow`)** and the **`TortoiseBots`** companion AI engine.
 
-Operating strictly under **Option 1 ("Brackets Orchestrates; Unchanged Playerbots Executes")**: the module monitors bot population distribution, identifies capital city and outdoor deficits, filters eligible bots, and requests **already implemented native tasks** through verified public entry points (`CityVisitService::RequestVisit` and `PlayerbotAI::DoSpecificAction`). The native bot engine owns 100% of gameplay execution, combat, pathfinding, and movement. Both the core server and bot engines remain completely untouched.
+The module monitors bot population distribution, identifies capital city and outdoor deficits, filters eligible bots, and requests **already implemented native tasks** through verified public entry points (`CityVisitService::RequestVisit` and `PlayerbotAI::DoSpecificAction`). The native bot engine owns 100% of gameplay execution, combat, pathfinding, and movement. Both the core server and bot engines remain completely untouched.
 
 ---
 
-## 🌟 Key Features & Option 1 Architectural Invariants
+## 🌟 Key Features & Architectural Invariants
 
 ```mermaid
 flowchart TD
-    subgraph mod_twow_bot_level_brackets["mod-twow-bot-level-brackets (Option 1 Orchestrator)"]
+    subgraph mod_twow_bot_level_brackets["mod-twow-bot-level-brackets (Population Orchestrator)"]
         Census["Census Manager<br/>(Physical Residents, Inbound, Pending)"]
         Policy["Population Policy & Quotas<br/>(Largest-Remainder Apportionment)"]
         Protections["Social Protection Cache<br/>(Player Groups, Friends, Guilds)"]
@@ -92,7 +92,7 @@ The codebase is organized into cleanly decoupled subsystems in `src/`:
 
 ## 📋 Audited Native Activities Catalog
 
-All 42 native bot activities are classified by capability domain in [`docs/option1/capability_manifest.json`](docs/option1/capability_manifest.json):
+All 42 native bot activities are classified by capability domain:
 
 | Domain | Description | Example Activities |
 |:---|:---|:---|
@@ -149,8 +149,7 @@ Key configuration parameters in `mod_twow_bot_level_brackets.conf`:
 # Master enable switch
 BotLevelBrackets.Enabled = 1
 
-# Option 1 Operating Mode (strictly ExistingNativeTasks)
-BotLevelBrackets.Orchestration.Mode = ExistingNativeTasks
+# DryRun Simulation Mode
 BotLevelBrackets.Orchestration.DryRun = 0
 
 # Cadence & Limits
@@ -191,8 +190,8 @@ BotLevelBrackets.Protection.SocialRefreshSeconds = 300
 
 # Diagnostic Logging & Rate Limiting
 BotLevelBrackets.Debug.Mode = Off
-BotLevelBrackets.Debug.RateLimitPerSec = 50
-BotLevelBrackets.Debug.RingBufferSize = 2000
+BotLevelBrackets.Debug.MaxEventsPerSecond = 50
+BotLevelBrackets.Debug.RingBufferEvents = 2000
 ```
 
 ---
@@ -224,7 +223,7 @@ All commands require `SEC_MODERATOR` or `SEC_ADMINISTRATOR` permissions:
 The module includes an automated validation suite in `tests/`:
 
 ```bash
-# 1. Verify 49 configuration defaults match the shipped template
+# 1. Verify 45 configuration defaults match the shipped template
 python tests/test_config_defaults.py
 
 # 2. Verify quota apportionment math and hysteresis deadbands
@@ -242,12 +241,8 @@ powershell -ExecutionPolicy Bypass -File tools/verify_core_immutability.ps1
 
 ---
 
-## 📚 Option 1 Documentation Index
+## 📚 Documentation Index
 
-- **[`docs/option1/capability_audit.md`](docs/option1/capability_audit.md)**: Baseline audit, entry-point call traces, thread contracts, and dependency pins.
-- **[`docs/option1/function_migration.md`](docs/option1/function_migration.md)**: Exhaustive legacy-to-Option-1 symbol, timer, queue, and function mapping.
-- **[`docs/option1/config_migration.md`](docs/option1/config_migration.md)**: Configuration key migration reference, units, validation, and conflict precedence.
-- **[`docs/option1/capability_manifest.json`](docs/option1/capability_manifest.json)**: Machine-readable schema v1.0.0 manifest of all 42 audited native activities.
 - **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**: Deep dive into internal class hierarchy, data flows, and concurrency.
 - **[`docs/GUIDE.md`](docs/GUIDE.md)**: Comprehensive operator, configuration, and troubleshooting manual.
 

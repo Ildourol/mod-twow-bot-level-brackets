@@ -15,21 +15,6 @@ enum class DestinationPolicy : uint8_t
     AllowNativeChoice = 1
 };
 
-enum class OrchestrationMode : uint8_t
-{
-    ExistingNativeTasks = 0
-};
-
-enum class LevelPolicyMode : uint8_t
-{
-    ObserveNative = 0
-};
-
-enum class PopulationMode : uint8_t
-{
-    ObserveNative = 0
-};
-
 struct LevelBracketConfig
 {
     uint8_t lower;

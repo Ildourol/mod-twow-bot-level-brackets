@@ -27,8 +27,6 @@ print(f'{checks} literal config fallbacks match the shipped template.')
 
 # Ensure obsolete/removed settings are not advertised as active in documentation or source
 readme = (root / 'README.md').read_text(encoding='utf-8')
-audit_fixes = (root / 'docs/AUDIT_FIXES.md').read_text(encoding='utf-8')
 assert 'BotLevelBrackets.HubDisperse.PopulationLimitsEnabled =' not in readme, 'README.md still assigns obsolete PopulationLimitsEnabled'
-assert 'BotLevelBrackets.HubDisperse.PopulationLimitsEnabled =' not in audit_fixes, 'AUDIT_FIXES.md still assigns obsolete PopulationLimitsEnabled'
 assert 'PopulationLimitsEnabled' not in source, 'src/mod-twow-bot-level-brackets.cpp still references obsolete PopulationLimitsEnabled'
 print('Documentation consistency verified: no active assignments of obsolete PopulationLimitsEnabled.')

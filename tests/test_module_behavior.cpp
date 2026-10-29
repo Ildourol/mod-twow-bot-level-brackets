@@ -43,7 +43,7 @@ static void AddPlayer(Player& p)
 
 int main()
 {
-    std::cout << "Starting mod-twow-bot-level-brackets Option 1 test suite..." << std::endl;
+    std::cout << "Starting mod-twow-bot-level-brackets test suite..." << std::endl;
 
     // -------------------------------------------------------------------------
     // Test 1: Baseline Architecture & Unchanged Bot Engine Immutability
@@ -64,7 +64,7 @@ int main()
     assert(bot1.level == 25);
 
     // -------------------------------------------------------------------------
-    // Test 2: Option 1 City Request Flow via Unchanged CityVisitService
+    // Test 2: City Request Flow via Unchanged CityVisitService
     // -------------------------------------------------------------------------
     // Configure Stormwind deficit: target = 7, actual = 0
     PopulationPolicy::Instance().SetCityTarget(0, 7);
@@ -183,6 +183,6 @@ int main()
     assert(!cmdScript.CanExecuteCommand(&chat, "blb", "cleanup"));
     assert(!cmdScript.CanExecuteCommand(&chat, "blb", "debug dryrun"));
 
-    std::cout << "All Option 1 behavioral, safety, and orchestration tests passed successfully!" << std::endl;
+    std::cout << "All behavioral, safety, and orchestration tests passed successfully!" << std::endl;
     return 0;
 }
