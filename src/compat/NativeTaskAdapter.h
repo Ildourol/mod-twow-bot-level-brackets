@@ -59,6 +59,8 @@ public:
     static uint32_t GetCityInboundCount(CityId cityId);
     static uint32_t GetCityResidentCount(CityId cityId);
     static bool IsBotInCity(Player* bot, CityId cityId);
+    static void Update(uint32_t diff);
+    static void Clear();
 
     // Native Action Dispatch (Gate-Preserving via DoSpecificAction)
     static bool DispatchNativeAction(Player* bot, const std::string& actionName);

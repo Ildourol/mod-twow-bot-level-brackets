@@ -1,5 +1,9 @@
 #include "ReadOnlyCatalog.h"
 #include <cstring>
+
+#if defined(_MSC_VER)
+#define strcasecmp _stricmp
+#endif
 #include <cmath>
 #include <algorithm>
 

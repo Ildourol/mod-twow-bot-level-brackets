@@ -4,7 +4,7 @@
 #include "Common.h"
 #include "Objects/Player.h"
 #include "Group/Group.h"
-#include "runtime/CityVisitService.h"
+#include "ObjectAccessor.h"
 #include "runtime/BotActivityLease.h"
 #include "runtime/BotManager.h"
 #include "runtime/PlayerbotAIStorage.h"
@@ -16,13 +16,19 @@
 #include "Common.h"
 #include "Player.h"
 #include "Group.h"
+#include "ObjectAccessor.h"
 #include "playerbot/PlayerbotAI.h"
 #include "playerbot/RandomPlayerbotMgr.h"
 #else
 // Generic Headless / Test doubles
 #include "Objects/Player.h"
 #include "Group/Group.h"
+#include "ObjectAccessor.h"
 #endif
+
+#include <unordered_map>
+#include <mutex>
+#include <ctime>
 
 namespace BotLevelBrackets
 {
@@ -164,6 +170,28 @@ bool NativeTaskAdapter::IsInWorldAndReady(Player* player)
     return true;
 }
 
+struct CityVisitRecord
+{
+    uint64_t requestId = 0;
+    ObjectGuid botGuid;
+    CityId cityId = CityId::None;
+    uint32_t requestedAt = 0;
+    uint32_t arrivedAt = 0;
+    uint32_t dwellDurationMs = 0;
+    uint32_t configGeneration = 0;
+    enum State : uint8_t { Traveling, Visiting } state = Traveling;
+};
+
+static std::unordered_map<ObjectGuid, CityVisitRecord> s_cityVisits;
+static std::mutex s_cityVisitsMutex;
+static uint64_t s_nextCityRequestId = 1;
+
+void NativeTaskAdapter::Clear()
+{
+    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+    s_cityVisits.clear();
+}
+
 TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId cityId,
                                                         uint32_t dwellDurationMs,
                                                         uint32_t configGeneration,
@@ -176,89 +204,129 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
     if (!IsFreeBot(bot))
         return TaskAdmissionResult::Protected;
 
-#if defined(HAVE_TORTOISEBOTS)
-    TortoiseBots::CityId tbCityId = static_cast<TortoiseBots::CityId>(cityId);
-    TortoiseBots::CityVisitAdmission adm = TortoiseBots::CityVisitService::Instance().RequestVisit(
-        bot, tbCityId, dwellDurationMs, "mod-twow-bot-level-brackets", configGeneration, outRequestId);
+    const CityDefinition* def = ReadOnlyCatalog::Instance().GetCity(cityId);
+    if (!def)
+        return TaskAdmissionResult::UnsupportedCity;
 
-    switch (adm)
     {
-        case TortoiseBots::CityVisitAdmission::Accepted:
-            return TaskAdmissionResult::Accepted;
-        case TortoiseBots::CityVisitAdmission::AlreadyActive:
+        std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+        auto it = s_cityVisits.find(bot->GetObjectGuid());
+        if (it != s_cityVisits.end())
             return TaskAdmissionResult::AlreadyActive;
-        case TortoiseBots::CityVisitAdmission::Busy:
-            return TaskAdmissionResult::Busy;
-        case TortoiseBots::CityVisitAdmission::Protected:
-            return TaskAdmissionResult::Protected;
-        case TortoiseBots::CityVisitAdmission::UnsupportedCity:
-            return TaskAdmissionResult::UnsupportedCity;
-        case TortoiseBots::CityVisitAdmission::UnsafeRoute:
-            return TaskAdmissionResult::UnsafeRoute;
-        case TortoiseBots::CityVisitAdmission::BudgetExhausted:
-            return TaskAdmissionResult::BudgetExhausted;
-        default:
-            return TaskAdmissionResult::Unavailable;
+
+        outRequestId = ++s_nextCityRequestId;
+        CityVisitRecord rec;
+        rec.requestId = outRequestId;
+        rec.botGuid = bot->GetObjectGuid();
+        rec.cityId = cityId;
+        rec.requestedAt = static_cast<uint32_t>(time(nullptr));
+        rec.arrivedAt = 0;
+        rec.dwellDurationMs = dwellDurationMs;
+        rec.configGeneration = configGeneration;
+
+        if (IsBotInCity(bot, cityId))
+        {
+            rec.state = CityVisitRecord::Visiting;
+            rec.arrivedAt = rec.requestedAt;
+            s_cityVisits[bot->GetObjectGuid()] = rec;
+        }
+        else
+        {
+            rec.state = CityVisitRecord::Traveling;
+            s_cityVisits[bot->GetObjectGuid()] = rec;
+        }
     }
-#else
-    // Legacy / Generic mode: no native CityVisitService available
-    return TaskAdmissionResult::Unavailable;
+
+    if (IsBotInCity(bot, cityId))
+    {
+#if defined(HAVE_TORTOISEBOTS)
+        PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+        if (ai)
+            ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+        PlayerbotAI* ai = bot->GetPlayerbotAI();
+        if (ai)
+            ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
 #endif
+    }
+    else
+    {
+#if defined(HAVE_TORTOISEBOTS)
+        PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+        if (ai)
+        {
+            ai->ChangeStrategy("+travel", BotState::BOT_STATE_NON_COMBAT);
+            ai->DoSpecificAction("choose travel target", Event(), true);
+        }
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+        PlayerbotAI* ai = bot->GetPlayerbotAI();
+        if (ai)
+        {
+            ai->ChangeStrategy("+travel", BotState::BOT_STATE_NON_COMBAT);
+            ai->DoSpecificAction("choose travel target", Event(), true);
+        }
+#endif
+    }
+
+    return TaskAdmissionResult::Accepted;
 }
 
 bool NativeTaskAdapter::CancelCityVisit(ObjectGuid botGuid, const std::string& ownerId)
 {
-#if defined(HAVE_TORTOISEBOTS)
-    return TortoiseBots::CityVisitService::Instance().CancelVisit(
-        botGuid, TortoiseBots::CityVisitCancelReason::OwnerRequested, ownerId);
-#else
-    (void)botGuid;
     (void)ownerId;
-    return false;
-#endif
+    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+    auto it = s_cityVisits.find(botGuid);
+    if (it == s_cityVisits.end())
+        return false;
+
+    s_cityVisits.erase(it);
+    return true;
 }
 
 bool NativeTaskAdapter::HasActiveCityVisit(ObjectGuid botGuid)
 {
-#if defined(HAVE_TORTOISEBOTS)
-    return TortoiseBots::CityVisitService::Instance().HasActiveVisit(botGuid);
-#else
-    (void)botGuid;
-    return false;
-#endif
+    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+    return s_cityVisits.find(botGuid) != s_cityVisits.end();
 }
 
 CityId NativeTaskAdapter::GetTargetCity(ObjectGuid botGuid)
 {
-#if defined(HAVE_TORTOISEBOTS)
-    TortoiseBots::CityId tbId = TortoiseBots::CityVisitService::Instance().GetTargetCity(botGuid);
-    return static_cast<CityId>(tbId);
-#else
-    (void)botGuid;
+    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+    auto it = s_cityVisits.find(botGuid);
+    if (it != s_cityVisits.end())
+        return it->second.cityId;
     return CityId::None;
-#endif
 }
 
 uint32_t NativeTaskAdapter::GetCityInboundCount(CityId cityId)
 {
-#if defined(HAVE_TORTOISEBOTS)
-    return TortoiseBots::CityVisitService::Instance().GetInboundCount(
-        static_cast<TortoiseBots::CityId>(cityId));
-#else
-    (void)cityId;
-    return 0;
-#endif
+    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+    uint32_t count = 0;
+    for (const auto& pair : s_cityVisits)
+    {
+        if (pair.second.cityId == cityId && pair.second.state == CityVisitRecord::Traveling)
+            ++count;
+    }
+    return count;
 }
 
 uint32_t NativeTaskAdapter::GetCityResidentCount(CityId cityId)
 {
-#if defined(HAVE_TORTOISEBOTS)
-    return TortoiseBots::CityVisitService::Instance().GetResidentCount(
-        static_cast<TortoiseBots::CityId>(cityId));
-#else
-    (void)cityId;
-    return 0;
+    const CityDefinition* def = ReadOnlyCatalog::Instance().GetCity(cityId);
+    if (!def)
+        return 0;
+
+    uint32_t count = 0;
+#if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
+    HashMapHolder<Player>::MapType& players = sObjectAccessor.GetPlayers();
+    for (auto& pair : players)
+    {
+        Player* p = pair.second;
+        if (p && p->IsInWorld() && IsBot(p) && IsBotInCity(p, cityId))
+            ++count;
+    }
 #endif
+    return count;
 }
 
 bool NativeTaskAdapter::IsBotInCity(Player* bot, CityId cityId)
@@ -266,18 +334,65 @@ bool NativeTaskAdapter::IsBotInCity(Player* bot, CityId cityId)
     if (!bot)
         return false;
 
-#if defined(HAVE_TORTOISEBOTS)
-    return TortoiseBots::CityVisitService::Instance().IsBotInCity(
-        bot, static_cast<TortoiseBots::CityId>(cityId));
-#else
     const CityDefinition* def = ReadOnlyCatalog::Instance().GetCity(cityId);
     if (!def || bot->GetMapId() != def->mapId)
         return false;
+
     float dx = bot->GetPositionX() - def->centerX;
     float dy = bot->GetPositionY() - def->centerY;
     float dz = bot->GetPositionZ() - def->centerZ;
     return (dx * dx + dy * dy + dz * dz) <= (def->radius * def->radius);
+}
+
+void NativeTaskAdapter::Update(uint32_t diff)
+{
+    (void)diff;
+    uint32_t now = static_cast<uint32_t>(time(nullptr));
+    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+
+    for (auto it = s_cityVisits.begin(); it != s_cityVisits.end(); )
+    {
+        Player* bot = ObjectAccessor::FindPlayer(it->first);
+        if (!bot || !bot->IsInWorld() || !bot->IsAlive() || !IsFreeBot(bot))
+        {
+            it = s_cityVisits.erase(it);
+            continue;
+        }
+
+        if (it->second.state == CityVisitRecord::Traveling)
+        {
+            if (IsBotInCity(bot, it->second.cityId))
+            {
+                it->second.state = CityVisitRecord::Visiting;
+                it->second.arrivedAt = now;
+#if defined(HAVE_TORTOISEBOTS)
+                PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+                if (ai)
+                    ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+                PlayerbotAI* ai = bot->GetPlayerbotAI();
+                if (ai)
+                    ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
 #endif
+            }
+            else if (now - it->second.requestedAt > 900)
+            {
+                it = s_cityVisits.erase(it);
+                continue;
+            }
+        }
+        else if (it->second.state == CityVisitRecord::Visiting)
+        {
+            uint32_t dwellSec = it->second.dwellDurationMs / 1000;
+            if (now - it->second.arrivedAt >= dwellSec)
+            {
+                it = s_cityVisits.erase(it);
+                continue;
+            }
+        }
+
+        ++it;
+    }
 }
 
 bool NativeTaskAdapter::DispatchNativeAction(Player* bot, const std::string& actionName)

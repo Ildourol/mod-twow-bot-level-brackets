@@ -36,6 +36,8 @@ Coordinator& Coordinator::Instance()
 
 void Coordinator::Update(uint32_t diff)
 {
+    NativeTaskAdapter::Update(diff);
+
     const auto& policy = PopulationPolicy::Instance();
     if (!policy.IsEnabled())
         return;
@@ -236,7 +238,7 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
 
                 DiagnosticManager::Instance().LogEvent(
                     "NativeAcknowledgment", "RequestAccepted", "Success",
-                    "Native CityVisitService accepted request",
+                    "Native task adapter accepted request",
                     reqId, guidLow, def->name, def->name, "");
             }
             else if (res == TaskAdmissionResult::AlreadyActive)
