@@ -81,7 +81,7 @@ int main()
     // 3. DestinationCatalog Verification
     assert(DestinationCatalog::Instance().GetCity(CITY_STORMWIND) != nullptr);
     assert(DestinationCatalog::Instance().GetCity(CITY_ALAH_THALAS) != nullptr);
-    assert(DestinationCatalog::Instance().GetCity(CITY_SPARKWATER_PORT) != nullptr);
+    assert(DestinationCatalog::Instance().GetCity(CITY_SPARKWATER) != nullptr);
     assert(DestinationCatalog::Instance().GetOutdoorRegions().size() == 38);
     const CityInfo* swInfo = DestinationCatalog::Instance().GetCity(CITY_STORMWIND);
     assert(swInfo != nullptr && swInfo->landing.mapId == 0);
