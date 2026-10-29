@@ -3,7 +3,7 @@
 **Module:** `mod-twow-bot-level-brackets-extended`  
 **Target Core:** Turtle WoW Custom vMaNGOS (`tortoise-wow` targeting client 1.18.1.7272 / 1.12.1)  
 **Target Bot Engine:** `TortoiseBots` (native modular companion engine)  
-**Architecture:** Option 2: Registered Opportunities via `RegisterAiContextAugmenter`  
+**Architecture:** Registered Opportunities via `RegisterAiContextAugmenter`
 
 ---
 
@@ -11,12 +11,12 @@
 
 The **Bot Level Brackets Extended** module coordinates dynamic world presence, capital city ambiance, and natural leveling bracket observation for autonomous playerbots.
 
-Rather than forcing unnatural level resets or synthetic teleports, the Extended module implements **Option 2: Registered Opportunities**:
+Rather than forcing unnatural level resets or synthetic teleports, the module coordinates bot presence through **Registered AI Opportunities**:
 * **Autonomous Scheduling:** The `OpportunityCoordinator` proposes opportunities to bots whose current level and status match destination deficits.
 * **Native AI Travel Execution:** Bots receive custom AI contexts (`BracketsStrategyContext`, `BracketsActionContext`) registered directly with `TortoiseBots`. Bots navigate natively using `ChooseTravelTargetAction` and `TravelMgr`.
 * **Lore-Friendly Capital Ambiance:** Populates classic capitals and Turtle WoW custom capitals (**Alah'Thalas** for High Elves, **Sparkwater Port** for Goblins) based on configurable resident quotas.
 * **Field Reserve Guarantee:** Protects the open world by reserving at least 70% of bots for leveling zones.
-* **Option 3 Restricted Fallback:** Emergency relocation fallback is strictly disabled by default (`Fallback.NativeRouteUnsupportedBeforeStart = 0`). Only activates for verified unreachable capital destinations with safe landing coordinates.
+* **Restricted Relocation Fallback:** Emergency relocation fallback is strictly disabled by default (`Fallback.NativeRouteUnsupportedBeforeStart = 0`). Only activates for verified unreachable capital destinations with safe landing coordinates.
 
 ---
 
@@ -96,9 +96,9 @@ BotLevelBrackets.HubPopulation.Horde.ThunderBluff = 8
 BotLevelBrackets.HubPopulation.Horde.Sparkwater = 8
 ```
 
-### 3.3 Option 3 Restricted Relocation Fallback
+### 3.3 Restricted Relocation Fallback
 ```ini
-# Option 3 restricted fallback (0 = disabled, 1 = enabled)
+# Restricted relocation fallback (0 = disabled, 1 = enabled)
 # Emergency fallback for verified unreachable capital destinations
 BotLevelBrackets.Fallback.NativeRouteUnsupportedBeforeStart = 0
 

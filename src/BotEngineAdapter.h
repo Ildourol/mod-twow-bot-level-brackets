@@ -234,7 +234,7 @@ public:
 
     /**
      * Safely dismounts and teleports a bot to a specified coordinate.
-     * Used exclusively by Option 3 restricted city relocation fallback.
+     * Used exclusively by restricted city relocation fallback.
      */
     static bool TeleportBot(Player* bot, uint32 mapId, float x, float y, float z, float o)
     {

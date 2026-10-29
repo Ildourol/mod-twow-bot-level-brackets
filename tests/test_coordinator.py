@@ -1,4 +1,4 @@
-"""Unit test suite for Option 2 Coordinator, Census, Quota Math, 43 Activities Catalog & Debug."""
+"""Unit test suite for Coordinator, Census, Quota Math, 43 Activities Catalog & Debug."""
 import unittest
 import math
 from pathlib import Path
@@ -19,7 +19,7 @@ ALL_43_ACTIVITIES = [
     "BattlegroundQueue", "DungeonQueue", "HomeBind", "AmbientChat", "RandomJump"
 ]
 
-class TestOption2ActivitiesCatalog(unittest.TestCase):
+class TestActivitiesCatalog(unittest.TestCase):
     def setUp(self):
         self.config_text = (ROOT / 'conf/mod_twow_bot_level_brackets.conf.dist').read_text(encoding='utf-8')
         self.cpp_text = '\n'.join(p.read_text(encoding='utf-8') for p in (ROOT / 'src').glob('*.cpp'))
@@ -41,7 +41,7 @@ class TestOption2ActivitiesCatalog(unittest.TestCase):
             self.assertIn(f'"{act}"', self.cpp_text, f"{act} not found in C++ source")
 
     def test_no_forbidden_ai_mutations_in_production(self):
-        """Option 2 strictly forbids SetLevel or GiveLevel calls in redistribution scheduling."""
+        """Strictly forbids SetLevel or GiveLevel calls in redistribution scheduling."""
         adapter = (ROOT / 'src/BotEngineAdapter.h').read_text(encoding='utf-8')
         coordinator = (ROOT / 'src/OpportunityCoordinator.cpp').read_text(encoding='utf-8')
         self.assertNotIn("bot->SetLevel(", coordinator, "OpportunityCoordinator must not mutate bot level")
@@ -99,7 +99,7 @@ class TestCensusAndQuotaMath(unittest.TestCase):
         self.assertLessEqual(feasible_city_sum, max_city_demand)
 
 
-class TestOption3FallbackInvariants(unittest.TestCase):
+class TestFallbackInvariants(unittest.TestCase):
     def setUp(self):
         self.config_text = (ROOT / 'conf/mod_twow_bot_level_brackets.conf.dist').read_text(encoding='utf-8')
         self.fallback_cpp = (ROOT / 'src/CityRelocationFallback.cpp').read_text(encoding='utf-8')

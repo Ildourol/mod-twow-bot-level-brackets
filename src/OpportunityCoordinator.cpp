@@ -302,7 +302,7 @@ namespace Brackets
                         {
                             ActivityId actId = SelectWeightedActivity(DOMAIN_CITY, bestCityId, candidate);
 
-                            // Check restricted Option 3 fallback allowlist
+                            // Check restricted fallback allowlist
                             std::string rejection;
                             if (config.fallbackEnabled &&
                                 CityRelocationFallback::Instance().CanRelocate(candidate, bestCityId, REASON_ROUTE_UNSUPPORTED_BEFORE_START, &rejection))
@@ -312,7 +312,7 @@ namespace Brackets
                             }
                             else
                             {
-                                // Standard Option 2 registered opportunity
+                                // Standard registered opportunity
                                 uint64 intentId = OpportunityLedger::Instance().CreateIntent(
                                     candidate->GetObjectGuid(), DOMAIN_CITY, bestCityId, city->name,
                                     actId, config.generation, candidate->GetLevel(), team, config.stabilitySeconds);

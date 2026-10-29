@@ -5,7 +5,7 @@
 [![Turtle WoW](https://img.shields.io/badge/Turtle_WoW-1.18.1%20%2F%201.12.1-orange.svg)](https://turtle-wow.org)
 [![Core](https://img.shields.io/badge/Core-tortoise--wow%20(vMaNGOS)-blue.svg)](https://github.com/tortoise-wow/tortoise-wow)
 [![Bot Engine](https://img.shields.io/badge/Bot%20Engine-TortoiseBots%20%7C%20PlayerBots-brightgreen.svg)](https://github.com/Sagiroth/TortoiseBots)
-[![Architecture](https://img.shields.io/badge/Architecture-Option%202%20Registered%20Opportunities-success.svg)]()
+[![Architecture](https://img.shields.io/badge/Architecture-Registered%20Opportunities-success.svg)]()
 [![Compliance](https://img.shields.io/badge/Unediting%20Doctrine-100%25%20Clean-brightgreen.svg)]()
 [![Activities](https://img.shields.io/badge/Native%20Activities-43%20Registered-purple.svg)]()
 [![License](https://img.shields.io/badge/License-GPL%20v2-blue.svg)]()
@@ -14,15 +14,15 @@ A next-generation, non-intrusive bot opportunity coordinator, capital city ambia
 
 ---
 
-## 🌟 What is the Extended Version?
+## 🌟 What Does This Module Do?
 
-While Option 1 follows standard level bracket rotation, **Option 2 (Extended)** completely eliminates forced level mutations and artificial teleports, replacing them with **Registered AI Opportunities**:
+The module coordinates bot world presence, capital city ambiance, and leveling progression through **Registered AI Opportunities**, eliminating forced level mutations and artificial teleports:
 
-1. **Option 2 AI Context Augmentation**: Registers custom AI strategies, actions, triggers, and values into `TortoiseBots` via `RegisterAiContextAugmenter()`. Bots receive opportunities and navigate autonomously using native `ChooseTravelTargetAction`, `TravelMgr`, and pathfinding.
+1. **AI Context Augmentation**: Registers custom AI strategies, actions, triggers, and values into `TortoiseBots` via `RegisterAiContextAugmenter()`. Bots receive opportunities and navigate autonomously using native `ChooseTravelTargetAction`, `TravelMgr`, and pathfinding.
 2. **43 Native Bot Activities**: Incorporates all 43 native bot activities across Capital Cities (17) and Outdoor World (26) domains—including AH trading, banking, tavern rest, class training, racial visits, hunting, gathering, questing, and dungeon exploration.
 3. **8 Capital City Hubs with Custom Turtle WoW Lore**: Balances resident quotas across Stormwind, Ironforge, Darnassus, **Alah'Thalas (High Elf)**, Orgrimmar, Undercity, Thunder Bluff, and **Sparkwater Port (Goblin)**.
 4. **Natural Progression Observation (`ObserveNative`)**: Observes native bot leveling progression without direct `SetLevel`, `GiveLevel`, synthetic XP, or factory resets. Bracket targets are advisory and calculated via largest-remainder allocation.
-5. **Option 3 Restricted Emergency Fallback**: A safety net disabled by default (`Fallback.NativeRouteUnsupportedBeforeStart = 0`). Only activates for verified unreachable capital destinations with preflight checks, landing point validation, and 1-hour anti-churn throttles.
+5. **Restricted Emergency Fallback**: A safety net disabled by default (`Fallback.NativeRouteUnsupportedBeforeStart = 0`). Only activates for verified unreachable capital destinations with preflight checks, landing point validation, and 1-hour anti-churn throttles.
 6. **Field Reserve Bound Guarantee**: Guarantees that at least 70% of bots remain in the open world, capping total city resident quotas to at most 30% of online bots.
 7. **Comprehensive Social & Arena Protection**: Protects bots on real-player friend lists (`character_social`), in guilds with human members (online or offline), grouped with humans, commanded by masters, or participating in custom arenas (Blood Ring Map 26, Sunnyglade Map 27, Gurubashi).
 8. **Module-Local Diagnostic Environment**: Fixed-capacity in-memory circular ring buffer (default 500 events), 20 categories, token-bucket rate limiter, JSONL telemetry export, and deep diagnostic inspection commands (`.blb explain bot`, `.blb explain city`, `.blb explain region`).
@@ -56,7 +56,7 @@ flowchart TD
         Catalogs["DestinationCatalog (8 Cities, 38 Regions)"]
         Social["SocialProtection (Friends & Guilds)"]
         Debug["BracketsDebug (Ring Buffer & JSONL)"]
-        Fallback["CityRelocationFallback (Option 3 Restrictive)"]
+        Fallback["CityRelocationFallback (Restricted Emergency)"]
         BracketsAI["BracketsAiContext (Strategy/Action/Trigger/Value)"]
     end
 
@@ -124,7 +124,7 @@ The module registers all 43 native activities with customizable selection weight
 
 ---
 
-## 🛡️ Option 3 Restricted Relocation Fallback
+## 🛡️ Restricted Relocation Fallback
 
 An emergency bridge for verified unreachable capital destinations:
 * **Disabled by default**: `BotLevelBrackets.Fallback.NativeRouteUnsupportedBeforeStart = 0`.
@@ -203,7 +203,7 @@ BotLevelBrackets.HubPopulation.Horde.Sparkwater = 8
 # Outdoor regional world opportunities enable switch
 BotLevelBrackets.WorldOpportunity.Enabled = 1
 
-# Option 3 restricted emergency fallback (0 = disabled, 1 = enabled)
+# Restricted emergency fallback (0 = disabled, 1 = enabled)
 BotLevelBrackets.Fallback.NativeRouteUnsupportedBeforeStart = 0
 
 # Diagnostic debug mode: Off, Summary, Trace, DryRun (default: Off)
@@ -256,4 +256,4 @@ cp modules/mod-twow-bot-level-brackets-extended/conf/mod_twow_bot_level_brackets
 * [**`docs/GUIDE.md`**](docs/GUIDE.md): Complete operator manual, configuration guide, and command reference.
 * [**`docs/ACTIVITIES.md`**](docs/ACTIVITIES.md): Comprehensive catalog of all 43 native activities with bitmasks and defaults.
 * [**`docs/DEBUG_ENVIRONMENT.md`**](docs/DEBUG_ENVIRONMENT.md): Diagnostic observability suite, categories, ring buffer, and JSONL format.
-* [**`docs/MIGRATION_GUIDE.md`**](docs/MIGRATION_GUIDE.md): Step-by-step migration from legacy redistribution to Option 2.
+* [**`docs/MIGRATION_GUIDE.md`**](docs/MIGRATION_GUIDE.md): Step-by-step migration from legacy redistribution to registered opportunities.

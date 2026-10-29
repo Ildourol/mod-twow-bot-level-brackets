@@ -119,7 +119,7 @@ namespace Brackets
         staged.hubCityPcts[CITY_THUNDER_BLUFF] = ReadBoundedUInt("BotLevelBrackets.HubDisperse.ThunderBluffPct", 4, 0, 100);
         staged.hubCityPcts[CITY_SPARKWATER]  = ReadBoundedUInt("BotLevelBrackets.HubDisperse.SparkwaterPct", 4, 0, 100);
 
-        // 6. City Fallback (Option 3 restricted compatibility path)
+        // 6. City Fallback (Restricted compatibility path)
         staged.fallbackEnabled = GetBoolDefault("BotLevelBrackets.City.Fallback.Enabled", false);
         staged.fallbackCities = GetStringDefault("BotLevelBrackets.City.Fallback.Cities", "");
         staged.fallbackCityAllowlist.clear();

@@ -43,7 +43,7 @@ All log entries are tagged with one of 20 discrete categories, enabling granular
 | 5 | `CityAmbiance` | Capital city resident quotas, arrivals, and departures. |
 | 6 | `WorldOpportunity`| Outdoor regional opportunities and area envelope matching. |
 | 7 | `Activity` | Native activity selection lottery and weights. |
-| 8 | `Fallback` | Option 3 emergency relocation fallback checks and execution. |
+| 8 | `Fallback` | Restricted emergency relocation fallback checks and execution. |
 | 9 | `AiContext` | Context augmentation registration and Strategy/Action execution. |
 | 10 | `Trigger` | AI trigger evaluations (`CityOpportunityTrigger`, `WorldOpportunityTrigger`). |
 | 11 | `Action` | AI action execution (`CityOpportunityAction`, `WorldOpportunityAction`). |

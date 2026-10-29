@@ -48,10 +48,10 @@ static void HandleStatusCommand(ChatHandler* handler)
     const auto& config = ConfigManager::Instance().GetConfig();
     ss << "Master Enabled: " << (config.enabled ? "|cff00ff00YES|r" : "|cffff0000NO|r")
        << " (Gen " << config.generation << ")\n";
-    ss << "City Path (Option 2): " << (config.cityEnabled ? "|cff00ff00ENABLED|r" : "|cffff0000DISABLED|r")
+    ss << "City Path: " << (config.cityEnabled ? "|cff00ff00ENABLED|r" : "|cffff0000DISABLED|r")
        << " [Mode: " << config.cityActivationMode << "]\n";
-    ss << "World Path (Option 2): " << (config.worldEnabled ? "|cff00ff00ENABLED|r" : "|cffff0000DISABLED|r") << "\n";
-    ss << "City Fallback (Option 3): " << (config.fallbackEnabled ? "|cff00ff00ENABLED|r" : "|cffff0000DISABLED|r")
+    ss << "World Path: " << (config.worldEnabled ? "|cff00ff00ENABLED|r" : "|cffff0000DISABLED|r") << "\n";
+    ss << "City Fallback: " << (config.fallbackEnabled ? "|cff00ff00ENABLED|r" : "|cffff0000DISABLED|r")
        << " [Allowlist: " << (config.fallbackCities.empty() ? "None" : config.fallbackCities) << "]\n";
     ss << "Level Policy: |cffffff00" << (config.levelPolicyMode == LEVEL_POLICY_OBSERVE_NATIVE ? "ObserveNative (Advisory)" : "Advisory") << "|r\n";
 
@@ -187,7 +187,7 @@ static void HandlePendingCommand(ChatHandler* handler)
         }
     }
 
-    ss << "|cff888888Historical level reset queue: RETIRED (Option 2 operates via native travel).|r\n";
+    ss << "|cff888888Historical level reset queue: RETIRED (module operates via native travel).|r\n";
     handler->SendSysMessage(ss.str().c_str());
 }
 
@@ -245,7 +245,7 @@ static void HandleVisitsCommand(ChatHandler* handler, const char* args)
 static void HandleFallbackCommand(ChatHandler* handler)
 {
     std::ostringstream ss;
-    ss << "|cff00ccff=== Option 3 City Relocation Fallback Status ===|r\n";
+    ss << "|cff00ccff=== Restricted City Relocation Fallback Status ===|r\n";
 
     const auto& config = ConfigManager::Instance().GetConfig();
     ss << "Fallback Enabled: " << (config.fallbackEnabled ? "|cff00ff00YES|r" : "|cffff0000NO (Default)|r") << "\n";
@@ -514,7 +514,7 @@ public:
             handler->SendSysMessage("  .blb brackets        - Level distribution and advisory ladder");
             handler->SendSysMessage("  .blb pending         - Active opportunity reservations");
             handler->SendSysMessage("  .blb visits [guid]   - Opportunity history and metrics");
-            handler->SendSysMessage("  .blb fallback        - Option 3 restricted fallback status");
+            handler->SendSysMessage("  .blb fallback        - Restricted city relocation fallback status");
             handler->SendSysMessage("  .blb stats           - Performance and scheduler telemetry");
             handler->SendSysMessage("  .blb activities      - 43 native activities catalog");
             handler->SendSysMessage("  .blb explain <guid>  - Bot diagnostic snapshot");

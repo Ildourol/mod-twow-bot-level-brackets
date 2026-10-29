@@ -11,7 +11,7 @@ jobs:
         run: |
           python3 tests/test_config_defaults.py
           python3 tests/test_hub_population.py
-          python3 tests/test_option2_coordinator.py
+          python3 tests/test_coordinator.py
       - name: Native, legacy and generic module behavior
         run: python3 tests/test_module_behavior.py --sanitize
       - name: Patch whitespace

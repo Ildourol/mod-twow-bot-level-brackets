@@ -58,7 +58,7 @@ namespace Brackets
         uint32 hubHysteresisBots{2};
         uint32 hubCityPcts[CITY_COUNT]{ 7, 5, 4, 4, 7, 5, 4, 4 };
 
-        // City Fallback (Option 3 restricted compatibility path)
+        // City Fallback (Restricted compatibility path)
         bool   fallbackEnabled{false};
         std::string fallbackCities{""};
         std::unordered_set<std::string> fallbackCityAllowlist;

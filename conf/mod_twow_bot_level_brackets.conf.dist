@@ -17,14 +17,14 @@ BotLevelBrackets.Enabled = 1
 
 #
 # BotLevelBrackets.City.Enabled
-# Enables Option 2 capital city opportunity generation.
+# Enables capital city opportunity generation.
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.City.Enabled = 1
 
 #
 # BotLevelBrackets.World.Enabled
-# Enables Option 2 outdoor world opportunity generation.
+# Enables outdoor world opportunity generation.
 # Default: 1 (Enabled)
 #
 BotLevelBrackets.World.Enabled = 1
@@ -126,7 +126,7 @@ BotLevelBrackets.World.RegionConfig = ""
 
 #
 # BotLevelBrackets.LevelPolicy.Mode
-# Policy for level distribution. In Option 2, character levels progress naturally.
+# Policy for level distribution. Character levels progress naturally.
 # Values: ObserveNative (advisory observation of native login ladder)
 # Default: ObserveNative
 #
@@ -234,7 +234,7 @@ BotLevelBrackets.HubDisperse.SparkwaterPct = 4
 
 
 ###############################################################################
-# 6. OPTION 3 RESTRICTED CITY RELOCATION FALLBACK
+# 6. RESTRICTED CITY RELOCATION FALLBACK
 ###############################################################################
 
 #
