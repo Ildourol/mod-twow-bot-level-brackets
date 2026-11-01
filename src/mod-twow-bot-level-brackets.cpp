@@ -596,15 +596,10 @@ public:
 // SCRIPT REGISTRATION ENTRYPOINTS
 // -----------------------------------------------------------------------------
 
-void Addmod_twow_bot_level_bracketsScripts()
+void Addmod_twow_bot_level_brackets_extendedScripts()
 {
     new BotLevelBracketsWorldScript();
     new BotLevelBracketsPlayerScript();
     new BotLevelBracketsGuildScript();
     new BotLevelBracketsCommandScript();
-}
-
-void Addmod_twow_bot_level_brackets_extendedScripts()
-{
-    Addmod_twow_bot_level_bracketsScripts();
 }
