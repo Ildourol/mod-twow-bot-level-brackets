@@ -13,8 +13,9 @@
 #include "Player.h"
 #include "ObjectAccessor.h"
 #else
-// Test Doubles
-#include "support/Framework.h"
+#include "Common.h"
+#include "Objects/Player.h"
+#include "ObjectAccessor.h"
 #endif
 
 #include <ctime>

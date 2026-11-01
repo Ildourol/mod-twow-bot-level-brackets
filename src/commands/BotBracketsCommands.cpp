@@ -20,8 +20,10 @@
 #include "Config/Config.h"
 #include "Log.h"
 #else
-// Test doubles
-#include "support/Framework.h"
+#include "Common.h"
+#include "Chat/Chat.h"
+#include "Config/Config.h"
+#include "Log.h"
 #endif
 
 #include <cstring>

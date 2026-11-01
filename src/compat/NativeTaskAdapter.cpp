@@ -132,7 +132,7 @@ bool NativeTaskAdapter::HasRealPlayerInParty(Player* player)
 
     for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
     {
-        Player* member = ref->GetSource();
+        Player* member = ref->getSource();
         if (member && member->IsInWorld() && member->GetSession() && !member->GetSession()->IsHeadless())
             return true;
     }

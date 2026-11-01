@@ -17,8 +17,10 @@
 #include "ObjectAccessor.h"
 #include "Log.h"
 #else
-// Test Doubles
-#include "support/Framework.h"
+#include "Common.h"
+#include "Objects/Player.h"
+#include "ObjectAccessor.h"
+#include "Log.h"
 #endif
 
 #include <ctime>

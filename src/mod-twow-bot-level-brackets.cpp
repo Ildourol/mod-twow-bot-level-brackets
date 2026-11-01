@@ -38,8 +38,18 @@
 #include "Group.h"
 #include "Guild.h"
 #else
-// Test doubles / generic
-#include "support/Framework.h"
+#include "Common.h"
+#include "ScriptObjects.h"
+#include "ScriptMgr.h"
+#include "Objects/Player.h"
+#include "ObjectMgr.h"
+#include "ObjectAccessor.h"
+#include "Chat/Chat.h"
+#include "Log.h"
+#include "Config/Config.h"
+#include "World.h"
+#include "Group/Group.h"
+#include "Guild/Guild.h"
 #endif
 
 #include <string>
