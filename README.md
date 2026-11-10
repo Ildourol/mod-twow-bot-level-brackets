@@ -52,8 +52,10 @@ flowchart TD
    The module never injects custom strategies, actions, triggers, or values (`RegisterAiContextAugmenter` is deliberately avoided). It queries existing native services to determine where bots are needed and requests genuine existing tasks.
 2. **Strict Immutability (The Unediting Doctrine):**
    `tortoise-wow` (core) and `TortoiseBots` (bot engine) are 100% read-only. All scheduling, telemetry, state tracking, and commands reside exclusively within standalone module space.
-3. **Zero Teleports & Zero Character Mutations:**
-   No synthetic `Player::TeleportTo` calls, no factory re-provisioning, and no forced level mutations or artificial XP grants. Bots travel through the world organically using native engine pathfinding. Level supply shortages are tracked and reported as **Advisory**.
+3. **Active Level Redistribution & Full Native Provisioning:**
+   Maintains healthy population distribution across 7 level brackets (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60). Leveled bots receive complete `TortoiseBots` provisioning: spells, talents, defense/weapon skills, Plate/Mail at 40, Riding 75/150, racial mounts, primary & secondary professions with tools, and autogear. Teleport on level adjustment is enabled by default (`BotLevelBrackets.TeleportOnLevelChange = 1`) to route bots to leveling zones and native racial starter valleys (including Turtle WoW High Elf and Goblin custom zones).
+4. **Automated Starter & Wrong-Map Dispersal:**
+   Background checks automatically evacuate over-leveled bots (> Level 9) from the 8 starter valleys and return stranded bots from invalid maps back to the open world.
 4. **Native Need & Feasibility Gates Preserved:**
    Every dispatched action flows through `PlayerbotAI::DoSpecificAction`, which evaluates `action->isUseful()` and `action->isPossible()` before execution. If a bot cannot perform an action, the native engine refuses it safely.
 5. **Transient 1-Task-per-Bot Deduplication Barrier:**
@@ -83,6 +85,7 @@ The codebase is organized into cleanly decoupled subsystems in `src/`:
 | **`policy/`** | [`src/policy/PopulationPolicy.h`](src/policy/PopulationPolicy.h)<br/>[`src/policy/QuotaAllocator.h`](src/policy/QuotaAllocator.h) | Configuration schema, target math, largest-remainder apportionment, and bounds clamping. |
 | **`world/`** | [`src/world/ReadOnlyCatalog.h`](src/world/ReadOnlyCatalog.h)<br/>[`src/world/Census.h`](src/world/Census.h) | Hub catalog, outdoor zone definitions, and coherent point-in-time census snapshots. |
 | **`scheduling/`** | [`src/scheduling/Coordinator.h`](src/scheduling/Coordinator.h)<br/>[`src/scheduling/RequestLedger.h`](src/scheduling/RequestLedger.h) | Periodic scheduling pass, cursor rotation, task deduplication, and rejection backoff. |
+| **`distribution/`** | [`src/distribution/LevelDistributionManager.h`](src/distribution/LevelDistributionManager.h) | Autonomous level bracket redistribution, RAM-first pending queue, starting-zone and wrong-map dispersals. |
 | **`activities/`** | [`src/activities/ActivityRegistry.h`](src/activities/ActivityRegistry.h) | Catalog of 42 audited native activities mapped to capability domains. |
 | **`social/`** | [`src/social/ProtectionCache.h`](src/social/ProtectionCache.h) | Caches protecting bots interacting with real players or human guilds. |
 | **`commands/`** | [`src/commands/BotBracketsCommands.h`](src/commands/BotBracketsCommands.h) | Implementation of all `.blb` GM and operator console commands. |
@@ -156,7 +159,8 @@ BotLevelBrackets.Orchestration.RejectionBackoffSeconds = 600
 BotLevelBrackets.City.Enabled = 1
 BotLevelBrackets.City.DestinationPolicy = RequireExact
 BotLevelBrackets.City.QuotaMode = 2
-BotLevelBrackets.City.TransitMode = 1
+BotLevelBrackets.City.TransitMode = 2
+BotLevelBrackets.City.PickAllBrackets = 1
 BotLevelBrackets.City.DwellDurationMs = 300000
 BotLevelBrackets.City.MinDwellDurationMs = 300000
 BotLevelBrackets.City.MaxDwellDurationMs = 600000

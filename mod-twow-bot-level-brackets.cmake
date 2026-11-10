@@ -69,6 +69,7 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
         "${CMAKE_CURRENT_LIST_DIR}/src/social"
         "${CMAKE_CURRENT_LIST_DIR}/src/commands"
         "${CMAKE_CURRENT_LIST_DIR}/src/debug"
+        "${CMAKE_CURRENT_LIST_DIR}/src/distribution"
     )
   elseif(LEGACY_PLAYERBOTS_FOUND)
     message(STATUS "mod-twow-bot-level-brackets: Discovered Legacy PlayerBots at ${LEGACY_PLAYERBOTS_ROOT}")
@@ -98,6 +99,7 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
         "${CMAKE_CURRENT_LIST_DIR}/src/social"
         "${CMAKE_CURRENT_LIST_DIR}/src/commands"
         "${CMAKE_CURRENT_LIST_DIR}/src/debug"
+        "${CMAKE_CURRENT_LIST_DIR}/src/distribution"
     )
   else()
     message(STATUS "mod-twow-bot-level-brackets: No PlayerBots engine found; enabling Generic Headless Session Mode.")
@@ -115,6 +117,7 @@ if(TORTOISE_MODULE_CMAKE_PHASE STREQUAL "POST_TARGETS")
         "${CMAKE_CURRENT_LIST_DIR}/src/social"
         "${CMAKE_CURRENT_LIST_DIR}/src/commands"
         "${CMAKE_CURRENT_LIST_DIR}/src/debug"
+        "${CMAKE_CURRENT_LIST_DIR}/src/distribution"
     )
   endif()
 

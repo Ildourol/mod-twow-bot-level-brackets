@@ -8,22 +8,29 @@
 #include "../activities/ActivityRegistry.h"
 #include "../debug/DiagnosticManager.h"
 #include "../social/ProtectionCache.h"
+#include "../distribution/LevelDistributionManager.h"
 
 #ifdef HAVE_TORTOISEBOTS
 #include "Common.h"
 #include "Chat/Chat.h"
 #include "Config/Config.h"
 #include "Log.h"
+#include "Objects/Player.h"
+#include "ObjectAccessor.h"
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
 #include "Common.h"
 #include "Chat.h"
 #include "Config/Config.h"
 #include "Log.h"
+#include "Player.h"
+#include "ObjectAccessor.h"
 #else
 #include "Common.h"
 #include "Chat/Chat.h"
 #include "Config/Config.h"
 #include "Log.h"
+#include "Objects/Player.h"
+#include "ObjectAccessor.h"
 #endif
 
 #include <cstring>
@@ -54,8 +61,14 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
     if (strcmp(subCommand, "activities") == 0)
         return HandleActivities(handler);
 
-    if (strcmp(subCommand, "ledger") == 0 || strcmp(subCommand, "pending") == 0)
+    if (strcmp(subCommand, "ledger") == 0)
         return HandleLedger(handler);
+
+    if (strcmp(subCommand, "pending") == 0)
+        return HandlePending(handler);
+
+    if (strcmp(subCommand, "boost") == 0)
+        return HandleBoost(handler, args);
 
     if (strcmp(subCommand, "stats") == 0)
         return HandleStats(handler);
@@ -67,7 +80,7 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
         return HandleReload(handler);
 
     if (strcmp(subCommand, "force") == 0)
-        return HandleForce(handler);
+        return HandleForce(handler, args);
 
     if (strcmp(subCommand, "cleanup") == 0)
         return HandleCleanup(handler);
@@ -75,7 +88,7 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
     if (strcmp(subCommand, "debug") == 0)
         return HandleDebug(handler, args);
 
-    handler->SendSysMessage("Unknown BLB subcommand. Valid: status, cities, world, brackets, activities, ledger, stats, explain, reload, force, cleanup, debug.");
+    handler->SendSysMessage("Unknown BLB subcommand. Valid: status, cities, world, brackets, boost, pending, activities, ledger, stats, explain, reload, force, cleanup, debug.");
     return true;
 }
 
@@ -147,8 +160,14 @@ bool BotBracketsCommands::HandleWorld(ChatHandler* handler)
 bool BotBracketsCommands::HandleBrackets(ChatHandler* handler)
 {
     CensusSnapshot snap = Census::Instance().TakeSnapshot();
-    handler->SendSysMessage("=== Level Bracket Distribution (ADVISORY - Native Owned) ===");
-    handler->SendSysMessage("Notice: Module observes native level progression without character resets.");
+    const auto& policy = PopulationPolicy::Instance();
+    const auto& distMgr = LevelDistributionManager::Instance();
+
+    handler->SendSysMessage("=== Level Bracket Distribution & Active Booster ===");
+    handler->PSendSysMessage("Active Redistribution: %s | Teleport On Ding/Boost: %s | Pending Queue: %u",
+        policy.IsLevelDistributionEnabled() ? "ENABLED" : "DISABLED",
+        policy.IsTeleportOnLevelChange() ? "ENABLED" : "DISABLED",
+        static_cast<uint32_t>(distMgr.GetPendingQueueSize()));
     handler->SendSysMessage("Faction  | Bracket | Bots | Actual % | Target % | Shortage | Humans");
     handler->SendSysMessage("---------+---------+------+----------+----------+----------+-------");
 
@@ -214,8 +233,10 @@ bool BotBracketsCommands::HandleLedger(ChatHandler* handler)
 bool BotBracketsCommands::HandleStats(ChatHandler* handler)
 {
     const auto& coord = Coordinator::Instance();
-    handler->SendSysMessage("=== Coordinator Performance & Request Telemetry ===");
-    handler->PSendSysMessage("Total Scheduling Cycles Executed: %llu",
+    const auto& distMgr = LevelDistributionManager::Instance();
+
+    handler->SendSysMessage("=== Coordinator Performance & Telemetry ===");
+    handler->PSendSysMessage("Total City Scheduling Cycles Executed: %llu",
         static_cast<unsigned long long>(coord.GetTotalCyclesRun()));
     handler->PSendSysMessage("Total Native Task Requests Submitted: %llu",
         static_cast<unsigned long long>(coord.GetTotalRequestsSubmitted()));
@@ -223,6 +244,20 @@ bool BotBracketsCommands::HandleStats(ChatHandler* handler)
         static_cast<unsigned long long>(coord.GetTotalRequestsAccepted()));
     handler->PSendSysMessage("Total Native Requests Refused/Rejected: %llu",
         static_cast<unsigned long long>(coord.GetTotalRequestsRejected()));
+
+    handler->SendSysMessage("=== Level Distribution & Dispersal Telemetry ===");
+    handler->PSendSysMessage("Total Distribution Cycles Run: %llu",
+        static_cast<unsigned long long>(distMgr.GetTotalCyclesRun()));
+    handler->PSendSysMessage("Total Bots Level-Adjusted / Boosted: %llu",
+        static_cast<unsigned long long>(distMgr.GetTotalBotsAdjusted()));
+    handler->PSendSysMessage("Total Bots Teleported to Leveling Zones: %llu",
+        static_cast<unsigned long long>(distMgr.GetTotalBotsTeleported()));
+    handler->PSendSysMessage("Total Over-Leveled Bots Dispersed from Starters: %llu",
+        static_cast<unsigned long long>(distMgr.GetTotalDispersedStarter()));
+    handler->PSendSysMessage("Total Stranded Bots Dispersed from Wrong Maps: %llu",
+        static_cast<unsigned long long>(distMgr.GetTotalDispersedWrongMap()));
+    handler->PSendSysMessage("Pending Reset Queue Size: %u",
+        static_cast<uint32_t>(distMgr.GetPendingQueueSize()));
     return true;
 }
 
@@ -281,11 +316,26 @@ bool BotBracketsCommands::HandleReload(ChatHandler* handler)
     return true;
 }
 
-bool BotBracketsCommands::HandleForce(ChatHandler* handler)
+bool BotBracketsCommands::HandleForce(ChatHandler* handler, const char* args)
 {
-    handler->SendSysMessage("Triggering immediate bounded coordinator scheduling pass...");
+    std::string argStr = args ? args : "";
+    if (argStr == "level" || argStr == "dist" || argStr == "distribution")
+    {
+        handler->SendSysMessage("Triggering immediate level bracket redistribution pass...");
+        LevelDistributionManager::Instance().ForceDistributionCycle(handler);
+        return true;
+    }
+    if (argStr == "disperse" || argStr == "evacuate")
+    {
+        handler->SendSysMessage("Triggering starting zone and wrong map dispersal passes...");
+        LevelDistributionManager::Instance().ForceDispersalCycle(handler);
+        return true;
+    }
+
+    handler->SendSysMessage("Triggering coordinator city pass and level distribution pass...");
     Coordinator::Instance().ForceExecutionCycle();
-    handler->SendSysMessage("Scheduling pass complete.");
+    LevelDistributionManager::Instance().ForceDistributionCycle(handler);
+    handler->SendSysMessage("Force execution cycle complete.");
     return true;
 }
 
@@ -293,7 +343,109 @@ bool BotBracketsCommands::HandleCleanup(ChatHandler* handler)
 {
     handler->SendSysMessage("Pruning stale ledger requests and expired cooldowns...");
     Coordinator::Instance().CleanupStaleEntries();
+    uint32_t removedGuilds = ProtectionCache::Instance().CleanupGuildTracker();
+    uint32_t remainingGuilds = ProtectionCache::Instance().GetProtectedPersistentGuildsCount();
+    handler->PSendSysMessage("[BotBrackets] Guild cleanup complete. Removed %u guild(s). %u guild(s) remain tracked.",
+        removedGuilds, remainingGuilds);
     handler->SendSysMessage("Cleanup complete.");
+    return true;
+}
+
+bool BotBracketsCommands::HandleBoost(ChatHandler* handler, const char* args)
+{
+    if (!args || strlen(args) == 0)
+    {
+        handler->SendSysMessage("Usage: .blb boost <botName|target> <targetLevel>");
+        return true;
+    }
+
+    std::stringstream ss(args);
+    std::string firstToken;
+    ss >> firstToken;
+
+    Player* targetBot = nullptr;
+    uint32_t targetLevel = 0;
+
+    // Check if firstToken is level (when target player is selected in-game)
+    char* endPtr = nullptr;
+    long lvlVal = strtol(firstToken.c_str(), &endPtr, 10);
+    if (*endPtr == '\0')
+    {
+        targetLevel = static_cast<uint32_t>(lvlVal);
+        if (handler->GetPlayer() && handler->GetPlayer()->GetSelectionGuid())
+            targetBot = sObjectMgr.GetPlayer(handler->GetPlayer()->GetSelectionGuid());
+        else if (handler->GetPlayer())
+            targetBot = handler->GetPlayer();
+    }
+    else
+    {
+        targetBot = sObjectAccessor.FindPlayerByName(firstToken.c_str());
+        if (!(ss >> targetLevel))
+        {
+            handler->SendSysMessage("Usage: .blb boost <botName> <targetLevel>");
+            return true;
+        }
+    }
+
+    if (!targetBot)
+    {
+        handler->SendSysMessage("Target bot not found or not currently online.");
+        return true;
+    }
+
+    if (!NativeTaskAdapter::IsBot(targetBot))
+    {
+        handler->PSendSysMessage("Player '%s' is a real player, not an autonomous bot.", targetBot->GetName());
+        return true;
+    }
+
+    if (targetLevel < 1 || targetLevel > 60)
+    {
+        handler->SendSysMessage("Target level must be between 1 and 60.");
+        return true;
+    }
+
+    handler->PSendSysMessage("Executing full TortoiseBots level boost for bot '%s' (%u -> %u)...",
+        targetBot->GetName(), targetBot->GetLevel(), targetLevel);
+
+    if (LevelDistributionManager::Instance().BoostBotDirect(targetBot, static_cast<uint8_t>(targetLevel)))
+    {
+        handler->PSendSysMessage("Success: Bot '%s' boosted to level %u with full skills, mounts, professions, and autogear.",
+            targetBot->GetName(), targetLevel);
+    }
+    else
+    {
+        handler->PSendSysMessage("Failed to boost bot '%s'. Check server logs for details.", targetBot->GetName());
+    }
+    return true;
+}
+
+bool BotBracketsCommands::HandlePending(ChatHandler* handler)
+{
+    auto snapshot = LevelDistributionManager::Instance().GetPendingQueueSnapshot();
+    handler->PSendSysMessage("=== Pending Level Resets Queue (Total: %u) ===",
+        static_cast<uint32_t>(snapshot.size()));
+
+    if (snapshot.empty())
+    {
+        handler->SendSysMessage("Pending reset queue is empty.");
+        return true;
+    }
+
+    handler->SendSysMessage("GUID Low | Bot Name        | Team | Target Range | Target Level | Age (s)");
+    handler->SendSysMessage("---------+-----------------+------+--------------+--------------+--------");
+    uint32_t now = static_cast<uint32_t>(time(nullptr));
+
+    for (const auto& entry : snapshot)
+    {
+        Player* p = sObjectAccessor.FindPlayer(ObjectGuid(entry.guidLow));
+        std::string name = p ? p->GetName() : "Unknown/Offline";
+        uint32_t age = (now >= entry.enqueuedAt) ? (now - entry.enqueuedAt) : 0;
+
+        handler->PSendSysMessage("%8u | %-15s | %-4s | %12u | %12u | %7u",
+            entry.guidLow, name.c_str(), (entry.teamId == 0 ? "Ally" : "Hord"),
+            entry.targetRange, entry.targetLevel, age);
+    }
     return true;
 }
 

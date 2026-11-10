@@ -26,6 +26,7 @@
 #include <ctime>
 #include <algorithm>
 #include <vector>
+#include <random>
 
 namespace BotLevelBrackets
 {
@@ -174,6 +175,18 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
             if (!NativeTaskAdapter::IsFreeBot(p))
                 continue;
 
+            // Must not be in a racial starter valley (Northshire, Coldridge, Shadowglen, Valley of Trials, etc.)
+            if (NativeTaskAdapter::IsInStarterValley(p))
+                continue;
+
+            // Must satisfy minimum city visit level
+            if (p->GetLevel() < policy.GetCityMinLevel())
+                continue;
+
+            // Must not already have an active city visit in progress
+            if (NativeTaskAdapter::HasActiveCityVisit(p->GetObjectGuid()))
+                continue;
+
             uint32_t guidLow = p->GetObjectGuid().GetCounter();
             if (ledger.HasActiveRequest(guidLow))
                 continue;
@@ -200,36 +213,117 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
             continue;
         }
 
-        // Prioritize bots closest to the city: same map/continent first, then lowest distance
-        std::sort(candidates.begin(), candidates.end(), [def](Player* a, Player* b) {
-            bool aSameMap = (a->GetMapId() == def->mapId);
-            bool bSameMap = (b->GetMapId() == def->mapId);
-            if (aSameMap != bSameMap)
-                return aSameMap;
-
-            if (aSameMap)
-            {
-                float dxA = a->GetPositionX() - def->centerX;
-                float dyA = a->GetPositionY() - def->centerY;
-                float dzA = a->GetPositionZ() - def->centerZ;
-                float distSqA = dxA * dxA + dyA * dyA + dzA * dzA;
-
-                float dxB = b->GetPositionX() - def->centerX;
-                float dyB = b->GetPositionY() - def->centerY;
-                float dzB = b->GetPositionZ() - def->centerZ;
-                float distSqB = dxB * dxB + dyB * dyB + dzB * dzB;
-
-                return distSqA < distSqB;
-            }
-
-            return false;
-        });
-
         // Bounded selection: request up to c.shortfall and up to requestsRemaining
         uint32_t toRequest = std::min(c.shortfall, requestsRemaining);
-        for (size_t i = 0; i < toRequest && i < candidates.size(); ++i)
+        std::vector<Player*> selectedCandidates;
+
+        if (policy.IsCityPickAllBrackets())
         {
-            Player* bot = candidates[i];
+            const auto& bracketConfigs = policy.GetLevelBrackets(teamId);
+            size_t numBrackets = bracketConfigs.empty() ? 1 : bracketConfigs.size();
+            std::vector<std::vector<Player*>> bracketCandidates(numBrackets);
+
+            for (Player* p : candidates)
+            {
+                uint8_t lvl = p->GetLevel();
+                size_t assignedBracket = numBrackets - 1;
+                for (size_t b = 0; b < bracketConfigs.size(); ++b)
+                {
+                    if (lvl >= bracketConfigs[b].lower && lvl <= bracketConfigs[b].upper)
+                    {
+                        assignedBracket = b;
+                        break;
+                    }
+                }
+                bracketCandidates[assignedBracket].push_back(p);
+            }
+
+            for (size_t b = 0; b < numBrackets; ++b)
+            {
+                if (bracketCandidates[b].empty())
+                    continue;
+
+                if (policy.GetCityTransitMode() == TransitMode::Teleport)
+                {
+                    std::mt19937 rng(static_cast<unsigned int>(now + b * 37));
+                    std::shuffle(bracketCandidates[b].begin(), bracketCandidates[b].end(), rng);
+                }
+                else
+                {
+                    std::sort(bracketCandidates[b].begin(), bracketCandidates[b].end(), [def](Player* a, Player* bBot) {
+                        bool aSameMap = (a->GetMapId() == def->mapId);
+                        bool bSameMap = (bBot->GetMapId() == def->mapId);
+                        if (aSameMap != bSameMap)
+                            return aSameMap;
+                        if (aSameMap)
+                        {
+                            float distSqA = (a->GetPositionX() - def->centerX) * (a->GetPositionX() - def->centerX) +
+                                            (a->GetPositionY() - def->centerY) * (a->GetPositionY() - def->centerY);
+                            float distSqB = (bBot->GetPositionX() - def->centerX) * (bBot->GetPositionX() - def->centerX) +
+                                            (bBot->GetPositionY() - def->centerY) * (bBot->GetPositionY() - def->centerY);
+                            return distSqA < distSqB;
+                        }
+                        return false;
+                    });
+                }
+            }
+
+            static size_t s_bracketRotator[2] = { 0, 0 };
+            size_t currentBracket = s_bracketRotator[teamId % 2] % numBrackets;
+
+            std::vector<size_t> bracketIdx(numBrackets, 0);
+            size_t emptyRounds = 0;
+
+            while (selectedCandidates.size() < toRequest && emptyRounds < numBrackets)
+            {
+                if (bracketIdx[currentBracket] < bracketCandidates[currentBracket].size())
+                {
+                    selectedCandidates.push_back(bracketCandidates[currentBracket][bracketIdx[currentBracket]]);
+                    ++bracketIdx[currentBracket];
+                    emptyRounds = 0;
+                }
+                else
+                {
+                    ++emptyRounds;
+                }
+                currentBracket = (currentBracket + 1) % numBrackets;
+            }
+            s_bracketRotator[teamId % 2] = currentBracket;
+        }
+        else
+        {
+            // Prioritize bots closest to the city: same map/continent first, then lowest distance
+            std::sort(candidates.begin(), candidates.end(), [def](Player* a, Player* b) {
+                bool aSameMap = (a->GetMapId() == def->mapId);
+                bool bSameMap = (b->GetMapId() == def->mapId);
+                if (aSameMap != bSameMap)
+                    return aSameMap;
+
+                if (aSameMap)
+                {
+                    float dxA = a->GetPositionX() - def->centerX;
+                    float dyA = a->GetPositionY() - def->centerY;
+                    float dzA = a->GetPositionZ() - def->centerZ;
+                    float distSqA = dxA * dxA + dyA * dyA + dzA * dzA;
+
+                    float dxB = b->GetPositionX() - def->centerX;
+                    float dyB = b->GetPositionY() - def->centerY;
+                    float dzB = b->GetPositionZ() - def->centerZ;
+                    float distSqB = dxB * dxB + dyB * dyB + dzB * dzB;
+
+                    return distSqA < distSqB;
+                }
+
+                return false;
+            });
+
+            for (size_t i = 0; i < toRequest && i < candidates.size(); ++i)
+                selectedCandidates.push_back(candidates[i]);
+        }
+
+        for (size_t i = 0; i < selectedCandidates.size(); ++i)
+        {
+            Player* bot = selectedCandidates[i];
             uint32_t guidLow = bot->GetObjectGuid().GetCounter();
 
             if (isDryRun)

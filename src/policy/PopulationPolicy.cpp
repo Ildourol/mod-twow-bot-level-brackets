@@ -1,5 +1,12 @@
 #include "PopulationPolicy.h"
 #include <algorithm>
+#include <cmath>
+
+#if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
+#include "Log.h"
+#else
+#include "Log.h"
+#endif
 
 namespace BotLevelBrackets
 {
@@ -39,6 +46,8 @@ void PopulationPolicy::LoadDefaults()
     m_cityMinDwellDurationMs = 300000;
     m_cityMaxDwellDurationMs = 600000;
     m_cityTransitMode = TransitMode::Travel;
+    m_cityPickAllBrackets = true;
+    m_cityMinLevel = 10;
 
     m_cityQuotaMode = 2;
     m_cityMinLimitEnabled = false;
@@ -54,19 +63,34 @@ void PopulationPolicy::LoadDefaults()
 
     // Default 7 brackets for 1-60 progression: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60
     m_allianceBrackets = {
-        { 1,   9,  10 },
-        { 10, 19,  15 },
-        { 20, 29,  15 },
-        { 30, 39,  15 },
-        { 40, 49,  15 },
-        { 50, 59,  15 },
-        { 60, 60,  15 }
+        { 1,   9,  16 },
+        { 10, 19,  14 },
+        { 20, 29,  14 },
+        { 30, 39,  14 },
+        { 40, 49,  14 },
+        { 50, 59,  14 },
+        { 60, 60,  14 }
     };
     m_hordeBrackets = m_allianceBrackets;
 
     m_useDynamicDistribution = false;
     m_realPlayerWeight = 1.0f;
     m_syncFactions = false;
+
+    m_levelDistributionEnabled = true;
+    m_distributionCheckFrequency = 300;
+    m_checkFlaggedFrequency = 15;
+    m_flaggedProcessLimit = 5;
+    m_minBracketChangeThreshold = 2;
+    m_maxPendingQueueSize = 0;
+    m_pendingQueueTTL = 0;
+    m_teleportOnLevelChange = true;
+
+    m_startingZoneDisperseEnabled = true;
+    m_startingZoneDisperseFrequency = 120;
+
+    m_wrongMapDisperseEnabled = true;
+    m_wrongMapDisperseFrequency = 180;
 }
 
 int32_t PopulationPolicy::GetCityTarget(size_t cityIndex) const
@@ -99,6 +123,79 @@ void PopulationPolicy::SetLevelBrackets(uint8_t team, const std::vector<LevelBra
         if (m_syncFactions)
             m_hordeBrackets = brackets;
     }
+}
+
+void PopulationPolicy::ClampAndBalanceBrackets(bool warnLayout)
+{
+    auto clampAndBalance = [warnLayout](std::vector<LevelBracketConfig>& ranges, const char* factionName)
+    {
+        for (auto& r : ranges)
+        {
+            if (r.lower < 1)
+                r.lower = 1;
+            if (r.upper > 60)
+                r.upper = 60;
+            if (r.lower > r.upper)
+                r.desiredPercent = 0;
+        }
+
+        uint32_t total = 0;
+        std::vector<size_t> valid;
+        for (size_t i = 0; i < ranges.size(); ++i)
+        {
+            if (ranges[i].lower <= ranges[i].upper)
+            {
+                valid.push_back(i);
+                total += ranges[i].desiredPercent;
+            }
+            else
+                ranges[i].desiredPercent = 0;
+        }
+
+        if (valid.empty())
+            return;
+
+        std::vector<double> remainders(ranges.size(), 0.0);
+        uint32_t assigned = 0;
+        for (size_t index : valid)
+        {
+            double raw = total > 0
+                ? (static_cast<double>(ranges[index].desiredPercent) * 100.0 / total)
+                : (100.0 / valid.size());
+            uint32_t base = static_cast<uint32_t>(std::floor(raw));
+            ranges[index].desiredPercent = static_cast<uint8_t>(base);
+            remainders[index] = raw - base;
+            assigned += base;
+        }
+
+        std::stable_sort(valid.begin(), valid.end(), [&remainders](size_t left, size_t right)
+        {
+            return remainders[left] > remainders[right];
+        });
+        for (size_t i = 0; assigned < 100; ++i, ++assigned)
+            ++ranges[valid[i % valid.size()]].desiredPercent;
+
+        if (total != 100)
+        {
+            sLog.outString("[BotLevelBrackets] Normalized %s bracket percentages from %u to 100.", factionName, total);
+        }
+
+        if (warnLayout)
+        {
+            for (size_t i = 1; i < ranges.size(); ++i)
+            {
+                if (ranges[i].lower <= ranges[i - 1].upper)
+                {
+                    sLog.outError("[BotLevelBrackets] %s Range %u (%u-%u) overlaps with Range %u (%u-%u)!",
+                        factionName, static_cast<unsigned>(i + 1), ranges[i].lower, ranges[i].upper,
+                        static_cast<unsigned>(i), ranges[i - 1].lower, ranges[i - 1].upper);
+                }
+            }
+        }
+    };
+
+    clampAndBalance(m_allianceBrackets, "Alliance");
+    clampAndBalance(m_hordeBrackets, "Horde");
 }
 
 } // namespace BotLevelBrackets

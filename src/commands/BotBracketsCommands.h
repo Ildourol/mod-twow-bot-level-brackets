@@ -23,9 +23,11 @@ private:
     static bool HandleStats(ChatHandler* handler);
     static bool HandleExplain(ChatHandler* handler, const char* args);
     static bool HandleReload(ChatHandler* handler);
-    static bool HandleForce(ChatHandler* handler);
+    static bool HandleForce(ChatHandler* handler, const char* args);
     static bool HandleCleanup(ChatHandler* handler);
     static bool HandleDebug(ChatHandler* handler, const char* args);
+    static bool HandleBoost(ChatHandler* handler, const char* args);
+    static bool HandlePending(ChatHandler* handler);
 };
 
 } // namespace BotLevelBrackets

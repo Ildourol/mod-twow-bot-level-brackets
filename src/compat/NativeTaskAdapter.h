@@ -44,6 +44,7 @@ public:
     // Universal Bot Identification & Availability
     static bool IsBot(Player* player);
     static bool IsRandomBot(Player* player);
+    static bool IsInRandomAccountList(uint32_t accountId);
     static bool IsFreeBot(Player* player);
     static bool HasRealPlayerMaster(Player* player);
     static bool HasRealPlayerInParty(Player* player);
@@ -63,6 +64,7 @@ public:
                                                 uint64_t& outRequestId);
 
     static bool AreCityErrandsSatisfied(Player* bot, CityId cityId);
+    static void ApplyCityArrivalProtocol(Player* bot, CityId cityId);
 
     static bool CancelCityVisit(ObjectGuid botGuid, const std::string& ownerId = "mod-twow-bot-level-brackets");
     static bool HasActiveCityVisit(ObjectGuid botGuid);
@@ -79,6 +81,15 @@ public:
     // Native Travel State Inspection (Read-Only)
     static bool IsBotTraveling(Player* bot);
     static std::string GetBotTravelStatusString(Player* bot);
+
+    // Level Adjustment & Complete Provisioning
+    static bool AdjustBotLevel(Player* bot, uint8_t newLevel);
+    static bool TeleportBotToLevelZone(Player* bot, uint8_t newLevel, uint8_t teamId);
+
+    // Dispersal Checks & Operations
+    static bool IsInStarterValley(Player* bot);
+    static bool IsOnWrongMap(Player* bot);
+    static bool IsBotSafeForDispersal(Player* bot);
 };
 
 } // namespace BotLevelBrackets

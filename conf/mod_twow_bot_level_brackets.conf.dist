@@ -84,7 +84,17 @@ BotLevelBrackets.City.HysteresisBots = 2
 # City Transit Mode
 # 1 = Travel / Directions (Default - bot receives travel directions to walk/use flight paths to the city)
 # 2 = Teleport (Directly teleports the bot to the city center upon request, as in previous versions)
-BotLevelBrackets.City.TransitMode = 1
+BotLevelBrackets.City.TransitMode = 2
+
+# Pick bots from all level brackets for city visits (1 = Enabled, 0 = Distance-only bias).
+# When enabled, candidates are selected across all level brackets (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60),
+# ensuring high-level bots visit capital cities alongside low-level bots.
+BotLevelBrackets.City.PickAllBrackets = 1
+
+# Minimum level required for a bot to be eligible for a capital city visit.
+# Characters under level 10 remain in starting zones (Northshire, Coldridge, Shadowglen, Valley of Trials, etc.)
+# Default: 10
+BotLevelBrackets.City.MinLevel = 10
 
 # Desired dwell duration for bots visiting a city (in milliseconds).
 # Default: 300000 (5 minutes).
@@ -129,7 +139,66 @@ BotLevelBrackets.World.DestinationPolicy = RequireExact
 BotLevelBrackets.World.FieldReservePct = 70
 
 ###################################################################################################
-# LEVEL & POPULATION POLICIES (ADVISORY)
+# LEVEL DISTRIBUTION & BOOST ENGINE
+###################################################################################################
+
+# Master toggle for active level bracket rebalancing and bot level adjustments.
+# 1 = Active redistribution (boost/reset), 0 = Disabled.
+BotLevelBrackets.LevelDistribution.Enabled = 1
+
+# Cadence for the level distribution rebalancing check (in seconds).
+# Default: 300 (5 minutes).
+BotLevelBrackets.LevelDistribution.CheckFrequency = 300
+
+# Cadence for processing queued/flagged bot level adjustments (in seconds).
+# Default: 15 seconds.
+BotLevelBrackets.LevelDistribution.CheckFlaggedFrequency = 15
+
+# Maximum number of flagged bots to level-adjust per tick.
+# Default: 5.
+BotLevelBrackets.LevelDistribution.FlaggedProcessLimit = 5
+
+# Minimum surplus bots in a bracket before redistribution moves bots out of it.
+# Default: 2.
+BotLevelBrackets.LevelDistribution.MinBracketChangeThreshold = 2
+
+# Maximum size of the pending reset queue (0 = unlimited).
+# Default: 0.
+BotLevelBrackets.LevelDistribution.MaxPendingQueueSize = 0
+
+# Maximum time a bot can remain in the pending reset queue (in seconds, 0 = no TTL).
+# Default: 0.
+BotLevelBrackets.LevelDistribution.PendingQueueTTL = 0
+
+# Teleport on level adjustment:
+# When enabled, bots are safely dismounted and teleported to their leveling zone
+# or native racial starter valley after their level is adjusted.
+# 1 = Enabled (Default), 0 = Disabled.
+BotLevelBrackets.TeleportOnLevelChange = 1
+
+###################################################################################################
+# STARTING ZONE & WRONG MAP DISPERSAL
+###################################################################################################
+
+# Enable automatic evacuation of over-leveled bots (> Level 9) from the 8 starter valleys
+# (Northshire, Coldridge, Shadowglen, Thalassian Highlands, Valley of Trials, Red Cloud Mesa, Deathknell, Blackstone Island).
+# 1 = Enabled, 0 = Disabled.
+BotLevelBrackets.StartingZoneDisperse.Enabled = 1
+
+# Frequency (in seconds) at which starting-zone dispersal runs.
+# Default: 120 seconds.
+BotLevelBrackets.StartingZoneDisperse.Frequency = 120
+
+# Enable automatic evacuation of bots stranded on invalid or non-continental maps.
+# 1 = Enabled, 0 = Disabled.
+BotLevelBrackets.WrongMapDisperse.Enabled = 1
+
+# Frequency (in seconds) at which wrong-map dispersal runs.
+# Default: 180 seconds.
+BotLevelBrackets.WrongMapDisperse.Frequency = 180
+
+###################################################################################################
+# LEVEL & POPULATION POLICIES
 ###################################################################################################
 
 # Dynamic Human Weighting
@@ -137,6 +206,81 @@ BotLevelBrackets.World.FieldReservePct = 70
 BotLevelBrackets.LevelPolicy.UseDynamic = 0
 BotLevelBrackets.LevelPolicy.HumanWeight = 1.0
 BotLevelBrackets.LevelPolicy.SyncFactions = 0
+
+###################################################################################################
+# LEVEL BRACKET DEFINITIONS
+###################################################################################################
+
+#
+# BotLevelBrackets.NumRanges
+# Number of level brackets configured. Default for Vanilla (1-60) is 7 ranges.
+# Default: 7
+#
+BotLevelBrackets.NumRanges = 7
+
+#
+# Alliance Level Brackets Configuration (Percentages must sum to 100)
+# Default distribution: 1-9 (16%), 10-19 (14%), 20-29 (14%), 30-39 (14%), 40-49 (14%), 50-59 (14%), 60-60 (14%)
+#
+BotLevelBrackets.Alliance.Range1.Lower = 1
+BotLevelBrackets.Alliance.Range1.Upper = 9
+BotLevelBrackets.Alliance.Range1.Pct = 16
+
+BotLevelBrackets.Alliance.Range2.Lower = 10
+BotLevelBrackets.Alliance.Range2.Upper = 19
+BotLevelBrackets.Alliance.Range2.Pct = 14
+
+BotLevelBrackets.Alliance.Range3.Lower = 20
+BotLevelBrackets.Alliance.Range3.Upper = 29
+BotLevelBrackets.Alliance.Range3.Pct = 14
+
+BotLevelBrackets.Alliance.Range4.Lower = 30
+BotLevelBrackets.Alliance.Range4.Upper = 39
+BotLevelBrackets.Alliance.Range4.Pct = 14
+
+BotLevelBrackets.Alliance.Range5.Lower = 40
+BotLevelBrackets.Alliance.Range5.Upper = 49
+BotLevelBrackets.Alliance.Range5.Pct = 14
+
+BotLevelBrackets.Alliance.Range6.Lower = 50
+BotLevelBrackets.Alliance.Range6.Upper = 59
+BotLevelBrackets.Alliance.Range6.Pct = 14
+
+BotLevelBrackets.Alliance.Range7.Lower = 60
+BotLevelBrackets.Alliance.Range7.Upper = 60
+BotLevelBrackets.Alliance.Range7.Pct = 14
+
+#
+# Horde Level Brackets Configuration (Percentages must sum to 100)
+# Default distribution: 1-9 (16%), 10-19 (14%), 20-29 (14%), 30-39 (14%), 40-49 (14%), 50-59 (14%), 60-60 (14%)
+#
+BotLevelBrackets.Horde.Range1.Lower = 1
+BotLevelBrackets.Horde.Range1.Upper = 9
+BotLevelBrackets.Horde.Range1.Pct = 16
+
+BotLevelBrackets.Horde.Range2.Lower = 10
+BotLevelBrackets.Horde.Range2.Upper = 19
+BotLevelBrackets.Horde.Range2.Pct = 14
+
+BotLevelBrackets.Horde.Range3.Lower = 20
+BotLevelBrackets.Horde.Range3.Upper = 29
+BotLevelBrackets.Horde.Range3.Pct = 14
+
+BotLevelBrackets.Horde.Range4.Lower = 30
+BotLevelBrackets.Horde.Range4.Upper = 39
+BotLevelBrackets.Horde.Range4.Pct = 14
+
+BotLevelBrackets.Horde.Range5.Lower = 40
+BotLevelBrackets.Horde.Range5.Upper = 49
+BotLevelBrackets.Horde.Range5.Pct = 14
+
+BotLevelBrackets.Horde.Range6.Lower = 50
+BotLevelBrackets.Horde.Range6.Upper = 59
+BotLevelBrackets.Horde.Range6.Pct = 14
+
+BotLevelBrackets.Horde.Range7.Lower = 60
+BotLevelBrackets.Horde.Range7.Upper = 60
+BotLevelBrackets.Horde.Range7.Pct = 14
 
 ###################################################################################################
 # SOCIAL & IDENTITY PROTECTIONS
@@ -154,6 +298,10 @@ BotLevelBrackets.Protection.IgnoreArenaTeams = 1
 # Cadence for refreshing social protection caches from the character database (in seconds).
 # Default: 300 seconds (5 minutes).
 BotLevelBrackets.Protection.SocialRefreshSeconds = 300
+
+# Cadence for refreshing the persistent guild tracker table from the character database (in seconds).
+# Default: 600 seconds (10 minutes).
+BotLevelBrackets.Protection.GuildTrackerUpdateSeconds = 600
 
 # Comma-separated list of bot names immune from module task orchestration.
 BotLevelBrackets.Protection.ExcludedBotNames = ""

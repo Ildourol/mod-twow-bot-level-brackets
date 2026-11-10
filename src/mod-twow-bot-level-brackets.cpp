@@ -10,6 +10,7 @@
 #include "social/ProtectionCache.h"
 #include "commands/BotBracketsCommands.h"
 #include "debug/DiagnosticManager.h"
+#include "distribution/LevelDistributionManager.h"
 
 #ifdef HAVE_TORTOISEBOTS
 #include "Common.h"
@@ -93,7 +94,9 @@ void LoadModuleConfiguration()
     policy.SetCityMinBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinBotsPerCity", 0)));
     policy.SetCityMaxBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxBotsPerCity", 60)));
     policy.SetCityHysteresis(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.HysteresisBots", 2)));
-    policy.SetCityTransitMode(static_cast<TransitMode>(sConfig.GetIntDefault("BotLevelBrackets.City.TransitMode", 1)));
+    policy.SetCityTransitMode(static_cast<TransitMode>(sConfig.GetIntDefault("BotLevelBrackets.City.TransitMode", 2)));
+    policy.SetCityPickAllBrackets(sConfig.GetBoolDefault("BotLevelBrackets.City.PickAllBrackets", true));
+    policy.SetCityMinLevel(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinLevel", 10)));
     policy.SetCityDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.DwellDurationMs", 300000)));
     policy.SetCityMinDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinDwellDurationMs", 300000)));
     policy.SetCityMaxDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxDwellDurationMs", 600000)));
@@ -113,19 +116,120 @@ void LoadModuleConfiguration()
     policy.SetWorldDestinationPolicy((worldDestStr == "AllowNativeChoice") ? DestinationPolicy::AllowNativeChoice : DestinationPolicy::RequireExact);
     policy.SetFieldReservePct(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.World.FieldReservePct", 70)));
 
-    // 4. Level & Population Policy Settings (Advisory)
+    // 4. Level & Population Policy Settings & Active Redistribution
+    policy.SetLevelDistributionEnabled(sConfig.GetBoolDefault("BotLevelBrackets.LevelDistribution.Enabled", true));
+    policy.SetDistributionCheckFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.CheckFrequency", 300)));
+    policy.SetCheckFlaggedFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.CheckFlaggedFrequency", 15)));
+    policy.SetFlaggedProcessLimit(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.FlaggedProcessLimit", 5)));
+    policy.SetMinBracketChangeThreshold(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.MinBracketChangeThreshold", 2)));
+    policy.SetMaxPendingQueueSize(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.MaxPendingQueueSize", 0)));
+    policy.SetPendingQueueTTL(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.PendingQueueTTL", 0)));
+    policy.SetTeleportOnLevelChange(sConfig.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true));
+
+    // Starting-Zone and Wrong-Map Dispersal Settings
+    policy.SetStartingZoneDisperseEnabled(sConfig.GetBoolDefault("BotLevelBrackets.StartingZoneDisperse.Enabled", true));
+    policy.SetStartingZoneDisperseFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.StartingZoneDisperse.Frequency", 120)));
+    policy.SetWrongMapDisperseEnabled(sConfig.GetBoolDefault("BotLevelBrackets.WrongMapDisperse.Enabled", true));
+    policy.SetWrongMapDisperseFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.WrongMapDisperse.Frequency", 180)));
+
     policy.SetUseDynamicDistribution(sConfig.GetBoolDefault("BotLevelBrackets.LevelPolicy.UseDynamic", false));
     policy.SetRealPlayerWeight(sConfig.GetFloatDefault("BotLevelBrackets.LevelPolicy.HumanWeight", 1.0f));
     policy.SetSyncFactions(sConfig.GetBoolDefault("BotLevelBrackets.LevelPolicy.SyncFactions", false));
 
-    // 5. Social & Identity Protections
+    // 5. Explicit Level Bracket Definitions (Alliance and Horde)
+    uint32_t numRanges = static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.NumRanges", 7));
+    (void)numRanges;
+
+    std::vector<LevelBracketConfig> allianceBrackets;
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Lower", 1)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Upper", 9)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Pct", 16))
+    });
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Lower", 10)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Upper", 19)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Pct", 14))
+    });
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Lower", 20)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Upper", 29)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Pct", 14))
+    });
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Lower", 30)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Upper", 39)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Pct", 14))
+    });
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Lower", 40)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Upper", 49)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Pct", 14))
+    });
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Lower", 50)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Upper", 59)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Pct", 14))
+    });
+    allianceBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Lower", 60)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Upper", 60)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Pct", 14))
+    });
+    if (numRanges > 0 && numRanges < allianceBrackets.size())
+        allianceBrackets.resize(numRanges);
+    policy.SetLevelBrackets(0, allianceBrackets);
+
+    std::vector<LevelBracketConfig> hordeBrackets;
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Lower", 1)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Upper", 9)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Pct", 16))
+    });
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Lower", 10)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Upper", 19)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Pct", 14))
+    });
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Lower", 20)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Upper", 29)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Pct", 14))
+    });
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Lower", 30)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Upper", 39)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Pct", 14))
+    });
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Lower", 40)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Upper", 49)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Pct", 14))
+    });
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Lower", 50)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Upper", 59)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Pct", 14))
+    });
+    hordeBrackets.push_back({
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Lower", 60)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Upper", 60)),
+        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Pct", 14))
+    });
+    if (numRanges > 0 && numRanges < hordeBrackets.size())
+        hordeBrackets.resize(numRanges);
+    policy.SetLevelBrackets(1, hordeBrackets);
+    policy.ClampAndBalanceBrackets(true);
+
+    // 6. Social & Identity Protections
     prot.SetIgnoreFriendListed(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreFriendListed", true));
     prot.SetIgnoreRealPlayerGuilds(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreRealPlayerGuilds", true));
     prot.SetIgnoreArenaTeams(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreArenaTeams", true));
     prot.SetSocialRefreshCadence(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Protection.SocialRefreshSeconds", 300)));
+    prot.SetGuildTrackerCadence(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Protection.GuildTrackerUpdateSeconds", 600)));
     prot.SetExcludedNames(sConfig.GetStringDefault("BotLevelBrackets.Protection.ExcludedBotNames", ""));
 
-    // 6. Activity Registry Controls
+    // 7. Activity Registry Controls
     reg.SetActivitiesEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Activities.Enabled", true));
     reg.SetRequireSupported(sConfig.GetBoolDefault("BotLevelBrackets.Activities.RequireSupported", false));
 
@@ -193,6 +297,7 @@ public:
 
         LoadModuleConfiguration();
         ProtectionCache::Instance().Initialize();
+        LevelDistributionManager::Instance().LoadPendingResetsFromDB();
     }
 
     void OnAfterConfigLoad(bool reload) override
@@ -209,6 +314,8 @@ public:
     void OnUpdate(uint32 diff) override
     {
         Coordinator::Instance().Update(diff);
+        LevelDistributionManager::Instance().Update(diff);
+        ProtectionCache::Instance().Update(diff);
     }
 };
 
@@ -219,8 +326,12 @@ public:
 
     void OnLogin(Player* player) override
     {
-        (void)player;
-        // On bot or player login, census updates automatically on next cycle
+        if (!player || NativeTaskAdapter::IsBot(player))
+            return;
+
+        uint32 guildId = player->GetGuildId();
+        if (guildId != 0)
+            ProtectionCache::Instance().OnGuildMemberAdd(guildId, true);
     }
 
     void OnLogout(Player* player) override
@@ -248,8 +359,7 @@ public:
         if (!guild || !player)
             return;
 
-        bool isReal = player->GetSession() && !player->GetSession()->IsHeadless();
-        if (isReal)
+        if (!NativeTaskAdapter::IsBot(player))
             ProtectionCache::Instance().OnGuildMemberAdd(guild->GetId(), true);
     }
 
@@ -258,8 +368,7 @@ public:
         if (!guild || !player)
             return;
 
-        bool isReal = player->GetSession() && !player->GetSession()->IsHeadless();
-        if (isReal)
+        if (!NativeTaskAdapter::IsBot(player))
             ProtectionCache::Instance().OnGuildMemberRemove(guild->GetId(), true);
     }
 };
@@ -269,23 +378,64 @@ class BotLevelBracketsCommandScript : public AllCommandScript
 public:
     BotLevelBracketsCommandScript() : AllCommandScript("BotLevelBracketsCommandScript") {}
 
-    bool CanExecuteCommand(ChatHandler* handler, const char* cmd, const char* subCmd) override
+    bool CanExecuteCommand(ChatHandler* handler, const char* cmd, const char* args) override
     {
         if (!cmd)
             return true;
 
-        if (strcmp(cmd, "blb") == 0)
+        std::string rootCommand = cmd;
+        std::transform(rootCommand.begin(), rootCommand.end(), rootCommand.begin(), ::tolower);
+        if (rootCommand != "blb" && rootCommand != "botbrackets" && rootCommand != "botlevelbrackets")
+            return true;
+
+        std::string rawArgs = args ? args : "";
+        size_t first = rawArgs.find_first_not_of(" \t\r\n");
+        std::string subCmd = "status";
+        std::string extraArgs = "";
+
+        if (first != std::string::npos)
         {
-            if (handler && handler->GetSession() && handler->GetSession()->GetSecurity() < SEC_MODERATOR)
+            rawArgs.erase(0, first);
+            size_t spacePos = rawArgs.find_first_of(" \t\r\n");
+            if (spacePos != std::string::npos)
+            {
+                subCmd = rawArgs.substr(0, spacePos);
+                size_t restFirst = rawArgs.find_first_not_of(" \t\r\n", spacePos);
+                if (restFirst != std::string::npos)
+                    extraArgs = rawArgs.substr(restFirst);
+            }
+            else
+            {
+                subCmd = rawArgs;
+            }
+        }
+        std::transform(subCmd.begin(), subCmd.end(), subCmd.begin(), ::tolower);
+
+        WorldSession* session = handler ? handler->GetSession() : nullptr;
+        auto hasSecurity = [session](AccountTypes security)
+        {
+            return !session || session->GetSecurity() >= security;
+        };
+
+        if (subCmd == "reload" || subCmd == "cleanup" || subCmd == "guildcleanup" || subCmd == "force")
+        {
+            if (!hasSecurity(SEC_ADMINISTRATOR))
+            {
+                handler->SendSysMessage("You do not have permission to execute this administrative command.");
+                return false;
+            }
+        }
+        else
+        {
+            if (!hasSecurity(SEC_MODERATOR))
             {
                 handler->SendSysMessage("You do not have permission to execute BotLevelBrackets commands.");
                 return false;
             }
-
-            BotBracketsCommands::HandleCommand(handler, subCmd, "");
-            return false; // Command fully consumed
         }
-        return true;
+
+        BotBracketsCommands::HandleCommand(handler, subCmd.c_str(), extraArgs.c_str());
+        return false; // Command fully consumed
     }
 };
 

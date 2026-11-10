@@ -96,6 +96,12 @@ public:
     TransitMode GetCityTransitMode() const { return m_cityTransitMode; }
     void SetCityTransitMode(TransitMode val) { m_cityTransitMode = val; }
 
+    bool IsCityPickAllBrackets() const { return m_cityPickAllBrackets; }
+    void SetCityPickAllBrackets(bool val) { m_cityPickAllBrackets = val; }
+
+    uint32_t GetCityMinLevel() const { return m_cityMinLevel; }
+    void SetCityMinLevel(uint32_t val) { m_cityMinLevel = val; }
+
     // Quota math configuration
     uint32_t GetCityQuotaMode() const { return m_cityQuotaMode; } // 1 = count, 2 = pct
     void SetCityQuotaMode(uint32_t val) { m_cityQuotaMode = val; }
@@ -124,6 +130,43 @@ public:
     // Level brackets
     const std::vector<LevelBracketConfig>& GetLevelBrackets(uint8_t team) const;
     void SetLevelBrackets(uint8_t team, const std::vector<LevelBracketConfig>& brackets);
+    void ClampAndBalanceBrackets(bool warnLayout = true);
+
+    bool IsLevelDistributionEnabled() const { return m_levelDistributionEnabled; }
+    void SetLevelDistributionEnabled(bool val) { m_levelDistributionEnabled = val; }
+
+    uint32_t GetDistributionCheckFrequency() const { return m_distributionCheckFrequency; }
+    void SetDistributionCheckFrequency(uint32_t val) { m_distributionCheckFrequency = val; }
+
+    uint32_t GetCheckFlaggedFrequency() const { return m_checkFlaggedFrequency; }
+    void SetCheckFlaggedFrequency(uint32_t val) { m_checkFlaggedFrequency = val; }
+
+    uint32_t GetFlaggedProcessLimit() const { return m_flaggedProcessLimit; }
+    void SetFlaggedProcessLimit(uint32_t val) { m_flaggedProcessLimit = val; }
+
+    uint32_t GetMinBracketChangeThreshold() const { return m_minBracketChangeThreshold; }
+    void SetMinBracketChangeThreshold(uint32_t val) { m_minBracketChangeThreshold = val; }
+
+    uint32_t GetMaxPendingQueueSize() const { return m_maxPendingQueueSize; }
+    void SetMaxPendingQueueSize(uint32_t val) { m_maxPendingQueueSize = val; }
+
+    uint32_t GetPendingQueueTTL() const { return m_pendingQueueTTL; }
+    void SetPendingQueueTTL(uint32_t val) { m_pendingQueueTTL = val; }
+
+    bool IsTeleportOnLevelChange() const { return m_teleportOnLevelChange; }
+    void SetTeleportOnLevelChange(bool val) { m_teleportOnLevelChange = val; }
+
+    bool IsStartingZoneDisperseEnabled() const { return m_startingZoneDisperseEnabled; }
+    void SetStartingZoneDisperseEnabled(bool val) { m_startingZoneDisperseEnabled = val; }
+
+    uint32_t GetStartingZoneDisperseFrequency() const { return m_startingZoneDisperseFrequency; }
+    void SetStartingZoneDisperseFrequency(uint32_t val) { m_startingZoneDisperseFrequency = val; }
+
+    bool IsWrongMapDisperseEnabled() const { return m_wrongMapDisperseEnabled; }
+    void SetWrongMapDisperseEnabled(bool val) { m_wrongMapDisperseEnabled = val; }
+
+    uint32_t GetWrongMapDisperseFrequency() const { return m_wrongMapDisperseFrequency; }
+    void SetWrongMapDisperseFrequency(uint32_t val) { m_wrongMapDisperseFrequency = val; }
 
     bool UseDynamicDistribution() const { return m_useDynamicDistribution; }
     void SetUseDynamicDistribution(bool val) { m_useDynamicDistribution = val; }
@@ -162,6 +205,8 @@ private:
     uint32_t m_cityMinDwellDurationMs = 300000;
     uint32_t m_cityMaxDwellDurationMs = 600000;
     TransitMode m_cityTransitMode = TransitMode::Travel;
+    bool m_cityPickAllBrackets = true;
+    uint32_t m_cityMinLevel = 10;
 
     uint32_t m_cityQuotaMode = 2; // default: 2 (percentage)
     bool m_cityMinLimitEnabled = false;
@@ -175,6 +220,21 @@ private:
 
     std::vector<LevelBracketConfig> m_allianceBrackets;
     std::vector<LevelBracketConfig> m_hordeBrackets;
+
+    bool m_levelDistributionEnabled = true;
+    uint32_t m_distributionCheckFrequency = 300;
+    uint32_t m_checkFlaggedFrequency = 15;
+    uint32_t m_flaggedProcessLimit = 5;
+    uint32_t m_minBracketChangeThreshold = 2;
+    uint32_t m_maxPendingQueueSize = 0;
+    uint32_t m_pendingQueueTTL = 0;
+    bool m_teleportOnLevelChange = true;
+
+    bool m_startingZoneDisperseEnabled = true;
+    uint32_t m_startingZoneDisperseFrequency = 120;
+
+    bool m_wrongMapDisperseEnabled = true;
+    uint32_t m_wrongMapDisperseFrequency = 180;
 
     bool m_useDynamicDistribution = false;
     float m_realPlayerWeight = 1.0f;

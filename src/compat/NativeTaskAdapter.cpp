@@ -6,11 +6,16 @@
 #include "Objects/Player.h"
 #include "Group/Group.h"
 #include "ObjectAccessor.h"
+#include "ObjectMgr.h"
+#include "Maps/Map.h"
+#include "Movement/MotionMaster.h"
 #include "runtime/BotActivityLease.h"
 #include "runtime/BotManager.h"
 #include "runtime/PlayerbotAIStorage.h"
 #include "ai/playerbot/RandomBotFacade.h"
 #include "ai/playerbot/PlayerbotAI.h"
+#include "ai/playerbot/PlayerbotAIConfig.h"
+#include "ai/playerbot/PlayerbotFactory.h"
 #include "ai/playerbot/TravelMgr.h"
 #include "ai/playerbot/strategy/AiObjectContext.h"
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
@@ -18,13 +23,16 @@
 #include "Player.h"
 #include "Group.h"
 #include "ObjectAccessor.h"
+#include "ObjectMgr.h"
 #include "playerbot/PlayerbotAI.h"
+#include "playerbot/PlayerbotFactory.h"
 #include "playerbot/RandomPlayerbotMgr.h"
 #else
 // Generic Headless / Test doubles
 #include "Objects/Player.h"
 #include "Group/Group.h"
 #include "ObjectAccessor.h"
+#include "ObjectMgr.h"
 #endif
 
 #include <unordered_map>
@@ -97,6 +105,16 @@ bool NativeTaskAdapter::IsRandomBot(Player* player)
     return sRandomPlayerbotMgr.IsRandomBot(player);
 #else
     return IsBot(player);
+#endif
+}
+
+bool NativeTaskAdapter::IsInRandomAccountList(uint32_t accountId)
+{
+#if defined(HAVE_TORTOISEBOTS) || defined(HAVE_LEGACY_PLAYERBOTS)
+    return sPlayerbotAIConfig.IsInRandomAccountList(accountId);
+#else
+    (void)accountId;
+    return false;
 #endif
 }
 
@@ -178,6 +196,7 @@ struct CityVisitRecord
     CityId cityId = CityId::None;
     uint32_t requestedAt = 0;
     uint32_t arrivedAt = 0;
+    uint32_t lastPulseAt = 0;
     uint32_t minDwellDurationMs = 300000;
     uint32_t maxDwellDurationMs = 600000;
     TransitMode transitMode = TransitMode::Travel;
@@ -193,6 +212,44 @@ void NativeTaskAdapter::Clear()
 {
     std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
     s_cityVisits.clear();
+}
+
+void NativeTaskAdapter::ApplyCityArrivalProtocol(Player* bot, CityId cityId)
+{
+    (void)cityId;
+    if (!bot || !bot->IsInWorld() || !bot->IsAlive())
+        return;
+
+    bot->StopMoving();
+    if (bot->GetMotionMaster())
+        bot->GetMotionMaster()->Clear(false);
+
+#if defined(HAVE_TORTOISEBOTS)
+    PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+    if (ai)
+    {
+        // 1. Full AI reset to clean up stale open-world travel targets, expired combat state, and queues
+        ai->Reset(true);
+
+        // 2. Configure non-combat strategies to enforce TortoiseBots city protocol
+        // Drop open-world grinding and travel while visiting racial capitals
+        ai->ChangeStrategy("-travel,-grind", BotState::BOT_STATE_NON_COMBAT);
+
+        // Add standard TortoiseBots city activities (quests, vendors, AH, mail, trainers, repairs, professions)
+        ai->ChangeStrategy("+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+collision", BotState::BOT_STATE_NON_COMBAT);
+
+        // 3. Initiate first city RPG action so bot immediately begins interacting with NPCs
+        ai->DoSpecificAction("choose rpg target", Event(), true);
+        ai->DoSpecificAction("move to rpg target", Event(), true);
+    }
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+    PlayerbotAI* ai = bot->GetPlayerbotAI();
+    if (ai)
+    {
+        ai->ChangeStrategy("-travel,-grind,+rpg", BotState::BOT_STATE_NON_COMBAT);
+        ai->DoSpecificAction("choose rpg target", Event(), true);
+    }
+#endif
 }
 
 TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId cityId,
@@ -227,6 +284,7 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
         rec.cityId = cityId;
         rec.requestedAt = static_cast<uint32_t>(time(nullptr));
         rec.arrivedAt = 0;
+        rec.lastPulseAt = 0;
         rec.minDwellDurationMs = minDwellDurationMs;
         rec.maxDwellDurationMs = maxDwellDurationMs;
         rec.transitMode = transitMode;
@@ -237,18 +295,38 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
             if (bot->IsMounted())
                 bot->Unmount();
 
-            bot->TeleportTo(def->mapId, def->centerX, def->centerY, def->centerZ, 0.0f);
-            rec.state = CityVisitRecord::Visiting;
-            rec.arrivedAt = rec.requestedAt;
+            // Disperse arrival coordinates across a 3.0 to 13.0 yard radius with random angle
+            // to avoid stacking multiple teleported bots on top of each other.
+            float angle = static_cast<float>(rand() % 628) / 100.0f;
+            float radius = 3.0f + static_cast<float>(rand() % 100) / 10.0f;
+            float landingX = def->centerX + std::cos(angle) * radius;
+            float landingY = def->centerY + std::sin(angle) * radius;
+            float landingZ = def->centerZ;
+            float landingO = angle;
+
+            if (bot->GetMapId() == def->mapId && bot->GetMap())
+            {
+                float h = bot->GetMap()->GetHeight(landingX, landingY, landingZ + 2.0f, true, 50.0f);
+                if (h > -2000.0f && std::abs(h - def->centerZ) < 10.0f)
+                    landingZ = h;
+            }
+
+            bot->TeleportTo(def->mapId, landingX, landingY, landingZ, landingO);
+            rec.state = CityVisitRecord::Traveling;
+            rec.arrivedAt = 0;
+            rec.lastPulseAt = 0;
         }
         else if (IsBotInCity(bot, cityId))
         {
             rec.state = CityVisitRecord::Visiting;
             rec.arrivedAt = rec.requestedAt;
+            rec.lastPulseAt = rec.requestedAt;
         }
         else
         {
             rec.state = CityVisitRecord::Traveling;
+            rec.arrivedAt = 0;
+            rec.lastPulseAt = 0;
         }
 
         s_cityVisits[bot->GetObjectGuid()] = rec;
@@ -257,17 +335,9 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
 
     if (isVisiting)
     {
-#if defined(HAVE_TORTOISEBOTS)
-        PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
-        if (ai)
-            ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
-#elif defined(HAVE_LEGACY_PLAYERBOTS)
-        PlayerbotAI* ai = bot->GetPlayerbotAI();
-        if (ai)
-            ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
-#endif
+        ApplyCityArrivalProtocol(bot, cityId);
     }
-    else
+    else if (transitMode != TransitMode::Teleport)
     {
 #if defined(HAVE_TORTOISEBOTS)
         PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
@@ -387,19 +457,13 @@ void NativeTaskAdapter::Update(uint32_t diff)
 
         if (it->second.state == CityVisitRecord::Traveling)
         {
-            if (IsBotInCity(bot, it->second.cityId))
+            // Wait until teleport/travel has completed and player is in world and physically in city
+            if (!bot->IsBeingTeleported() && IsBotInCity(bot, it->second.cityId))
             {
                 it->second.state = CityVisitRecord::Visiting;
                 it->second.arrivedAt = now;
-#if defined(HAVE_TORTOISEBOTS)
-                PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
-                if (ai)
-                    ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
-#elif defined(HAVE_LEGACY_PLAYERBOTS)
-                PlayerbotAI* ai = bot->GetPlayerbotAI();
-                if (ai)
-                    ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
-#endif
+                it->second.lastPulseAt = now;
+                ApplyCityArrivalProtocol(bot, it->second.cityId);
             }
             else if (now - it->second.requestedAt > 900)
             {
@@ -409,6 +473,40 @@ void NativeTaskAdapter::Update(uint32_t diff)
         }
         else if (it->second.state == CityVisitRecord::Visiting)
         {
+            if (!IsBotInCity(bot, it->second.cityId))
+            {
+                it = s_cityVisits.erase(it);
+                continue;
+            }
+
+            // Anti-AFK engine pulse: every 5 seconds, keep bot following TortoiseBots city protocol
+            if (now - it->second.lastPulseAt >= 5)
+            {
+                it->second.lastPulseAt = now;
+#if defined(HAVE_TORTOISEBOTS)
+                PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+                if (ai)
+                {
+                    if (ai->HasStrategy("travel", BotState::BOT_STATE_NON_COMBAT))
+                        ai->ChangeStrategy("-travel", BotState::BOT_STATE_NON_COMBAT);
+                    if (ai->HasStrategy("grind", BotState::BOT_STATE_NON_COMBAT))
+                        ai->ChangeStrategy("-grind", BotState::BOT_STATE_NON_COMBAT);
+                    if (!ai->HasStrategy("rpg", BotState::BOT_STATE_NON_COMBAT))
+                        ai->ChangeStrategy("+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft", BotState::BOT_STATE_NON_COMBAT);
+
+                    if (ai->GetAiObjectContext())
+                    {
+                        GuidPosition currentRpgTarget = ai->GetAiObjectContext()->GetValue<GuidPosition>("rpg target")->Get();
+                        if (!currentRpgTarget && !bot->IsMoving())
+                        {
+                            ai->DoSpecificAction("choose rpg target", Event(), true);
+                            ai->DoSpecificAction("move to rpg target", Event(), true);
+                        }
+                    }
+                }
+#endif
+            }
+
             uint32_t elapsedSec = now - it->second.arrivedAt;
             uint32_t minDwellSec = it->second.minDwellDurationMs / 1000;
             uint32_t maxDwellSec = it->second.maxDwellDurationMs / 1000;
@@ -428,8 +526,9 @@ void NativeTaskAdapter::Update(uint32_t diff)
                 PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
                 if (ai)
                 {
-                    ai->ChangeStrategy("-rpg", BotState::BOT_STATE_NON_COMBAT);
-                    ai->ChangeStrategy("+travel", BotState::BOT_STATE_NON_COMBAT);
+                    ai->ChangeStrategy("-rpg,-rpg quest,-rpg vendor,-rpg explore,-rpg maintenance,-rpg craft,-rpg guild", BotState::BOT_STATE_NON_COMBAT);
+                    ai->ChangeStrategy("+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+                    ai->Reset(true);
                     ai->DoSpecificAction("choose travel target", Event(), true);
                 }
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
@@ -437,7 +536,7 @@ void NativeTaskAdapter::Update(uint32_t diff)
                 if (ai)
                 {
                     ai->ChangeStrategy("-rpg", BotState::BOT_STATE_NON_COMBAT);
-                    ai->ChangeStrategy("+travel", BotState::BOT_STATE_NON_COMBAT);
+                    ai->ChangeStrategy("+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
                     ai->DoSpecificAction("choose travel target", Event(), true);
                 }
 #endif
@@ -452,7 +551,7 @@ void NativeTaskAdapter::Update(uint32_t diff)
 
 bool NativeTaskAdapter::AreCityErrandsSatisfied(Player* bot, CityId cityId)
 {
-    if (!bot)
+    if (!bot || !bot->IsInWorld() || !bot->IsAlive())
         return true;
 
     if (!IsBotInCity(bot, cityId))
@@ -463,20 +562,14 @@ bool NativeTaskAdapter::AreCityErrandsSatisfied(Player* bot, CityId cityId)
     if (!ai || !ai->GetAiObjectContext())
         return true;
 
-    TravelTarget* tt = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-    if (tt && tt->GetStatus() == TravelStatus::TRAVEL_STATUS_TRAVEL)
-        return true;
-
+    // If bot currently has an active RPG target, it is actively running an errand
     GuidPosition rpgTarget = ai->GetAiObjectContext()->GetValue<GuidPosition>("rpg target")->Get();
-    if (rpgTarget)
+    if (rpgTarget && rpgTarget.GetWorldObject(bot->GetInstanceId()))
         return false;
 
+    // Check if there are unvisited potential targets
     std::list<ObjectGuid> possibleTargets = ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("possible rpg targets")->Get();
     if (possibleTargets.empty())
-        return true;
-
-    std::string nextRpgAction = ai->GetAiObjectContext()->GetValue<std::string>("next rpg action")->Get();
-    if (nextRpgAction.empty() || nextRpgAction == "choose travel target")
         return true;
 
     return false;
@@ -555,6 +648,296 @@ std::string NativeTaskAdapter::GetBotTravelStatusString(Player* bot)
 #else
     return "Idle";
 #endif
+}
+
+// -----------------------------------------------------------------------------
+// LEVEL ADJUSTMENT & PROVISIONING DATA
+// -----------------------------------------------------------------------------
+
+struct TeleportZoneDestination
+{
+    uint32_t mapId;
+    float x;
+    float y;
+    float z;
+    float o;
+};
+
+struct StarterValleyArea
+{
+    uint32_t mapId;
+    float cx;
+    float cy;
+    float cz;
+    float radius;
+    uint8_t teamId;
+};
+
+static const StarterValleyArea s_StartingAreas[] =
+{
+    // Alliance starter valleys
+    { 0, -8949.9f,  -132.5f,  83.5f, 250.0f, 0 }, // Northshire Valley (Human)
+    { 0, -6240.3f,   331.0f, 382.8f, 250.0f, 0 }, // Coldridge Valley (Dwarf / Gnome)
+    { 1, 10311.3f,   832.5f, 1326.4f, 250.0f, 0 }, // Shadowglen (Night Elf)
+    { 0,  3322.0f, -2448.0f, 107.2f, 250.0f, 0 }, // Thalassian Highlands (High Elf - Turtle WoW)
+
+    // Horde starter valleys
+    { 1,  -618.0f, -4251.0f,  38.0f, 250.0f, 1 }, // Valley of Trials (Orc / Troll)
+    { 1, -2917.6f,  -258.0f,  52.9f, 250.0f, 1 }, // Red Cloud Mesa (Tauren)
+    { 0,  1676.7f,  1678.3f, 121.7f, 250.0f, 1 }, // Deathknell (Undead)
+    { 1,  -275.6f, -7474.6f,  73.2f, 250.0f, 1 }  // Blackstone Island (Goblin - Turtle WoW)
+};
+static constexpr size_t s_NumStartingAreas = sizeof(s_StartingAreas) / sizeof(s_StartingAreas[0]);
+
+static const TeleportZoneDestination s_AllianceZones[] =
+{
+    { 0,  -9464.0f,    62.0f,  56.0f, 0.0f },     // 1-9:   Elwynn Forest (Goldshire)
+    { 0, -10515.0f,  1070.0f,  55.0f, 0.0f },     // 10-19: Westfall (Sentinel Hill)
+    { 0,  -9250.0f, -2160.0f,  64.0f, 0.0f },     // 20-29: Redridge Mountains (Lakeshire)
+    { 0, -11340.0f,  -200.0f,  75.0f, 0.0f },     // 30-39: Northern STV (Rebel Camp)
+    { 1,  -4380.0f,  2060.0f,  49.0f, 0.0f },     // 40-49: Feralas (Feathermoon Stronghold)
+    { 0,    940.0f, -1450.0f,  63.0f, 0.0f },     // 50-59: Western Plaguelands (Chillwind Camp)
+    { 0,    940.0f, -1450.0f,  63.0f, 0.0f }      // 60:    Western Plaguelands (outdoors)
+};
+static constexpr size_t s_NumAllianceZones = sizeof(s_AllianceZones) / sizeof(s_AllianceZones[0]);
+
+static const TeleportZoneDestination s_HordeZones[] =
+{
+    { 1,   -618.0f, -4251.0f,  38.0f, 0.0f },     // 1-9:   Durotar (Valley of Trials)
+    { 1,    310.0f, -4680.0f,  16.0f, 0.0f },     // 10-19: Durotar (Razor Hill)
+    { 1,   -440.0f, -2650.0f,  96.0f, 0.0f },     // 20-29: The Barrens (Crossroads)
+    { 0,    -24.0f,  -870.0f,  55.0f, 0.0f },     // 30-39: Hillsbrad Foothills (Tarren Mill)
+    { 1,  -4400.0f,   190.0f,  25.0f, 0.0f },     // 40-49: Feralas (Camp Mojache)
+    { 1,  -7180.0f, -1070.0f, -188.0f, 0.0f },    // 50-59: Un'Goro Crater (Entrance)
+    { 1,  -7180.0f, -1070.0f, -188.0f, 0.0f }     // 60:    Un'Goro Crater (outdoors)
+};
+static constexpr size_t s_NumHordeZones = sizeof(s_HordeZones) / sizeof(s_HordeZones[0]);
+
+bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
+{
+    if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
+        return false;
+
+    uint8_t oldLevel = bot->GetLevel();
+    if (oldLevel == newLevel)
+        return true;
+
+    // Core level update
+    if (newLevel > oldLevel)
+    {
+        bot->GiveLevel(newLevel);
+    }
+    else
+    {
+        bot->SetLevel(newLevel);
+        bot->InitStatsForLevel(false);
+        bot->SetUInt32Value(PLAYER_XP, 0);
+        bot->SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr.GetXPForLevel(newLevel));
+    }
+
+#if defined(HAVE_TORTOISEBOTS)
+    PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+    if (!ai)
+        return false;
+
+    PlayerbotFactory factory(bot, newLevel);
+
+    // 1. Spec, Talents, Spells
+    ai->DoSpecificAction("auto talents");
+    ai->DoSpecificAction("auto learn spell");
+
+    if (newLevel < oldLevel)
+        factory.PruneOverLevelSpellRanks();
+
+    PlayerbotFactory::EnsureSkillRewardedSpells(bot);
+    PlayerbotFactory::EnsureTalentSpellsSaved(bot);
+
+    // 2. Defense, Armor proficiencies, Weapon skills
+    factory.InitSkills();
+
+    // 3. Professions, Specializations, Recipes & Tools
+    factory.InitAllSkills();
+    factory.EnsurePrimaryProfessions();
+    factory.EnsureSpecializations();
+    factory.LearnSpecializationRecipes();
+    factory.AddTools();
+
+    // 4. Riding Skills & Mounts
+    factory.InitMounts();
+
+    // 5. Autogear Equipment Pass
+    factory.UsePoolGearCap();
+    factory.UpgradeGearBest();
+    factory.EnchantEquipment();
+
+    // 6. Starter Kit, Projectiles & Consumables
+    factory.EnsureStarterKit();
+    factory.AddFood();
+    factory.AddConsumes();
+    factory.AddBandages();
+
+    // 7. AI Travel Target Expiration & State Reset
+    if (ai->GetAiObjectContext())
+    {
+        TravelTarget* travelTarget = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+        if (travelTarget)
+        {
+            sTravelMgr.SetNullTravelTarget(travelTarget);
+            travelTarget->SetStatus(TravelStatus::TRAVEL_STATUS_EXPIRED);
+            travelTarget->SetExpireIn(1000);
+        }
+    }
+
+    ai->UpdateTalentSpec();
+    ai->ResetStrategies();
+    bot->SaveToDB();
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+    PlayerbotFactory factory(bot, newLevel);
+    factory.Randomize(false, false);
+#endif
+
+    return true;
+}
+
+bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, uint8_t teamId)
+{
+    if (!bot || !bot->IsInWorld())
+        return false;
+
+    const TeleportZoneDestination* zones = nullptr;
+    size_t zoneCount = 0;
+    if (teamId == 0) // Alliance
+    {
+        zones = s_AllianceZones;
+        zoneCount = s_NumAllianceZones;
+    }
+    else if (teamId == 1) // Horde
+    {
+        zones = s_HordeZones;
+        zoneCount = s_NumHordeZones;
+    }
+    else
+        return false;
+
+    // Racial starter zone awareness for level 1-9 (bracket 0)
+    if (newLevel < 10)
+    {
+        uint8_t race = bot->GetRace();
+        TeleportZoneDestination racialDest{0, 0.0f, 0.0f, 0.0f, 0.0f};
+        bool hasRacialDest = true;
+
+        switch (race)
+        {
+            case RACE_HIGH_ELF: // High Elf (Turtle WoW) - Thalassian Highlands
+                racialDest = { 0, 3322.0f, -2448.0f, 107.2f, 3.47f };
+                break;
+            case RACE_GOBLIN: // Goblin (Turtle WoW) - Blackstone Island
+                racialDest = { 1, -275.6f, -7474.6f, 73.2f, 2.51f };
+                break;
+            case RACE_HUMAN: // Human - Northshire Valley
+                racialDest = { 0, -8949.9f, -132.5f, 83.5f, 0.0f };
+                break;
+            case RACE_DWARF: // Dwarf / Gnome - Coldridge Valley
+            case RACE_GNOME:
+                racialDest = { 0, -6240.3f, 331.0f, 382.8f, 6.17f };
+                break;
+            case RACE_NIGHTELF: // Night Elf - Shadowglen
+                racialDest = { 1, 10311.3f, 832.5f, 1326.4f, 5.69f };
+                break;
+            case RACE_ORC: // Orc / Troll - Valley of Trials
+            case RACE_TROLL:
+                racialDest = { 1, -618.0f, -4251.0f, 38.0f, 0.0f };
+                break;
+            case RACE_TAUREN: // Tauren - Red Cloud Mesa
+                racialDest = { 1, -2917.6f, -258.0f, 52.9f, 0.0f };
+                break;
+            case RACE_UNDEAD: // Undead - Deathknell
+                racialDest = { 0, 1676.7f, 1678.3f, 121.7f, 2.71f };
+                break;
+            default:
+                hasRacialDest = false;
+                break;
+        }
+
+        if (hasRacialDest)
+        {
+            if (bot->IsMounted())
+                bot->Unmount();
+            bot->TeleportTo(racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, racialDest.o);
+            return true;
+        }
+    }
+
+    size_t zoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, zoneCount - 1);
+    const TeleportZoneDestination& dest = zones[zoneIndex];
+
+    if (bot->IsMounted())
+        bot->Unmount();
+
+    bot->TeleportTo(dest.mapId, dest.x, dest.y, dest.z, dest.o);
+    return true;
+}
+
+bool NativeTaskAdapter::IsInStarterValley(Player* bot)
+{
+    if (!bot || !bot->IsInWorld())
+        return false;
+
+    uint32_t mapId = bot->GetMapId();
+    float bx = bot->GetPositionX();
+    float by = bot->GetPositionY();
+    float bz = bot->GetPositionZ();
+
+    for (size_t i = 0; i < s_NumStartingAreas; ++i)
+    {
+        const auto& area = s_StartingAreas[i];
+        if (mapId != area.mapId)
+            continue;
+
+        float dx = bx - area.cx;
+        float dy = by - area.cy;
+        float dz = bz - area.cz;
+        if (dx * dx + dy * dy + dz * dz <= area.radius * area.radius)
+            return true;
+    }
+    return false;
+}
+
+bool NativeTaskAdapter::IsOnWrongMap(Player* bot)
+{
+    if (!bot || !bot->IsInWorld())
+        return false;
+
+    if (bot->GetMap() && (bot->GetMap()->IsDungeon() || bot->GetMap()->IsBattleGround() || bot->GetMap()->IsRaid()))
+        return false;
+
+    uint32_t mapId = bot->GetMapId();
+    // Valid open-world / recognized maps:
+    // 0 = Eastern Kingdoms, 1 = Kalimdor, 369 = Deeprun Tram,
+    // 26 = Blood Ring Arena, 27 = Sunnyglade Valley,
+    // 813/815/816 = Custom Turtle content instances/islands
+    if (mapId == 0 || mapId == 1 || mapId == 369 || mapId == 26 || mapId == 27 ||
+        mapId == 813 || mapId == 815 || mapId == 816)
+        return false;
+
+    return true;
+}
+
+bool NativeTaskAdapter::IsBotSafeForDispersal(Player* bot)
+{
+    if (!bot || !bot->IsInWorld() || !bot->IsAlive())
+        return false;
+
+    if (bot->IsInCombat() || bot->IsBeingTeleported())
+        return false;
+
+    if (!IsFreeBot(bot))
+        return false;
+
+    if (bot->GetSession() && bot->GetSession()->isLogingOut())
+        return false;
+
+    return true;
 }
 
 } // namespace BotLevelBrackets
