@@ -110,21 +110,22 @@ void LoadModuleConfiguration()
     policy.SetCityTarget(6, sConfig.GetIntDefault("BotLevelBrackets.City.ThunderBluffTarget", 6));
     policy.SetCityTarget(7, sConfig.GetIntDefault("BotLevelBrackets.City.SparkwaterTarget", 6));
 
-    auto loadCityLoc = [&](CityId cId, const char* key, const char* defaultVal) {
-        std::string locStr = sConfig.GetStringDefault(key, defaultVal);
-        TeleportDestinationConfig dest;
-        if (NativeTaskAdapter::ResolveTeleportLocation(locStr, dest))
-            policy.SetCityLandingDestination(cId, dest);
+    // Optional city landing location overrides (defaults to hardcoded bank landing coordinates)
+    static const char* s_cityNames[] = {
+        "Stormwind", "Ironforge", "Darnassus", "AlahThalas",
+        "Orgrimmar", "Undercity", "ThunderBluff", "Sparkwater"
     };
-
-    loadCityLoc(CityId::Stormwind, "BotLevelBrackets.City.Stormwind.Location", "stormwind");
-    loadCityLoc(CityId::Ironforge, "BotLevelBrackets.City.Ironforge.Location", "ironforge");
-    loadCityLoc(CityId::Darnassus, "BotLevelBrackets.City.Darnassus.Location", "darnassus");
-    loadCityLoc(CityId::AlahThalas, "BotLevelBrackets.City.AlahThalas.Location", "alahthalasarrival");
-    loadCityLoc(CityId::Orgrimmar, "BotLevelBrackets.City.Orgrimmar.Location", "orgrimmar");
-    loadCityLoc(CityId::Undercity, "BotLevelBrackets.City.Undercity.Location", "undercity");
-    loadCityLoc(CityId::ThunderBluff, "BotLevelBrackets.City.ThunderBluff.Location", "thunderbluff");
-    loadCityLoc(CityId::Sparkwater, "BotLevelBrackets.City.Sparkwater.Location", "sparkwater");
+    for (size_t i = 0; i < 8; ++i)
+    {
+        std::string key = std::string("BotLevelBrackets.City.") + s_cityNames[i] + ".Location";
+        std::string val = sConfig.GetStringDefault(key.c_str(), "");
+        if (!val.empty())
+        {
+            TeleportDestinationConfig dest;
+            if (NativeTaskAdapter::ResolveTeleportLocation(val, dest))
+                policy.SetCityLandingDestination(static_cast<CityId>(i + 1), dest);
+        }
+    }
 
     // 3. Outdoor World Distribution Settings
     policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", true));
@@ -240,46 +241,36 @@ void LoadModuleConfiguration()
     policy.SetLevelBrackets(1, hordeBrackets);
     policy.ClampAndBalanceBrackets(true);
 
-    // Starter race leveling destination pools (Levels 1-9)
-    auto loadStarterPool = [&](uint8_t race, const char* key, const char* defaultPool) {
-        std::string poolStr = sConfig.GetStringDefault(key, defaultPool);
-        auto pool = NativeTaskAdapter::ParseTeleportLocationPool(poolStr);
-        policy.SetStarterLocationPool(race, pool);
+    // Optional starter race destination overrides (defaults to hardcoded starter valley coordinates)
+    static const char* s_starterRaces[] = {
+        "Human", "Dwarf", "Gnome", "NightElf", "HighElf",
+        "Orc", "Troll", "Tauren", "Undead", "Goblin"
     };
-
-    loadStarterPool(RACE_HUMAN, "BotLevelBrackets.Starter.Human.Locations", "northshire, goldshire");
-    loadStarterPool(RACE_DWARF, "BotLevelBrackets.Starter.Dwarf.Locations", "coldridge, kharanos, brewnallvillage");
-    loadStarterPool(RACE_GNOME, "BotLevelBrackets.Starter.Gnome.Locations", "coldridge, kharanos, brewnallvillage");
-    loadStarterPool(RACE_NIGHTELF, "BotLevelBrackets.Starter.NightElf.Locations", "shadowglen, dolanaar");
-    loadStarterPool(RACE_HIGH_ELF, "BotLevelBrackets.Starter.HighElf.Locations", "highelf, thalassianhighlands");
-    loadStarterPool(RACE_ORC, "BotLevelBrackets.Starter.Orc.Locations", "valleyoftrials, razorhill");
-    loadStarterPool(RACE_TROLL, "BotLevelBrackets.Starter.Troll.Locations", "valleyoftrials, senjinvillage");
-    loadStarterPool(RACE_TAUREN, "BotLevelBrackets.Starter.Tauren.Locations", "redcloud, campnarache, bloodhoofvillage");
-    loadStarterPool(RACE_UNDEAD, "BotLevelBrackets.Starter.Undead.Locations", "deathknell, brill");
-    loadStarterPool(RACE_GOBLIN, "BotLevelBrackets.Starter.Goblin.Locations", "blackstone");
-
-    // Leveling zone destination pools (Turtle WoW Zone Level Chart - Strictly Open-World Leveling Destinations)
-    auto loadRangePool = [&](uint8_t team, size_t rangeIndex, const char* key, const char* defaultPool) {
-        std::string poolStr = sConfig.GetStringDefault(key, defaultPool);
-        auto pool = NativeTaskAdapter::ParseTeleportLocationPool(poolStr);
-        policy.SetRangeLocationPool(team, rangeIndex, pool);
+    static const uint8_t s_raceIds[] = {
+        RACE_HUMAN, RACE_DWARF, RACE_GNOME, RACE_NIGHTELF, RACE_HIGH_ELF,
+        RACE_ORC, RACE_TROLL, RACE_TAUREN, RACE_UNDEAD, RACE_GOBLIN
     };
+    for (size_t i = 0; i < 10; ++i)
+    {
+        std::string key = std::string("BotLevelBrackets.Starter.") + s_starterRaces[i] + ".Locations";
+        std::string val = sConfig.GetStringDefault(key.c_str(), "");
+        if (!val.empty())
+            policy.SetStarterLocationPool(s_raceIds[i], NativeTaskAdapter::ParseTeleportLocationPool(val));
+    }
 
-    loadRangePool(0, 0, "BotLevelBrackets.Alliance.Range1.Locations", "goldshire, northshire, coldridge, kharanos, brewnallvillage, shadowglen, dolanaar, highelf, thalassianhighlands");
-    loadRangePool(0, 1, "BotLevelBrackets.Alliance.Range2.Locations", "westfall, sentinelhill, thelsamar, lochmodan, darkshore, auberdine");
-    loadRangePool(0, 2, "BotLevelBrackets.Alliance.Range3.Locations", "redridgemountains, lakeshire, duskwood, darkshire, wetlands, menethilharbor, ashenvale, astranaar, stonetalonpeak, southshore, balorhorde");
-    loadRangePool(0, 3, "BotLevelBrackets.Alliance.Range4.Locations", "refugepointe, arathihighlands, alteracmountains, rebelcamp, bootybay, desolace, nijelspoint, theramore, dustwallowmarsh, thousandneedles, badlands, swampofsorrows, gilneas, gilneascity");
-    loadRangePool(0, 4, "BotLevelBrackets.Alliance.Range5.Locations", "feathermoonstronghold, feralas, gadgetzan, tanaris, aeriepeak, thehinterlands, thoriumpoint, searinggorge, blastedlands, azshara, icepointrock, lapidisisle, lapidis");
-    loadRangePool(0, 5, "BotLevelBrackets.Alliance.Range6.Locations", "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, felwood, morgansvigil, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, silithus, cenarionhold, telabim, hyjalentrance");
-    loadRangePool(0, 6, "BotLevelBrackets.Alliance.Range7.Locations", "westernplaguelands, lightshopechapel, easternplaguelands, silithus, cenarionhold, winterspring, everlook, burningsteppes, morgansvigil, thoriumpoint, ungorocrater, marshalsrefuge, telabim, hyjalentrance");
+    // Optional leveling zone destination overrides (defaults to hardcoded Turtle WoW Zone Level Chart tables)
+    for (size_t b = 1; b <= 7; ++b)
+    {
+        std::string aKey = "BotLevelBrackets.Alliance.Range" + std::to_string(b) + ".Locations";
+        std::string aVal = sConfig.GetStringDefault(aKey.c_str(), "");
+        if (!aVal.empty())
+            policy.SetRangeLocationPool(0, b - 1, NativeTaskAdapter::ParseTeleportLocationPool(aVal));
 
-    loadRangePool(1, 0, "BotLevelBrackets.Horde.Range1.Locations", "valleyoftrials, razorhill, senjinvillage, deathknell, brill, campnarache, bloodhoofvillage, redcloud, blackstone");
-    loadRangePool(1, 1, "BotLevelBrackets.Horde.Range2.Locations", "thecrossroads, barrens, silverpineforest, thesepulcher, razorhill");
-    loadRangePool(1, 2, "BotLevelBrackets.Horde.Range3.Locations", "camptaurajo, splintertreepost, ashenvale, zoramgaroutpost, sunrockretreat, stonetalonmountains, tarrenmill, hillsbradfoothills, freewindpost, balorhorde");
-    loadRangePool(1, 3, "BotLevelBrackets.Horde.Range4.Locations", "hammerfall, arathihighlands, alteracmountains, gromgolbasecamp, stranglethornvale, bootybay, ghostwalkerpost, desolace, brackenwallvillage, dustwallowmarsh, freewindpost, thousandneedles, kargath, badlands, stonard, swampofsorrows, gilneas, gilneascity");
-    loadRangePool(1, 4, "BotLevelBrackets.Horde.Range5.Locations", "campmojache, feralas, gadgetzan, tanaris, revantuskvillage, thehinterlands, kargath, badlands, thoriumpoint, searinggorge, stonard, swampofsorrows, blastedlands, azshara, valormok, icepointrock, lapidisisle, lapidis");
-    loadRangePool(1, 5, "BotLevelBrackets.Horde.Range6.Locations", "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, bloodvenompost, felwood, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, silithus, cenarionhold, telabim, hyjalentrance");
-    loadRangePool(1, 6, "BotLevelBrackets.Horde.Range7.Locations", "westernplaguelands, lightshopechapel, easternplaguelands, silithus, cenarionhold, winterspring, everlook, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, telabim, hyjalentrance");
+        std::string hKey = "BotLevelBrackets.Horde.Range" + std::to_string(b) + ".Locations";
+        std::string hVal = sConfig.GetStringDefault(hKey.c_str(), "");
+        if (!hVal.empty())
+            policy.SetRangeLocationPool(1, b - 1, NativeTaskAdapter::ParseTeleportLocationPool(hVal));
+    }
 
     // 6. Social & Identity Protections
     prot.SetIgnoreFriendListed(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreFriendListed", true));

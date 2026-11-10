@@ -120,38 +120,12 @@ BotLevelBrackets.City.UndercityTarget = 8
 BotLevelBrackets.City.ThunderBluffTarget = 6
 BotLevelBrackets.City.SparkwaterTarget = 6
 
-# Major City Teleport Location Names & Bank Arrival Coordinates
-# Specifies the .tele command location name or exact coordinates (map x y z o)
-# when bots teleport to each racial capital city. Arriving bots land with a natural
-# 1.0 - 2.5 yard dispersion offset and ground height sampling.
-#
-# Available .tele Location Names:
-#   Stormwind:     "stormwind"
-#   Ironforge:     "ironforge"
-#   Darnassus:     "darnassus"
-#   Alah'Thalas:   "alahthalasarrival" (or "alahthalasentrance", "highelf")
-#   Orgrimmar:     "orgrimmar"
-#   Undercity:     "undercity"
-#   Thunder Bluff: "thunderbluff"
-#   Sparkwater:    "sparkwater"
-#
-# Alternatively, specify exact internal bank coordinates:
-#   Stormwind Bank:    "0 -8935.27 613.13 99.61 0.45"   (Trade District Bank)
-#   Ironforge Bank:    "0 -4886.55 -997.59 504.02 2.23" (The Great Forge Bank)
-#   Darnassus Bank:    "1 9938.84 2521.53 1317.66 4.38" (Darnassus Bank Tree)
-#   Alah'Thalas Bank:  "0 4261.59 -2842.02 8.45 0.08"   (Banker Shalanna, Alah'Thalas Bank)
-#   Orgrimmar Bank:    "1 1627.32 -4376.07 11.81 3.44"  (Valley of Strength Bank)
-#   Undercity Bank:    "0 1599.96 240.65 -52.06 0.09"   (Central Bank Ring)
-#   ThunderBluff Bank: "1 -1257.63 19.56 128.27 1.73"   (Lower Rise Bank)
-#   Sparkwater Bank:   "1 838.27 -5048.73 6.03 1.92"    (Sparkwater Port Bank)
-BotLevelBrackets.City.Stormwind.Location = "stormwind"
-BotLevelBrackets.City.Ironforge.Location = "ironforge"
-BotLevelBrackets.City.Darnassus.Location = "darnassus"
-BotLevelBrackets.City.AlahThalas.Location = "alahthalasarrival"
-BotLevelBrackets.City.Orgrimmar.Location = "orgrimmar"
-BotLevelBrackets.City.Undercity.Location = "undercity"
-BotLevelBrackets.City.ThunderBluff.Location = "thunderbluff"
-BotLevelBrackets.City.Sparkwater.Location = "sparkwater"
+# Capital City Bank Landing Tiles (Hardcoded Engine Tables)
+# All 8 capital cities (Stormwind, Ironforge, Darnassus, Alah'Thalas, Orgrimmar,
+# Undercity, Thunder Bluff, Sparkwater Port) land directly inside their main bank
+# with ground height sampling and a 1.0 - 2.5 yard dispersion offset by default.
+# Optional overrides can be added if desired:
+#   BotLevelBrackets.City.<City>.Location = "location_name_or_coords"
 
 ###################################################################################################
 # OUTDOOR WORLD DISTRIBUTION
@@ -332,73 +306,33 @@ BotLevelBrackets.Horde.Range7.Upper = 60
 BotLevelBrackets.Horde.Range7.Pct = 14
 
 ###################################################################################################
-# STARTER VALLEYS & RACIAL TELEPORT DESTINATIONS (LEVELS 1-9)
-###################################################################################################
-# Comma-separated list of .tele location names or coordinates (map x y z o) for starting bots.
-# If a race has multiple locations, bots of that race randomly pick one upon creation or reset.
-BotLevelBrackets.Starter.Human.Locations = "northshire, goldshire"
-BotLevelBrackets.Starter.Dwarf.Locations = "coldridge, kharanos, brewnallvillage"
-BotLevelBrackets.Starter.Gnome.Locations = "coldridge, kharanos, brewnallvillage"
-BotLevelBrackets.Starter.NightElf.Locations = "shadowglen, dolanaar"
-BotLevelBrackets.Starter.HighElf.Locations = "highelf, thalassianhighlands"
-BotLevelBrackets.Starter.Orc.Locations = "valleyoftrials, razorhill"
-BotLevelBrackets.Starter.Troll.Locations = "valleyoftrials, senjinvillage"
-BotLevelBrackets.Starter.Tauren.Locations = "redcloud, campnarache, bloodhoofvillage"
-BotLevelBrackets.Starter.Undead.Locations = "deathknell, brill"
-BotLevelBrackets.Starter.Goblin.Locations = "blackstone"
-
-###################################################################################################
-# LEVELING ZONE DESTINATIONS & TURTLE WOW ZONE LEVEL CHART
+# LEVELING ZONE & CAPITAL CITY DESTINATIONS (HARDCODED ENGINE TABLES)
 # Reference: https://turtle-wow.fandom.com/wiki/Zone_Level_Chart
 ###################################################################################################
-# For each level bracket and faction, specify a comma-separated pool of locations.
-# Leveling zone destinations strictly contain open-world questing zones and settlements
-# matching that bracket's level range. Capital cities are NOT included in world leveling
-# pools; capital cities are managed separately via the dedicated Capital City Ladder
-# (BotLevelBrackets.City.*) where bots of all brackets (1-7) can be teleported to cities.
 #
-# Available Turtle WoW Zones & Supported .tele Names:
-#   Bracket 1 (1-9):    Goldshire, Northshire, Coldridge, Kharanos, Brewnall Village,
-#                       Shadowglen, Dolanaar, High Elf, Thalassian Highlands,
-#                       Valley of Trials, Razor Hill, Sen'jin Village, Deathknell, Brill,
-#                       Camp Narache, Bloodhoof Village, Red Cloud, Blackstone Island
-#   Bracket 2 (10-19):  Westfall, Sentinel Hill, Thelsamar, Loch Modan, Darkshore, Auberdine,
-#                       The Crossroads, Barrens, Silverpine Forest, The Sepulcher, Razor Hill
-#   Bracket 3 (20-29):  Redridge Mountains, Lakeshire, Duskwood, Darkshire, Wetlands, Menethil Harbor,
-#                       Ashenvale, Astranaar, Splintertree Post, Zoram'gar Outpost, Stonetalon Mountains,
-#                       Stonetalon Peak, Sun Rock Retreat, Tarren Mill, Hillsbrad Foothills, Southshore,
-#                       Freewind Post, Balor
-#   Bracket 4 (30-39):  Refuge Pointe, Hammerfall, Arathi Highlands, Alterac Mountains,
-#                       Rebel Camp, Grom'gol Base Camp, Stranglethorn Vale, Booty Bay, Desolace,
-#                       Nijel's Point, Ghost Walker Post, Theramore, Brackenwall Village, Dustwallow Marsh,
-#                       Freewind Post, Thousand Needles, Kargath, Badlands, Stonard, Swamp of Sorrows,
-#                       Gilneas, Gilneas City
-#   Bracket 5 (40-49):  Feathermoon Stronghold, Camp Mojache, Feralas, Gadgetzan, Tanaris, Aerie Peak,
-#                       Revantusk Village, The Hinterlands, Kargath, Badlands, Thorium Point, Searing Gorge,
-#                       Stonard, Swamp of Sorrows, Blasted Lands, Azshara, Valormok, Icepoint Rock, Lapidis Isle
-#   Bracket 6 (50-59):  Western Plaguelands, Eastern Plaguelands, Light's Hope Chapel, Winterspring,
-#                       Everlook, Felwood, Bloodvenom Post, Morgan's Vigil, Flame Crest, Burning Steppes,
-#                       Thorium Point, Un'Goro Crater, Marshal's Refuge, Blasted Lands, Silithus, Cenarion Hold,
-#                       Tel'Abim, Hyjal Entrance
-#   Bracket 7 (60):     Western Plaguelands, Eastern Plaguelands, Light's Hope Chapel, Silithus,
-#                       Cenarion Hold, Winterspring, Everlook, Burning Steppes, Morgan's Vigil, Flame Crest,
-#                       Thorium Point, Un'Goro Crater, Marshal's Refuge, Tel'Abim, Hyjal Entrance
-
-BotLevelBrackets.Alliance.Range1.Locations = "goldshire, northshire, coldridge, kharanos, brewnallvillage, shadowglen, dolanaar, highelf, thalassianhighlands"
-BotLevelBrackets.Alliance.Range2.Locations = "westfall, sentinelhill, thelsamar, lochmodan, darkshore, auberdine"
-BotLevelBrackets.Alliance.Range3.Locations = "redridgemountains, lakeshire, duskwood, darkshire, wetlands, menethilharbor, ashenvale, astranaar, stonetalonpeak, southshore, balorhorde"
-BotLevelBrackets.Alliance.Range4.Locations = "refugepointe, arathihighlands, alteracmountains, rebelcamp, bootybay, desolace, nijelspoint, theramore, dustwallowmarsh, thousandneedles, badlands, swampofsorrows, gilneas, gilneascity"
-BotLevelBrackets.Alliance.Range5.Locations = "feathermoonstronghold, feralas, gadgetzan, tanaris, aeriepeak, thehinterlands, thoriumpoint, searinggorge, blastedlands, azshara, icepointrock, lapidisisle, lapidis"
-BotLevelBrackets.Alliance.Range6.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, felwood, morgansvigil, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, silithus, cenarionhold, telabim, hyjalentrance"
-BotLevelBrackets.Alliance.Range7.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, silithus, cenarionhold, winterspring, everlook, burningsteppes, morgansvigil, thoriumpoint, ungorocrater, marshalsrefuge, telabim, hyjalentrance"
-
-BotLevelBrackets.Horde.Range1.Locations = "valleyoftrials, razorhill, senjinvillage, deathknell, brill, campnarache, bloodhoofvillage, redcloud, blackstone"
-BotLevelBrackets.Horde.Range2.Locations = "thecrossroads, barrens, silverpineforest, thesepulcher, razorhill"
-BotLevelBrackets.Horde.Range3.Locations = "camptaurajo, splintertreepost, ashenvale, zoramgaroutpost, sunrockretreat, stonetalonmountains, tarrenmill, hillsbradfoothills, freewindpost, balorhorde"
-BotLevelBrackets.Horde.Range4.Locations = "hammerfall, arathihighlands, alteracmountains, gromgolbasecamp, stranglethornvale, bootybay, ghostwalkerpost, desolace, brackenwallvillage, dustwallowmarsh, freewindpost, thousandneedles, kargath, badlands, stonard, swampofsorrows, gilneas, gilneascity"
-BotLevelBrackets.Horde.Range5.Locations = "campmojache, feralas, gadgetzan, tanaris, revantuskvillage, thehinterlands, kargath, badlands, thoriumpoint, searinggorge, stonard, swampofsorrows, blastedlands, azshara, valormok, icepointrock, lapidisisle, lapidis"
-BotLevelBrackets.Horde.Range6.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, bloodvenompost, felwood, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, silithus, cenarionhold, telabim, hyjalentrance"
-BotLevelBrackets.Horde.Range7.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, silithus, cenarionhold, winterspring, everlook, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, telabim, hyjalentrance"
+# All leveling zone destinations, starter valleys, and capital city bank landing coordinates
+# are 100% hardcoded directly in C++ engine tables (NativeTaskAdapter.cpp & ReadOnlyCatalog.cpp):
+#
+# - Capital City Ladder (Bank Landing Tiles):
+#     Alliance: Stormwind, Ironforge, Darnassus, Alah'Thalas
+#     Horde:    Orgrimmar, Undercity, Thunder Bluff, Sparkwater Port
+#
+# - Leveling Zone Destinations (Strictly Open-World Questing Hubs & Wilderness):
+#     Bracket 1 (1-9):   Elwynn, Dun Morogh, Teldrassil, Thalassian Highlands / Durotar, Tirisfal, Mulgore, Blackstone
+#     Bracket 2 (10-19): Westfall, Loch Modan, Darkshore / Northern Barrens, Silverpine Forest, Razor Hill
+#     Bracket 3 (20-29): Redridge, Duskwood, Wetlands, Ashenvale, Stonetalon, Southshore, Balor / Taurajo, Tarren Mill
+#     Bracket 4 (30-39): Arathi, Alterac, STV, Desolace, Dustwallow, 1000 Needles, Badlands, Swamp of Sorrows, Gilneas
+#     Bracket 5 (40-49): Feralas, Tanaris, The Hinterlands, Searing Gorge, Blasted Lands, Azshara, Icepoint, Lapidis
+#     Bracket 6 (50-59): WPL, EPL, Light's Hope, Winterspring, Felwood, Burning Steppes, Un'Goro, Silithus, Tel'Abim, Hyjal
+#     Bracket 7 (60):    Western Plaguelands, Eastern Plaguelands, Light's Hope, Silithus, Winterspring, Burning Steppes
+#
+# Zero configuration required! The module runs autonomously off its built-in C++ tables.
+# If you wish to selectively override any destination pool, you can optionally add:
+#   BotLevelBrackets.Starter.<Race>.Locations = "location1, location2"
+#   BotLevelBrackets.Alliance.Range<1..7>.Locations = "location1, location2"
+#   BotLevelBrackets.Horde.Range<1..7>.Locations = "location1, location2"
+#   BotLevelBrackets.City.<City>.Location = "location_name_or_coords"
+#
 
 ###################################################################################################
 # SOCIAL & IDENTITY PROTECTIONS
