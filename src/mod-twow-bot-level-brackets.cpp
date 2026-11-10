@@ -117,14 +117,14 @@ void LoadModuleConfiguration()
             policy.SetCityLandingDestination(cId, dest);
     };
 
-    loadCityLoc(CityId::Stormwind, "BotLevelBrackets.City.Stormwind.Location", "0 -8935.27 613.13 99.61 0.45");
-    loadCityLoc(CityId::Ironforge, "BotLevelBrackets.City.Ironforge.Location", "0 -4886.55 -997.59 504.02 2.23");
-    loadCityLoc(CityId::Darnassus, "BotLevelBrackets.City.Darnassus.Location", "1 9938.84 2521.53 1317.66 4.38");
-    loadCityLoc(CityId::AlahThalas, "BotLevelBrackets.City.AlahThalas.Location", "0 4261.59 -2842.02 8.45 0.08");
-    loadCityLoc(CityId::Orgrimmar, "BotLevelBrackets.City.Orgrimmar.Location", "1 1627.32 -4376.07 11.81 3.44");
-    loadCityLoc(CityId::Undercity, "BotLevelBrackets.City.Undercity.Location", "0 1599.96 240.65 -52.06 0.09");
-    loadCityLoc(CityId::ThunderBluff, "BotLevelBrackets.City.ThunderBluff.Location", "1 -1257.63 19.56 128.27 1.73");
-    loadCityLoc(CityId::Sparkwater, "BotLevelBrackets.City.Sparkwater.Location", "1 838.27 -5048.73 6.03 1.92");
+    loadCityLoc(CityId::Stormwind, "BotLevelBrackets.City.Stormwind.Location", "stormwind");
+    loadCityLoc(CityId::Ironforge, "BotLevelBrackets.City.Ironforge.Location", "ironforge");
+    loadCityLoc(CityId::Darnassus, "BotLevelBrackets.City.Darnassus.Location", "darnassus");
+    loadCityLoc(CityId::AlahThalas, "BotLevelBrackets.City.AlahThalas.Location", "alahthalasarrival");
+    loadCityLoc(CityId::Orgrimmar, "BotLevelBrackets.City.Orgrimmar.Location", "orgrimmar");
+    loadCityLoc(CityId::Undercity, "BotLevelBrackets.City.Undercity.Location", "undercity");
+    loadCityLoc(CityId::ThunderBluff, "BotLevelBrackets.City.ThunderBluff.Location", "thunderbluff");
+    loadCityLoc(CityId::Sparkwater, "BotLevelBrackets.City.Sparkwater.Location", "sparkwater");
 
     // 3. Outdoor World Distribution Settings
     policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", true));
@@ -247,39 +247,39 @@ void LoadModuleConfiguration()
         policy.SetStarterLocationPool(race, pool);
     };
 
-    loadStarterPool(RACE_HUMAN, "BotLevelBrackets.Starter.Human.Locations", "northshire");
-    loadStarterPool(RACE_DWARF, "BotLevelBrackets.Starter.Dwarf.Locations", "coldridge");
-    loadStarterPool(RACE_GNOME, "BotLevelBrackets.Starter.Gnome.Locations", "coldridge");
-    loadStarterPool(RACE_NIGHTELF, "BotLevelBrackets.Starter.NightElf.Locations", "shadowglen");
-    loadStarterPool(RACE_HIGH_ELF, "BotLevelBrackets.Starter.HighElf.Locations", "highelf");
-    loadStarterPool(RACE_ORC, "BotLevelBrackets.Starter.Orc.Locations", "valleyoftrials");
-    loadStarterPool(RACE_TROLL, "BotLevelBrackets.Starter.Troll.Locations", "valleyoftrials");
-    loadStarterPool(RACE_TAUREN, "BotLevelBrackets.Starter.Tauren.Locations", "redcloud");
-    loadStarterPool(RACE_UNDEAD, "BotLevelBrackets.Starter.Undead.Locations", "deathknell");
-    loadStarterPool(RACE_GOBLIN, "BotLevelBrackets.Starter.Goblin.Locations", "blackstone");
+    loadStarterPool(RACE_HUMAN, "BotLevelBrackets.Starter.Human.Locations", "northshire, goldshire");
+    loadStarterPool(RACE_DWARF, "BotLevelBrackets.Starter.Dwarf.Locations", "coldridge, kharanos");
+    loadStarterPool(RACE_GNOME, "BotLevelBrackets.Starter.Gnome.Locations", "coldridge, kharanos");
+    loadStarterPool(RACE_NIGHTELF, "BotLevelBrackets.Starter.NightElf.Locations", "shadowglen, dolanaar");
+    loadStarterPool(RACE_HIGH_ELF, "BotLevelBrackets.Starter.HighElf.Locations", "highelf, alahthalasarrival");
+    loadStarterPool(RACE_ORC, "BotLevelBrackets.Starter.Orc.Locations", "valleyoftrials, razorhill");
+    loadStarterPool(RACE_TROLL, "BotLevelBrackets.Starter.Troll.Locations", "valleyoftrials, senjinvillage");
+    loadStarterPool(RACE_TAUREN, "BotLevelBrackets.Starter.Tauren.Locations", "redcloud, campnarache, bloodhoofvillage");
+    loadStarterPool(RACE_UNDEAD, "BotLevelBrackets.Starter.Undead.Locations", "deathknell, brill");
+    loadStarterPool(RACE_GOBLIN, "BotLevelBrackets.Starter.Goblin.Locations", "blackstone, sparkwater");
 
-    // Leveling zone destination pools (Turtle WoW Zone Level Chart)
+    // Leveling zone destination pools (Turtle WoW Zone Level Chart & City Hubs)
     auto loadRangePool = [&](uint8_t team, size_t rangeIndex, const char* key, const char* defaultPool) {
         std::string poolStr = sConfig.GetStringDefault(key, defaultPool);
         auto pool = NativeTaskAdapter::ParseTeleportLocationPool(poolStr);
         policy.SetRangeLocationPool(team, rangeIndex, pool);
     };
 
-    loadRangePool(0, 0, "BotLevelBrackets.Alliance.Range1.Locations", "goldshire");
-    loadRangePool(0, 1, "BotLevelBrackets.Alliance.Range2.Locations", "westfall, thelsamar, darkshore");
-    loadRangePool(0, 2, "BotLevelBrackets.Alliance.Range3.Locations", "redridge, duskwood, wetlands, ashenvale, balorhorde");
-    loadRangePool(0, 3, "BotLevelBrackets.Alliance.Range4.Locations", "rebelcamp, refugepointe, southshore, alteracmountains, gilneas");
-    loadRangePool(0, 4, "BotLevelBrackets.Alliance.Range5.Locations", "feathermoon, gadgetzan, aeriepeak, swampofsorrows, icepointrock, lapidisisle");
-    loadRangePool(0, 5, "BotLevelBrackets.Alliance.Range6.Locations", "chillwind, lightshopechapel, winterspring, felwood, morgansvigil, thoriumpoint, ungoro, blastedlands, telabim");
-    loadRangePool(0, 6, "BotLevelBrackets.Alliance.Range7.Locations", "lightshopechapel, silithus, winterspring, chillwind, stormwind");
+    loadRangePool(0, 0, "BotLevelBrackets.Alliance.Range1.Locations", "goldshire, northshire, coldridge, kharanos, shadowglen, dolanaar, highelf, stormwind, ironforge, darnassus, alahthalasarrival");
+    loadRangePool(0, 1, "BotLevelBrackets.Alliance.Range2.Locations", "westfall, sentinelhill, thelsamar, lochmodan, darkshore, auberdine, stormwind, ironforge, darnassus, alahthalasarrival");
+    loadRangePool(0, 2, "BotLevelBrackets.Alliance.Range3.Locations", "redridgemountains, lakeshire, duskwood, darkshire, wetlands, menethilharbor, ashenvale, astranaar, stonetalonpeak, southshore, balorhorde, stormwind, ironforge, darnassus, alahthalasarrival");
+    loadRangePool(0, 3, "BotLevelBrackets.Alliance.Range4.Locations", "refugepointe, arathihighlands, southshore, alteracmountains, rebelcamp, bootybay, desolace, nijelspoint, theramore, dustwallowmarsh, thousandneedles, gilneas, gilneascity, stormwind, ironforge, darnassus, alahthalasarrival");
+    loadRangePool(0, 4, "BotLevelBrackets.Alliance.Range5.Locations", "feathermoonstronghold, feralas, gadgetzan, tanaris, aeriepeak, thehinterlands, thoriumpoint, searinggorge, swampofsorrows, icepointrock, lapidisisle, lapidis, stormwind, ironforge, darnassus, alahthalasarrival");
+    loadRangePool(0, 5, "BotLevelBrackets.Alliance.Range6.Locations", "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, felwood, morgansvigil, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, azshara, silithus, cenarionhold, telabim, stormwind, ironforge, darnassus, alahthalasarrival");
+    loadRangePool(0, 6, "BotLevelBrackets.Alliance.Range7.Locations", "stormwind, ironforge, darnassus, alahthalasarrival, lightshopechapel, silithus, cenarionhold, winterspring, everlook, westernplaguelands, burningsteppes, morgansvigil, thoriumpoint, ungorocrater");
 
-    loadRangePool(1, 0, "BotLevelBrackets.Horde.Range1.Locations", "valleyoftrials");
-    loadRangePool(1, 1, "BotLevelBrackets.Horde.Range2.Locations", "thecrossroads, silverpineforest, razorhill");
-    loadRangePool(1, 2, "BotLevelBrackets.Horde.Range3.Locations", "camptaurajo, tarrenmill, ashenvale, stonetalonmountains, balorhorde");
-    loadRangePool(1, 3, "BotLevelBrackets.Horde.Range4.Locations", "gromgol, hammerfall, ghostwalker, freewindpost, kargath, gilneas");
-    loadRangePool(1, 4, "BotLevelBrackets.Horde.Range5.Locations", "campmojache, gadgetzan, hinterlands, stonard, icepointrock, lapidisisle");
-    loadRangePool(1, 5, "BotLevelBrackets.Horde.Range6.Locations", "ungoro, lightshopechapel, westernplaguelands, winterspring, felwood, flamecrest, thoriumpoint, silithus, telabim");
-    loadRangePool(1, 6, "BotLevelBrackets.Horde.Range7.Locations", "lightshopechapel, silithus, winterspring, ungoro, orgrimmar");
+    loadRangePool(1, 0, "BotLevelBrackets.Horde.Range1.Locations", "valleyoftrials, razorhill, senjinvillage, deathknell, brill, campnarache, bloodhoofvillage, redcloud, blackstone, orgrimmar, undercity, thunderbluff, sparkwater");
+    loadRangePool(1, 1, "BotLevelBrackets.Horde.Range2.Locations", "thecrossroads, barrens, silverpineforest, thesepulcher, razorhill, orgrimmar, undercity, thunderbluff, sparkwater");
+    loadRangePool(1, 2, "BotLevelBrackets.Horde.Range3.Locations", "camptaurajo, thecrossroads, splintertreepost, ashenvale, zoramgaroutpost, sunrockretreat, stonetalonmountains, tarrenmill, thesepulcher, balorhorde, orgrimmar, undercity, thunderbluff, sparkwater");
+    loadRangePool(1, 3, "BotLevelBrackets.Horde.Range4.Locations", "hammerfall, arathihighlands, alteracmountains, gromgolbasecamp, stranglethornvale, bootybay, ghostwalkerpost, desolace, brackenwallvillage, dustwallowmarsh, freewindpost, thousandneedles, kargath, badlands, stonard, swampofsorrows, gilneas, gilneascity, orgrimmar, undercity, thunderbluff, sparkwater");
+    loadRangePool(1, 4, "BotLevelBrackets.Horde.Range5.Locations", "campmojache, feralas, gadgetzan, tanaris, revantuskvillage, thehinterlands, kargath, badlands, thoriumpoint, searinggorge, stonard, swampofsorrows, icepointrock, lapidisisle, lapidis, orgrimmar, undercity, thunderbluff, sparkwater");
+    loadRangePool(1, 5, "BotLevelBrackets.Horde.Range6.Locations", "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, bloodvenompost, felwood, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, valormok, azshara, silithus, cenarionhold, telabim, orgrimmar, undercity, thunderbluff, sparkwater");
+    loadRangePool(1, 6, "BotLevelBrackets.Horde.Range7.Locations", "orgrimmar, undercity, thunderbluff, sparkwater, lightshopechapel, silithus, cenarionhold, winterspring, everlook, westernplaguelands, flamecrest, thoriumpoint, ungorocrater, valormok");
 
     // 6. Social & Identity Protections
     prot.SetIgnoreFriendListed(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreFriendListed", true));

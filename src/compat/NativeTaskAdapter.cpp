@@ -1046,6 +1046,14 @@ bool NativeTaskAdapter::ResolveTeleportLocation(const std::string& input, Telepo
             return true;
         }
     }
+#else
+    outDest.mapId = 0;
+    outDest.x = 0.0f;
+    outDest.y = 0.0f;
+    outDest.z = 0.0f;
+    outDest.o = 0.0f;
+    outDest.name = token;
+    return true;
 #endif
 
     return false;
