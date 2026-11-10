@@ -384,7 +384,7 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
             float landingO = angle;
 
             // Cross-map dynamic floor height sampling (mod-twow-arrival-floor)
-            float landingZ = SampleFloorHeight(def->mapId, landingX, landingY, def->centerZ, 25.0f);
+            landingZ = SampleFloorHeight(def->mapId, landingX, landingY, def->centerZ, 25.0f);
 
             bot->TeleportTo(def->mapId, landingX, landingY, landingZ, landingO);
             RegisterArrivalFloor(bot, def->mapId, landingX, landingY, landingZ,
