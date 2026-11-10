@@ -156,6 +156,15 @@ public:
     bool IsTeleportOnLevelChange() const { return m_teleportOnLevelChange; }
     void SetTeleportOnLevelChange(bool val) { m_teleportOnLevelChange = val; }
 
+    bool IsArrivalFloorHoldEnabled() const { return m_arrivalFloorHoldEnabled; }
+    void SetArrivalFloorHoldEnabled(bool val) { m_arrivalFloorHoldEnabled = val; }
+
+    uint32_t GetArrivalHoldDurationMs() const { return m_arrivalHoldDurationMs; }
+    void SetArrivalHoldDurationMs(uint32_t val) { m_arrivalHoldDurationMs = val; }
+
+    uint32_t GetMaxFloorLifts() const { return m_maxFloorLifts; }
+    void SetMaxFloorLifts(uint32_t val) { m_maxFloorLifts = val; }
+
     bool IsStartingZoneDisperseEnabled() const { return m_startingZoneDisperseEnabled; }
     void SetStartingZoneDisperseEnabled(bool val) { m_startingZoneDisperseEnabled = val; }
 
@@ -229,6 +238,9 @@ private:
     uint32_t m_maxPendingQueueSize = 0;
     uint32_t m_pendingQueueTTL = 0;
     bool m_teleportOnLevelChange = true;
+    bool m_arrivalFloorHoldEnabled = true;
+    uint32_t m_arrivalHoldDurationMs = 5000;
+    uint32_t m_maxFloorLifts = 6;
 
     bool m_startingZoneDisperseEnabled = true;
     uint32_t m_startingZoneDisperseFrequency = 120;

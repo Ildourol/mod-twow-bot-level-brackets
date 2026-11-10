@@ -90,6 +90,13 @@ public:
     static bool IsInStarterValley(Player* bot);
     static bool IsOnWrongMap(Player* bot);
     static bool IsBotSafeForDispersal(Player* bot);
+
+    // Cross-Map Floor Sampling & Anti-Fall Arrival Floor Engine (mod-twow-arrival-floor)
+    static float SampleFloorHeight(uint32_t mapId, float x, float y, float initialZ, float searchRange = 50.0f);
+    static void RegisterArrivalFloor(Player* bot, uint32_t mapId, float x, float y, float z, uint32_t holdDurationMs = 5000);
+    static void RemoveArrivalFloor(ObjectGuid botGuid);
+    static uint32_t GetActiveArrivalFloorHolds();
+    static uint32_t GetArrivalLiftsCount();
 };
 
 } // namespace BotLevelBrackets

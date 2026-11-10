@@ -85,6 +85,9 @@ void PopulationPolicy::LoadDefaults()
     m_maxPendingQueueSize = 0;
     m_pendingQueueTTL = 0;
     m_teleportOnLevelChange = true;
+    m_arrivalFloorHoldEnabled = true;
+    m_arrivalHoldDurationMs = 5000;
+    m_maxFloorLifts = 6;
 
     m_startingZoneDisperseEnabled = true;
     m_startingZoneDisperseFrequency = 120;

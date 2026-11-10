@@ -176,6 +176,23 @@ BotLevelBrackets.LevelDistribution.PendingQueueTTL = 0
 # 1 = Enabled (Default), 0 = Disabled.
 BotLevelBrackets.TeleportOnLevelChange = 1
 
+#
+# WMO Floor Arrival Hold & Anti-Fall Engine (mod-twow-arrival-floor)
+# Prevents bots from falling through bridges, docks, and WMO gameobject floors upon arrival.
+# When enabled, samples cross-map dynamic floor height and monitors the bot's floor Z.
+# If a bot falls below the arrival floor during loading/streaming, it is instantly lifted back.
+# 1 = Enabled (Default), 0 = Disabled.
+#
+BotLevelBrackets.Teleport.ArrivalFloorHold = 1
+
+# Duration (in milliseconds) to hold and monitor the bot's floor Z after teleporting.
+# Default: 5000 ms (5 seconds).
+BotLevelBrackets.Teleport.ArrivalHoldDurationMs = 5000
+
+# Maximum number of lift corrections permitted per teleport arrival.
+# Default: 6.
+BotLevelBrackets.Teleport.MaxFloorLifts = 6
+
 ###################################################################################################
 # STARTING ZONE & WRONG MAP DISPERSAL
 ###################################################################################################

@@ -125,6 +125,9 @@ void LoadModuleConfiguration()
     policy.SetMaxPendingQueueSize(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.MaxPendingQueueSize", 0)));
     policy.SetPendingQueueTTL(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.PendingQueueTTL", 0)));
     policy.SetTeleportOnLevelChange(sConfig.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true));
+    policy.SetArrivalFloorHoldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Teleport.ArrivalFloorHold", true));
+    policy.SetArrivalHoldDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Teleport.ArrivalHoldDurationMs", 5000)));
+    policy.SetMaxFloorLifts(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Teleport.MaxFloorLifts", 6)));
 
     // Starting-Zone and Wrong-Map Dispersal Settings
     policy.SetStartingZoneDisperseEnabled(sConfig.GetBoolDefault("BotLevelBrackets.StartingZoneDisperse.Enabled", true));
@@ -340,6 +343,7 @@ public:
 
         uint32_t guidLow = player->GetObjectGuid().GetCounter();
         LevelDistributionManager::Instance().RemoveBot(guidLow);
+        NativeTaskAdapter::RemoveArrivalFloor(player->GetObjectGuid());
         const LedgerEntry* active = RequestLedger::Instance().GetActiveEntryForBot(guidLow);
         if (active)
         {

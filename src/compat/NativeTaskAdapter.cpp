@@ -8,6 +8,8 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Maps/Map.h"
+#include "Maps/MapManager.h"
+#include "Movement/MovementPacketSender.h"
 #include "Movement/MotionMaster.h"
 #include "runtime/BotActivityLease.h"
 #include "runtime/BotManager.h"
@@ -208,10 +210,87 @@ static std::unordered_map<ObjectGuid, CityVisitRecord> s_cityVisits;
 static std::mutex s_cityVisitsMutex;
 static uint64_t s_nextCityRequestId = 1;
 
+// -----------------------------------------------------------------------------
+// ARRIVAL FLOOR & ANTI-FALL ENGINE (mod-twow-arrival-floor)
+// -----------------------------------------------------------------------------
+struct ArrivalFloorEntry
+{
+    ObjectGuid botGuid;
+    uint32_t mapId = 0;
+    float arrivalX = 0.0f;
+    float arrivalY = 0.0f;
+    float arrivalZ = 0.0f;
+    uint32_t arrivedAt = 0;
+    uint32_t holdDurationMs = 5000;
+    uint32_t lifts = 0;
+};
+
+static std::unordered_map<ObjectGuid, ArrivalFloorEntry> s_arrivalFloors;
+static std::mutex s_arrivalFloorMutex;
+static std::atomic<uint32_t> s_statsArrivalLifts{0};
+
+float NativeTaskAdapter::SampleFloorHeight(uint32_t mapId, float x, float y, float initialZ, float searchRange)
+{
+    Map* map = sMapMgr.FindMap(mapId);
+    if (!map)
+        return initialZ;
+
+    float sampledZ = map->GetHeight(x, y, initialZ + 2.0f, true, searchRange);
+    if (sampledZ > -2000.0f && std::abs(sampledZ - initialZ) <= searchRange)
+        return sampledZ;
+
+    return initialZ;
+}
+
+void NativeTaskAdapter::RegisterArrivalFloor(Player* bot, uint32_t mapId, float x, float y, float z, uint32_t holdDurationMs)
+{
+    if (!bot)
+        return;
+
+    if (!PopulationPolicy::Instance().IsArrivalFloorHoldEnabled())
+        return;
+
+    ArrivalFloorEntry entry;
+    entry.botGuid = bot->GetObjectGuid();
+    entry.mapId = mapId;
+    entry.arrivalX = x;
+    entry.arrivalY = y;
+    entry.arrivalZ = z;
+    entry.arrivedAt = static_cast<uint32_t>(time(nullptr));
+    entry.holdDurationMs = holdDurationMs;
+    entry.lifts = 0;
+
+    std::lock_guard<std::mutex> lock(s_arrivalFloorMutex);
+    s_arrivalFloors[bot->GetObjectGuid()] = entry;
+}
+
+void NativeTaskAdapter::RemoveArrivalFloor(ObjectGuid botGuid)
+{
+    std::lock_guard<std::mutex> lock(s_arrivalFloorMutex);
+    s_arrivalFloors.erase(botGuid);
+}
+
+uint32_t NativeTaskAdapter::GetActiveArrivalFloorHolds()
+{
+    std::lock_guard<std::mutex> lock(s_arrivalFloorMutex);
+    return static_cast<uint32_t>(s_arrivalFloors.size());
+}
+
+uint32_t NativeTaskAdapter::GetArrivalLiftsCount()
+{
+    return s_statsArrivalLifts.load(std::memory_order_relaxed);
+}
+
 void NativeTaskAdapter::Clear()
 {
-    std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
-    s_cityVisits.clear();
+    {
+        std::lock_guard<std::mutex> lock(s_cityVisitsMutex);
+        s_cityVisits.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(s_arrivalFloorMutex);
+        s_arrivalFloors.clear();
+    }
 }
 
 void NativeTaskAdapter::ApplyCityArrivalProtocol(Player* bot, CityId cityId)
@@ -304,14 +383,12 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
             float landingZ = def->centerZ;
             float landingO = angle;
 
-            if (bot->GetMapId() == def->mapId && bot->GetMap())
-            {
-                float h = bot->GetMap()->GetHeight(landingX, landingY, landingZ + 2.0f, true, 50.0f);
-                if (h > -2000.0f && std::abs(h - def->centerZ) < 10.0f)
-                    landingZ = h;
-            }
+            // Cross-map dynamic floor height sampling (mod-twow-arrival-floor)
+            float landingZ = SampleFloorHeight(def->mapId, landingX, landingY, def->centerZ, 25.0f);
 
             bot->TeleportTo(def->mapId, landingX, landingY, landingZ, landingO);
+            RegisterArrivalFloor(bot, def->mapId, landingX, landingY, landingZ,
+                                 PopulationPolicy::Instance().GetArrivalHoldDurationMs());
             rec.state = CityVisitRecord::Traveling;
             rec.arrivedAt = 0;
             rec.lastPulseAt = 0;
@@ -546,6 +623,76 @@ void NativeTaskAdapter::Update(uint32_t diff)
         }
 
         ++it;
+    }
+
+    // -------------------------------------------------------------------------
+    // ArrivalFloor Anti-Fall & WMO Floor Hold Engine (mod-twow-arrival-floor)
+    // -------------------------------------------------------------------------
+    if (PopulationPolicy::Instance().IsArrivalFloorHoldEnabled())
+    {
+        std::vector<ObjectGuid> expiredOrMoved;
+        {
+            std::lock_guard<std::mutex> lock(s_arrivalFloorMutex);
+            for (auto& pair : s_arrivalFloors)
+            {
+                ArrivalFloorEntry& entry = pair.second;
+                Player* bot = sObjectAccessor.FindPlayer(entry.botGuid);
+                if (!bot || !bot->IsInWorld() || !bot->IsAlive() || (bot->GetSession() && bot->GetSession()->isLogingOut()))
+                {
+                    expiredOrMoved.push_back(pair.first);
+                    continue;
+                }
+
+                if (bot->IsBeingTeleported())
+                    continue;
+
+                if (bot->GetMapId() != entry.mapId)
+                {
+                    if (now - entry.arrivedAt > 30)
+                        expiredOrMoved.push_back(pair.first);
+                    continue;
+                }
+
+                uint32_t holdSec = entry.holdDurationMs / 1000;
+                if (holdSec == 0)
+                    holdSec = 5;
+                if (now - entry.arrivedAt >= holdSec)
+                {
+                    expiredOrMoved.push_back(pair.first);
+                    continue;
+                }
+
+                float dx = bot->GetPositionX() - entry.arrivalX;
+                float dy = bot->GetPositionY() - entry.arrivalY;
+                if ((dx * dx + dy * dy) > 0.5f * 0.5f)
+                {
+                    // Bot moved intentionally away from arrival spot: release hold
+                    expiredOrMoved.push_back(pair.first);
+                    continue;
+                }
+
+                if (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_JUMPING))
+                {
+                    expiredOrMoved.push_back(pair.first);
+                    continue;
+                }
+
+                // Anti-fall check: bot dropped below arrival floor Z by more than 0.3 yards
+                float currentZ = bot->GetPositionZ();
+                if (currentZ < entry.arrivalZ - 0.3f && entry.lifts < PopulationPolicy::Instance().GetMaxFloorLifts())
+                {
+                    bot->NearTeleportTo(entry.arrivalX, entry.arrivalY, entry.arrivalZ, bot->GetOrientation());
+                    MovementPacketSender::SendTeleportToObservers(bot, entry.arrivalX, entry.arrivalY, entry.arrivalZ, bot->GetOrientation());
+                    entry.lifts++;
+                    s_statsArrivalLifts.fetch_add(1, std::memory_order_relaxed);
+                }
+            }
+
+            for (const auto& guid : expiredOrMoved)
+            {
+                s_arrivalFloors.erase(guid);
+            }
+        }
     }
 }
 
@@ -863,7 +1010,10 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
         {
             if (bot->IsMounted())
                 bot->Unmount();
-            bot->TeleportTo(racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, racialDest.o);
+            float landingZ = SampleFloorHeight(racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, 25.0f);
+            bot->TeleportTo(racialDest.mapId, racialDest.x, racialDest.y, landingZ, racialDest.o);
+            RegisterArrivalFloor(bot, racialDest.mapId, racialDest.x, racialDest.y, landingZ,
+                                 PopulationPolicy::Instance().GetArrivalHoldDurationMs());
             return true;
         }
     }
@@ -874,7 +1024,10 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
     if (bot->IsMounted())
         bot->Unmount();
 
-    bot->TeleportTo(dest.mapId, dest.x, dest.y, dest.z, dest.o);
+    float landingZ = SampleFloorHeight(dest.mapId, dest.x, dest.y, dest.z, 25.0f);
+    bot->TeleportTo(dest.mapId, dest.x, dest.y, landingZ, dest.o);
+    RegisterArrivalFloor(bot, dest.mapId, dest.x, dest.y, landingZ,
+                         PopulationPolicy::Instance().GetArrivalHoldDurationMs());
     return true;
 }
 

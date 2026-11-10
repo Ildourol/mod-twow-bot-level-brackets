@@ -260,6 +260,12 @@ bool BotBracketsCommands::HandleStats(ChatHandler* handler)
         static_cast<unsigned long long>(distMgr.GetTotalDispersedWrongMap()));
     handler->PSendSysMessage("Pending Reset Queue Size: %u",
         static_cast<uint32_t>(distMgr.GetPendingQueueSize()));
+
+    handler->SendSysMessage("=== Arrival Floor & Anti-Fall Telemetry ===");
+    handler->PSendSysMessage("Active Arrival Floor Holds: %u",
+        static_cast<uint32_t>(NativeTaskAdapter::GetActiveArrivalFloorHolds()));
+    handler->PSendSysMessage("Total Anti-Fall Floor Lifts Performed: %u",
+        static_cast<uint32_t>(NativeTaskAdapter::GetArrivalLiftsCount()));
     return true;
 }
 
