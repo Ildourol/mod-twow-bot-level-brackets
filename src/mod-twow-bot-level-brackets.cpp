@@ -300,7 +300,6 @@ public:
 
         LoadModuleConfiguration();
         ProtectionCache::Instance().Initialize();
-        LevelDistributionManager::Instance().Initialize();
     }
 
     void OnAfterConfigLoad(bool reload) override
