@@ -148,7 +148,7 @@ BotLevelBrackets.Enabled = 1
 BotLevelBrackets.Orchestration.DryRun = 0
 
 # Cadence & Limits
-BotLevelBrackets.Orchestration.CheckSeconds = 60
+BotLevelBrackets.Orchestration.CheckSeconds = 90
 BotLevelBrackets.Orchestration.MaxRequestsPerCycle = 5
 BotLevelBrackets.Orchestration.MaxOutstandingPerFaction = 10
 BotLevelBrackets.Orchestration.MaxLooseRequestsPerCycle = 1
@@ -161,19 +161,19 @@ BotLevelBrackets.City.DestinationPolicy = RequireExact
 BotLevelBrackets.City.QuotaMode = 2
 BotLevelBrackets.City.TransitMode = 2
 BotLevelBrackets.City.PickAllBrackets = 1
-BotLevelBrackets.City.DwellDurationMs = 180000
-BotLevelBrackets.City.MinDwellDurationMs = 180000
+BotLevelBrackets.City.DwellDurationMs = 300000
+BotLevelBrackets.City.MinDwellDurationMs = 300000
 BotLevelBrackets.City.MaxDwellDurationMs = 600000
 BotLevelBrackets.City.MaxBotsPerCity = 60
 
-# Capital Targets (% of faction bots: 39% total across capitals, 61% outdoors)
-BotLevelBrackets.City.StormwindTarget = 15
-BotLevelBrackets.City.IronforgeTarget = 12
+# Capital Targets (% of faction bots: 30% total across capitals, 70% outdoors)
+BotLevelBrackets.City.StormwindTarget = 10
+BotLevelBrackets.City.IronforgeTarget = 8
 BotLevelBrackets.City.DarnassusTarget = 6
 BotLevelBrackets.City.AlahThalasTarget = 6
 
-BotLevelBrackets.City.OrgrimmarTarget = 15
-BotLevelBrackets.City.UndercityTarget = 12
+BotLevelBrackets.City.OrgrimmarTarget = 10
+BotLevelBrackets.City.UndercityTarget = 8
 BotLevelBrackets.City.ThunderBluffTarget = 6
 BotLevelBrackets.City.SparkwaterTarget = 6
 

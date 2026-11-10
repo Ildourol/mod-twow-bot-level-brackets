@@ -32,7 +32,7 @@ void PopulationPolicy::LoadDefaults()
     m_cityDestPolicy = DestinationPolicy::RequireExact;
     m_worldDestPolicy = DestinationPolicy::RequireExact;
 
-    m_checkSeconds = 60;
+    m_checkSeconds = 90;
     m_maxRequestsPerCycle = 5;
     m_maxOutstandingPerFaction = 10;
     m_maxLooseRequestsPerCycle = 1;
@@ -42,8 +42,8 @@ void PopulationPolicy::LoadDefaults()
     m_dispatchTimeoutSeconds = 30;
     m_earlyDepartureBackoffSeconds = 3600;
     m_fieldReservePct = 70;
-    m_cityDwellDurationMs = 180000;
-    m_cityMinDwellDurationMs = 180000;
+    m_cityDwellDurationMs = 300000;
+    m_cityMinDwellDurationMs = 300000;
     m_cityMaxDwellDurationMs = 600000;
     m_cityTransitMode = TransitMode::Travel;
     m_cityPickAllBrackets = true;
@@ -57,7 +57,7 @@ void PopulationPolicy::LoadDefaults()
     m_cityMaxBots = 60;
     m_cityHysteresis = 2;
 
-    int32_t defaults[8] = { 15, 12, 6, 6, 15, 12, 6, 6 };
+    int32_t defaults[8] = { 10, 8, 6, 6, 10, 8, 6, 6 };
     for (size_t i = 0; i < 8; ++i)
         m_cityTargets[i] = defaults[i];
 

@@ -199,7 +199,7 @@ struct CityVisitRecord
     uint32_t requestedAt = 0;
     uint32_t arrivedAt = 0;
     uint32_t lastPulseAt = 0;
-    uint32_t minDwellDurationMs = 180000;
+    uint32_t minDwellDurationMs = 300000;
     uint32_t maxDwellDurationMs = 600000;
     TransitMode transitMode = TransitMode::Travel;
     uint32_t configGeneration = 0;
