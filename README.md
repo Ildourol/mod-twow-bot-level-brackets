@@ -144,27 +144,39 @@ Key configuration parameters in `mod_twow_bot_level_brackets.conf`:
 # Master enable switch
 BotLevelBrackets.Enabled = 1
 
-# DryRun Simulation Mode
-BotLevelBrackets.Orchestration.DryRun = 0
+# Level Distribution & Rebalancing
+BotLevelBrackets.LevelDistribution.Enabled = 1
+BotLevelBrackets.LevelDistribution.CheckFrequency = 300
+BotLevelBrackets.TeleportOnLevelChange = 1
+BotLevelBrackets.StartingZoneDisperse.Enabled = 1
+BotLevelBrackets.WrongMapDisperse.Enabled = 1
 
-# Cadence & Limits
-BotLevelBrackets.Orchestration.CheckSeconds = 90
-BotLevelBrackets.Orchestration.MaxRequestsPerCycle = 5
-BotLevelBrackets.Orchestration.MaxOutstandingPerFaction = 10
-BotLevelBrackets.Orchestration.MaxLooseRequestsPerCycle = 1
-BotLevelBrackets.Orchestration.RequestCooldownSeconds = 1800
-BotLevelBrackets.Orchestration.RejectionBackoffSeconds = 600
+# Level Bracket Percentages (Must sum to 100%)
+# Alliance Brackets 1-7 (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60):
+BotLevelBrackets.Alliance.Range1.Pct = 16
+BotLevelBrackets.Alliance.Range2.Pct = 14
+BotLevelBrackets.Alliance.Range3.Pct = 14
+BotLevelBrackets.Alliance.Range4.Pct = 14
+BotLevelBrackets.Alliance.Range5.Pct = 14
+BotLevelBrackets.Alliance.Range6.Pct = 14
+BotLevelBrackets.Alliance.Range7.Pct = 14
+
+# Horde Brackets 1-7 (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60):
+BotLevelBrackets.Horde.Range1.Pct = 16
+BotLevelBrackets.Horde.Range2.Pct = 14
+BotLevelBrackets.Horde.Range3.Pct = 14
+BotLevelBrackets.Horde.Range4.Pct = 14
+BotLevelBrackets.Horde.Range5.Pct = 14
+BotLevelBrackets.Horde.Range6.Pct = 14
+BotLevelBrackets.Horde.Range7.Pct = 14
 
 # City Orchestration
 BotLevelBrackets.City.Enabled = 1
-BotLevelBrackets.City.DestinationPolicy = RequireExact
-BotLevelBrackets.City.QuotaMode = 2
 BotLevelBrackets.City.TransitMode = 2
-BotLevelBrackets.City.PickAllBrackets = 1
-BotLevelBrackets.City.DwellDurationMs = 300000
-BotLevelBrackets.City.MinDwellDurationMs = 300000
-BotLevelBrackets.City.MaxDwellDurationMs = 600000
 BotLevelBrackets.City.MaxBotsPerCity = 60
+BotLevelBrackets.City.PickAllBrackets = 1
+BotLevelBrackets.City.MinLevel = 1
+BotLevelBrackets.City.DwellDurationMs = 300000
 
 # Capital Targets (% of faction bots: 30% total across capitals, 70% outdoors)
 BotLevelBrackets.City.StormwindTarget = 10
@@ -179,19 +191,17 @@ BotLevelBrackets.City.SparkwaterTarget = 6
 
 # Outdoor World Distribution & Field Reserve (1 = enabled, outdoor bots follow 100% native TortoiseBots AI)
 BotLevelBrackets.World.Enabled = 1
-BotLevelBrackets.World.DestinationPolicy = RequireExact
 BotLevelBrackets.World.FieldReservePct = 70
 
-# Social Protections
+# Social & Identity Protections
 BotLevelBrackets.Protection.IgnoreFriendListed = 1
 BotLevelBrackets.Protection.IgnoreRealPlayerGuilds = 1
 BotLevelBrackets.Protection.IgnoreArenaTeams = 1
-BotLevelBrackets.Protection.SocialRefreshSeconds = 300
+BotLevelBrackets.Protection.ExcludedBotNames = ""
 
-# Diagnostic Logging & Rate Limiting
+# Activity Registry & Diagnostics
+BotLevelBrackets.Activities.Enabled = 1
 BotLevelBrackets.Debug.Mode = Off
-BotLevelBrackets.Debug.MaxEventsPerSecond = 50
-BotLevelBrackets.Debug.RingBufferEvents = 2000
 ```
 
 ---
@@ -223,7 +233,7 @@ All commands require `SEC_MODERATOR` or `SEC_ADMINISTRATOR` permissions:
 The module includes an automated validation suite in `tests/`:
 
 ```bash
-# 1. Verify 45 configuration defaults match the shipped template
+# 1. Verify 42 configuration defaults match the shipped template
 python tests/test_config_defaults.py
 
 # 2. Verify quota apportionment math and hysteresis deadbands

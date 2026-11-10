@@ -8,142 +8,6 @@
 # 1 = Enabled, 0 = Disabled
 BotLevelBrackets.Enabled = 1
 
-# DryRun Simulation Mode
-# 1 = Evaluates eligibility and logs simulated proposals without calling native gameplay APIs.
-# 0 = Normal production execution.
-BotLevelBrackets.Orchestration.DryRun = 0
-
-# Cadence for the unified scheduling coordinator (in seconds).
-# Default: 90 seconds.
-BotLevelBrackets.Orchestration.CheckSeconds = 90
-
-# Maximum new task requests submitted in a single scheduling pass.
-# Default: 5.
-BotLevelBrackets.Orchestration.MaxRequestsPerCycle = 5
-
-# Maximum outstanding (proposed/submitted/accepted) requests permitted concurrently per faction.
-# Default: 10.
-BotLevelBrackets.Orchestration.MaxOutstandingPerFaction = 10
-
-# Maximum loose requests (AllowNativeChoice mode) per cycle.
-# Default: 1.
-BotLevelBrackets.Orchestration.MaxLooseRequestsPerCycle = 1
-
-# Repeat-request cooldown for a bot after completing an orchestrated task (in seconds).
-# Default: 1800 (30 minutes).
-BotLevelBrackets.Orchestration.RequestCooldownSeconds = 1800
-
-# Backoff cooldown applied to a bot after a native request is rejected (in seconds).
-# Default: 600 (10 minutes).
-BotLevelBrackets.Orchestration.RejectionBackoffSeconds = 600
-
-# Required persistent deficit duration before issuing new requests to a destination (in seconds).
-# Default: 60 seconds.
-BotLevelBrackets.Orchestration.StabilitySeconds = 60
-
-# Timeout after which an unconfirmed native dispatch proposal expires (in seconds).
-# Default: 30 seconds.
-BotLevelBrackets.Orchestration.DispatchTimeoutSeconds = 30
-
-# Cooldown applied when a bot leaves a destination prematurely (in seconds).
-# Default: 3600 (1 hour).
-BotLevelBrackets.Orchestration.EarlyDepartureBackoffSeconds = 3600
-
-###################################################################################################
-# CITY ORCHESTRATION (RACIAL CAPITALS)
-###################################################################################################
-
-# Enable city visit orchestration.
-# 1 = Enabled, 0 = Disabled.
-BotLevelBrackets.City.Enabled = 1
-
-# Destination honesty policy for cities.
-# RequireExact: Only issues requests when the target city is guaranteed by the native API.
-# AllowNativeChoice: Permits native task requests where the engine selects the target settlement.
-BotLevelBrackets.City.DestinationPolicy = RequireExact
-
-# City Quota Calculation Mode
-# 1 = Fixed headcounts per city
-# 2 = Percentage of total online faction bots (Default)
-BotLevelBrackets.City.QuotaMode = 2
-
-# City Population Bounds Toggles
-BotLevelBrackets.City.MinLimitEnabled = 0
-BotLevelBrackets.City.MaxLimitEnabled = 1
-
-# Units for city bounds (1 = absolute headcount, 2 = percentage)
-BotLevelBrackets.City.LimitsMode = 1
-
-# Minimum and Maximum bots per city
-BotLevelBrackets.City.MinBotsPerCity = 0
-BotLevelBrackets.City.MaxBotsPerCity = 60
-
-# Hysteresis deadband before acting on population imbalance
-BotLevelBrackets.City.HysteresisBots = 2
-
-# City Transit Mode
-# 1 = Travel / Directions (Default - bot receives travel directions to walk/use flight paths to the city)
-# 2 = Teleport (Directly teleports the bot to the city center upon request, as in previous versions)
-BotLevelBrackets.City.TransitMode = 2
-
-# Pick bots from all level brackets for city visits (1 = Enabled, 0 = Distance-only bias).
-# When enabled, candidates are selected across all level brackets (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60),
-# ensuring high-level bots visit capital cities alongside low-level bots.
-BotLevelBrackets.City.PickAllBrackets = 1
-
-# Minimum level required for a bot to be eligible for a capital city visit.
-# Default: 1 (allowing bots from all brackets 1-7 to visit capital cities)
-BotLevelBrackets.City.MinLevel = 1
-
-# Desired dwell duration for bots visiting a city (in milliseconds).
-# Default: 300000 (5 minutes).
-BotLevelBrackets.City.DwellDurationMs = 300000
-
-# Minimum dwell duration before bot may finish errands and depart (in milliseconds).
-# Default: 300000 (5 minutes).
-BotLevelBrackets.City.MinDwellDurationMs = 300000
-
-# Maximum dwell duration before bot is unconditionally released to open world (in milliseconds).
-# Default: 600000 (10 minutes).
-BotLevelBrackets.City.MaxDwellDurationMs = 600000
-
-# Configured Target Allocation for Racial Capitals (% of faction bots):
-# Alliance: Stormwind (10%), Ironforge (8%), Darnassus (6%), Alah'Thalas (6%) -> Total: 30%
-# Horde: Orgrimmar (10%), Undercity (8%), Thunder Bluff (6%), Sparkwater Port (6%) -> Total: 30%
-BotLevelBrackets.City.StormwindTarget = 10
-BotLevelBrackets.City.IronforgeTarget = 8
-BotLevelBrackets.City.DarnassusTarget = 6
-BotLevelBrackets.City.AlahThalasTarget = 6
-
-BotLevelBrackets.City.OrgrimmarTarget = 10
-BotLevelBrackets.City.UndercityTarget = 8
-BotLevelBrackets.City.ThunderBluffTarget = 6
-BotLevelBrackets.City.SparkwaterTarget = 6
-
-# Capital City Bank Landing Tiles (Hardcoded Engine Tables)
-# All 8 capital cities (Stormwind, Ironforge, Darnassus, Alah'Thalas, Orgrimmar,
-# Undercity, Thunder Bluff, Sparkwater Port) land directly inside their main bank
-# with ground height sampling and a 1.0 - 2.5 yard dispersion offset by default.
-# Optional overrides can be added if desired:
-#   BotLevelBrackets.City.<City>.Location = "location_name_or_coords"
-
-###################################################################################################
-# OUTDOOR WORLD DISTRIBUTION
-###################################################################################################
-
-# Enable outdoor activity encouragement.
-# 1 = Enabled, 0 = Disabled (Default: 1).
-BotLevelBrackets.World.Enabled = 1
-
-# Destination policy for outdoor tasks.
-# RequireExact: Requires exact region parameter (Honest missing control).
-# AllowNativeChoice: Allows native AI to pick quest/grind/gather locations.
-BotLevelBrackets.World.DestinationPolicy = RequireExact
-
-# Percentage of bot population reserved for the open world (field reserve).
-# Default: 70%.
-BotLevelBrackets.World.FieldReservePct = 70
-
 ###################################################################################################
 # LEVEL DISTRIBUTION & BOOST ENGINE
 ###################################################################################################
@@ -156,183 +20,103 @@ BotLevelBrackets.LevelDistribution.Enabled = 1
 # Default: 300 (5 minutes).
 BotLevelBrackets.LevelDistribution.CheckFrequency = 300
 
-# Cadence for processing queued/flagged bot level adjustments (in seconds).
-# Default: 15 seconds.
-BotLevelBrackets.LevelDistribution.CheckFlaggedFrequency = 15
-
-# Maximum number of flagged bots to level-adjust per tick.
-# Default: 5.
-BotLevelBrackets.LevelDistribution.FlaggedProcessLimit = 5
-
-# Minimum surplus bots in a bracket before redistribution moves bots out of it.
-# Default: 2.
-BotLevelBrackets.LevelDistribution.MinBracketChangeThreshold = 2
-
-# Maximum size of the in-memory pending reset queue (0 = unlimited).
-# Default: 0.
-BotLevelBrackets.LevelDistribution.MaxPendingQueueSize = 0
-
-# Maximum time a bot can remain in the in-memory pending reset queue (in seconds, 0 = no TTL).
-# Default: 0.
-BotLevelBrackets.LevelDistribution.PendingQueueTTL = 0
-
 # Teleport on level adjustment:
 # When enabled, bots are safely dismounted and teleported to their leveling zone
 # or native racial starter valley after their level is adjusted.
 # 1 = Enabled (Default), 0 = Disabled.
 BotLevelBrackets.TeleportOnLevelChange = 1
 
-#
-# WMO Floor Arrival Hold & Anti-Fall Engine (mod-twow-arrival-floor)
-# Prevents bots from falling through bridges, docks, and WMO gameobject floors upon arrival.
-# When enabled, samples cross-map dynamic floor height and monitors the bot's floor Z.
-# If a bot falls below the arrival floor during loading/streaming, it is instantly lifted back.
-# 1 = Enabled (Default), 0 = Disabled.
-#
-BotLevelBrackets.Teleport.ArrivalFloorHold = 1
-
-# Duration (in milliseconds) to hold and monitor the bot's floor Z after teleporting.
-# Default: 5000 ms (5 seconds).
-BotLevelBrackets.Teleport.ArrivalHoldDurationMs = 5000
-
-# Maximum number of lift corrections permitted per teleport arrival.
-# Default: 6.
-BotLevelBrackets.Teleport.MaxFloorLifts = 6
-
-###################################################################################################
-# STARTING ZONE & WRONG MAP DISPERSAL
-###################################################################################################
-
-# Enable automatic evacuation of over-leveled bots (> Level 9) from the 8 starter valleys
-# (Northshire, Coldridge, Shadowglen, Thalassian Highlands, Valley of Trials, Red Cloud Mesa, Deathknell, Blackstone Island).
+# Enable automatic evacuation of over-leveled bots (> Level 9) from the 8 starter valleys.
 # 1 = Enabled, 0 = Disabled.
 BotLevelBrackets.StartingZoneDisperse.Enabled = 1
-
-# Frequency (in seconds) at which starting-zone dispersal runs.
-# Default: 15 seconds (matching responsive WotLK baseline).
-BotLevelBrackets.StartingZoneDisperse.Frequency = 15
 
 # Enable automatic evacuation of bots stranded on invalid or non-continental maps.
 # 1 = Enabled, 0 = Disabled.
 BotLevelBrackets.WrongMapDisperse.Enabled = 1
 
-# Frequency (in seconds) at which wrong-map dispersal runs.
-# Default: 60 seconds (matching responsive WotLK baseline).
-BotLevelBrackets.WrongMapDisperse.Frequency = 60
-
 ###################################################################################################
-# LEVEL & POPULATION POLICIES
-###################################################################################################
-
-# Dynamic Human Weighting
-# When enabled, adjusts target bracket weights based on active human player levels.
-BotLevelBrackets.LevelPolicy.UseDynamic = 0
-BotLevelBrackets.LevelPolicy.HumanWeight = 1.0
-BotLevelBrackets.LevelPolicy.SyncFactions = 0
-
-###################################################################################################
-# LEVEL BRACKET DEFINITIONS
+# LEVEL BRACKET DISTRIBUTION (PERCENTAGES)
+# Configure what percentage of faction bots should be in each level bracket (must sum to 100%).
+# Canonical Vanilla Brackets:
+#   Range 1: Levels  1-9
+#   Range 2: Levels 10-19
+#   Range 3: Levels 20-29
+#   Range 4: Levels 30-39
+#   Range 5: Levels 40-49
+#   Range 6: Levels 50-59
+#   Range 7: Level  60
 ###################################################################################################
 
-#
-# BotLevelBrackets.NumRanges
-# Number of level brackets configured. Default for Vanilla (1-60) is 7 ranges.
-# Default: 7
-#
-BotLevelBrackets.NumRanges = 7
-
-#
-# Alliance Level Brackets Configuration (Percentages must sum to 100)
-# Default distribution: 1-9 (16%), 10-19 (14%), 20-29 (14%), 30-39 (14%), 40-49 (14%), 50-59 (14%), 60-60 (14%)
-#
-BotLevelBrackets.Alliance.Range1.Lower = 1
-BotLevelBrackets.Alliance.Range1.Upper = 9
+# Alliance Level Distribution (% of Alliance bots in each bracket):
 BotLevelBrackets.Alliance.Range1.Pct = 16
-
-BotLevelBrackets.Alliance.Range2.Lower = 10
-BotLevelBrackets.Alliance.Range2.Upper = 19
 BotLevelBrackets.Alliance.Range2.Pct = 14
-
-BotLevelBrackets.Alliance.Range3.Lower = 20
-BotLevelBrackets.Alliance.Range3.Upper = 29
 BotLevelBrackets.Alliance.Range3.Pct = 14
-
-BotLevelBrackets.Alliance.Range4.Lower = 30
-BotLevelBrackets.Alliance.Range4.Upper = 39
 BotLevelBrackets.Alliance.Range4.Pct = 14
-
-BotLevelBrackets.Alliance.Range5.Lower = 40
-BotLevelBrackets.Alliance.Range5.Upper = 49
 BotLevelBrackets.Alliance.Range5.Pct = 14
-
-BotLevelBrackets.Alliance.Range6.Lower = 50
-BotLevelBrackets.Alliance.Range6.Upper = 59
 BotLevelBrackets.Alliance.Range6.Pct = 14
-
-BotLevelBrackets.Alliance.Range7.Lower = 60
-BotLevelBrackets.Alliance.Range7.Upper = 60
 BotLevelBrackets.Alliance.Range7.Pct = 14
 
-#
-# Horde Level Brackets Configuration (Percentages must sum to 100)
-# Default distribution: 1-9 (16%), 10-19 (14%), 20-29 (14%), 30-39 (14%), 40-49 (14%), 50-59 (14%), 60-60 (14%)
-#
-BotLevelBrackets.Horde.Range1.Lower = 1
-BotLevelBrackets.Horde.Range1.Upper = 9
+# Horde Level Distribution (% of Horde bots in each bracket):
 BotLevelBrackets.Horde.Range1.Pct = 16
-
-BotLevelBrackets.Horde.Range2.Lower = 10
-BotLevelBrackets.Horde.Range2.Upper = 19
 BotLevelBrackets.Horde.Range2.Pct = 14
-
-BotLevelBrackets.Horde.Range3.Lower = 20
-BotLevelBrackets.Horde.Range3.Upper = 29
 BotLevelBrackets.Horde.Range3.Pct = 14
-
-BotLevelBrackets.Horde.Range4.Lower = 30
-BotLevelBrackets.Horde.Range4.Upper = 39
 BotLevelBrackets.Horde.Range4.Pct = 14
-
-BotLevelBrackets.Horde.Range5.Lower = 40
-BotLevelBrackets.Horde.Range5.Upper = 49
 BotLevelBrackets.Horde.Range5.Pct = 14
-
-BotLevelBrackets.Horde.Range6.Lower = 50
-BotLevelBrackets.Horde.Range6.Upper = 59
 BotLevelBrackets.Horde.Range6.Pct = 14
-
-BotLevelBrackets.Horde.Range7.Lower = 60
-BotLevelBrackets.Horde.Range7.Upper = 60
 BotLevelBrackets.Horde.Range7.Pct = 14
 
 ###################################################################################################
-# LEVELING ZONE & CAPITAL CITY DESTINATIONS (HARDCODED ENGINE TABLES)
-# Reference: https://turtle-wow.fandom.com/wiki/Zone_Level_Chart
+# CAPITAL CITY VISITS
 ###################################################################################################
-#
-# All leveling zone destinations, starter valleys, and capital city bank landing coordinates
-# are 100% hardcoded directly in C++ engine tables (NativeTaskAdapter.cpp & ReadOnlyCatalog.cpp):
-#
-# - Capital City Ladder (Bank Landing Tiles):
-#     Alliance: Stormwind, Ironforge, Darnassus, Alah'Thalas
-#     Horde:    Orgrimmar, Undercity, Thunder Bluff, Sparkwater Port
-#
-# - Leveling Zone Destinations (Strictly Open-World Questing Hubs & Wilderness):
-#     Bracket 1 (1-9):   Elwynn, Dun Morogh, Teldrassil, Thalassian Highlands / Durotar, Tirisfal, Mulgore, Blackstone
-#     Bracket 2 (10-19): Westfall, Loch Modan, Darkshore / Northern Barrens, Silverpine Forest, Razor Hill
-#     Bracket 3 (20-29): Redridge, Duskwood, Wetlands, Ashenvale, Stonetalon, Southshore, Balor / Taurajo, Tarren Mill
-#     Bracket 4 (30-39): Arathi, Alterac, STV, Desolace, Dustwallow, 1000 Needles, Badlands, Swamp of Sorrows, Gilneas
-#     Bracket 5 (40-49): Feralas, Tanaris, The Hinterlands, Searing Gorge, Blasted Lands, Azshara, Icepoint, Lapidis
-#     Bracket 6 (50-59): WPL, EPL, Light's Hope, Winterspring, Felwood, Burning Steppes, Un'Goro, Silithus, Tel'Abim, Hyjal
-#     Bracket 7 (60):    Western Plaguelands, Eastern Plaguelands, Light's Hope, Silithus, Winterspring, Burning Steppes
-#
-# Zero configuration required! The module runs autonomously off its built-in C++ tables.
-# If you wish to selectively override any destination pool, you can optionally add:
-#   BotLevelBrackets.Starter.<Race>.Locations = "location1, location2"
-#   BotLevelBrackets.Alliance.Range<1..7>.Locations = "location1, location2"
-#   BotLevelBrackets.Horde.Range<1..7>.Locations = "location1, location2"
-#   BotLevelBrackets.City.<City>.Location = "location_name_or_coords"
-#
+
+# Enable capital city visit orchestration.
+# 1 = Enabled, 0 = Disabled.
+BotLevelBrackets.City.Enabled = 1
+
+# City Transit Mode:
+# 1 = Travel / Walk (bot receives travel directions to walk or use flight paths)
+# 2 = Teleport (Directly teleports the bot to the city bank landing tile - Default)
+BotLevelBrackets.City.TransitMode = 2
+
+# Maximum bots permitted concurrently in any single capital city.
+# Default: 60.
+BotLevelBrackets.City.MaxBotsPerCity = 60
+
+# Pick bots from all level brackets for city visits (1 = Enabled, 0 = Distance-only bias).
+# When enabled, candidates are selected across all level brackets (1-9 through 60).
+BotLevelBrackets.City.PickAllBrackets = 1
+
+# Minimum level required for a bot to visit capital cities.
+# Default: 1 (allowing bots across all brackets 1-7 to visit capital cities).
+BotLevelBrackets.City.MinLevel = 1
+
+# Duration for bots to dwell in a city performing chores/errands before leaving (in milliseconds).
+# Default: 300000 (5 minutes).
+BotLevelBrackets.City.DwellDurationMs = 300000
+
+# Target Allocation for Alliance Capital Cities (% of Alliance bots visiting each city):
+BotLevelBrackets.City.StormwindTarget = 10
+BotLevelBrackets.City.IronforgeTarget = 8
+BotLevelBrackets.City.DarnassusTarget = 6
+BotLevelBrackets.City.AlahThalasTarget = 6
+
+# Target Allocation for Horde Capital Cities (% of Horde bots visiting each city):
+BotLevelBrackets.City.OrgrimmarTarget = 10
+BotLevelBrackets.City.UndercityTarget = 8
+BotLevelBrackets.City.ThunderBluffTarget = 6
+BotLevelBrackets.City.SparkwaterTarget = 6
+
+###################################################################################################
+# OUTDOOR WORLD DISTRIBUTION
+###################################################################################################
+
+# Enable outdoor activity encouragement / census tracking.
+# 1 = Enabled, 0 = Disabled.
+BotLevelBrackets.World.Enabled = 1
+
+# Percentage of total bot population reserved for the open world.
+# Default: 70%.
+BotLevelBrackets.World.FieldReservePct = 70
 
 ###################################################################################################
 # SOCIAL & IDENTITY PROTECTIONS
@@ -347,39 +131,20 @@ BotLevelBrackets.Protection.IgnoreRealPlayerGuilds = 1
 # Exclude bots belonging to active arena teams.
 BotLevelBrackets.Protection.IgnoreArenaTeams = 1
 
-# Cadence for refreshing social protection caches from the character database (in seconds).
-# Default: 300 seconds (5 minutes).
-BotLevelBrackets.Protection.SocialRefreshSeconds = 300
-
-# Cadence for refreshing the persistent guild tracker table from the character database (in seconds).
-# Default: 600 seconds (10 minutes).
-BotLevelBrackets.Protection.GuildTrackerUpdateSeconds = 600
-
-# Comma-separated list of bot names immune from module task orchestration.
+# Comma-separated list of specific bot names immune from module task orchestration.
 BotLevelBrackets.Protection.ExcludedBotNames = ""
-BotLevelBrackets.ExcludeNames = ""
 
 ###################################################################################################
 # ACTIVITY REGISTRY CONTROLS
 ###################################################################################################
 
-# Master toggle for activity registry controls and diagnostic telemetry (.blb activities).
-# When enabled (1), all 427 native bot activities from TortoiseBots are active in the registry.
-# 1 = Enabled (Default), 0 = Disabled.
+# Master toggle for native bot activities in the registry.
+# 1 = Enabled (Default, all native TortoiseBots actions active), 0 = Disabled.
 BotLevelBrackets.Activities.Enabled = 1
-
-# Rejection policy for unsupported activities (1 = fail validation on mismatch, 0 = soft fallback)
-BotLevelBrackets.Activities.RequireSupported = 0
 
 ###################################################################################################
 # DEBUGGING & DIAGNOSTICS
 ###################################################################################################
 
-# Debug output mode (Off, Summary, Trace, DryRun)
+# Debug output mode: Off, Summary, Trace, DryRun
 BotLevelBrackets.Debug.Mode = Off
-
-# Maximum diagnostic events logged per second
-BotLevelBrackets.Debug.MaxEventsPerSecond = 50
-
-# In-memory diagnostic ring buffer capacity
-BotLevelBrackets.Debug.RingBufferEvents = 2000

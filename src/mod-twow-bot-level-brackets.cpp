@@ -61,6 +61,11 @@ using namespace BotLevelBrackets;
 namespace
 {
 
+inline int GetInternalInt(const char* key, int def) { return sConfig.GetIntDefault(key, def); }
+inline bool GetInternalBool(const char* key, bool def) { return sConfig.GetBoolDefault(key, def); }
+inline float GetInternalFloat(const char* key, float def) { return sConfig.GetFloatDefault(key, def); }
+inline std::string GetInternalString(const char* key, const char* def) { return sConfig.GetStringDefault(key, def); }
+
 void LoadModuleConfiguration()
 {
     auto& policy = PopulationPolicy::Instance();
@@ -70,36 +75,36 @@ void LoadModuleConfiguration()
 
     // 1. Core Orchestration Settings
     policy.SetEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Enabled", true));
-    policy.SetDryRun(sConfig.GetBoolDefault("BotLevelBrackets.Orchestration.DryRun", false));
-    policy.SetCheckCadenceSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.CheckSeconds", 90)));
-    policy.SetMaxRequestsPerCycle(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.MaxRequestsPerCycle", 5)));
-    policy.SetMaxOutstandingPerFaction(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.MaxOutstandingPerFaction", 10)));
-    policy.SetMaxLooseRequestsPerCycle(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.MaxLooseRequestsPerCycle", 1)));
-    policy.SetRequestCooldownSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.RequestCooldownSeconds", 1800)));
-    policy.SetRejectionBackoffSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.RejectionBackoffSeconds", 600)));
-    policy.SetStabilitySeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.StabilitySeconds", 60)));
-    policy.SetDispatchTimeoutSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.DispatchTimeoutSeconds", 30)));
-    policy.SetEarlyDepartureBackoffSeconds(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Orchestration.EarlyDepartureBackoffSeconds", 3600)));
+    policy.SetDryRun(GetInternalBool("BotLevelBrackets.Orchestration.DryRun", false));
+    policy.SetCheckCadenceSeconds(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.CheckSeconds", 90)));
+    policy.SetMaxRequestsPerCycle(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.MaxRequestsPerCycle", 5)));
+    policy.SetMaxOutstandingPerFaction(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.MaxOutstandingPerFaction", 10)));
+    policy.SetMaxLooseRequestsPerCycle(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.MaxLooseRequestsPerCycle", 1)));
+    policy.SetRequestCooldownSeconds(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.RequestCooldownSeconds", 1800)));
+    policy.SetRejectionBackoffSeconds(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.RejectionBackoffSeconds", 600)));
+    policy.SetStabilitySeconds(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.StabilitySeconds", 60)));
+    policy.SetDispatchTimeoutSeconds(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.DispatchTimeoutSeconds", 30)));
+    policy.SetEarlyDepartureBackoffSeconds(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Orchestration.EarlyDepartureBackoffSeconds", 3600)));
 
     // 2. City Orchestration Settings
     policy.SetCityEnabled(sConfig.GetBoolDefault("BotLevelBrackets.City.Enabled", true));
 
-    std::string cityDestStr = sConfig.GetStringDefault("BotLevelBrackets.City.DestinationPolicy", "RequireExact");
+    std::string cityDestStr = GetInternalString("BotLevelBrackets.City.DestinationPolicy", "RequireExact");
     policy.SetCityDestinationPolicy((cityDestStr == "AllowNativeChoice") ? DestinationPolicy::AllowNativeChoice : DestinationPolicy::RequireExact);
 
-    policy.SetCityQuotaMode(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.QuotaMode", 2)));
-    policy.SetCityMinLimitEnabled(sConfig.GetBoolDefault("BotLevelBrackets.City.MinLimitEnabled", false));
-    policy.SetCityMaxLimitEnabled(sConfig.GetBoolDefault("BotLevelBrackets.City.MaxLimitEnabled", true));
-    policy.SetCityLimitsMode(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.LimitsMode", 1)));
-    policy.SetCityMinBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinBotsPerCity", 0)));
+    policy.SetCityQuotaMode(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.City.QuotaMode", 2)));
+    policy.SetCityMinLimitEnabled(GetInternalBool("BotLevelBrackets.City.MinLimitEnabled", false));
+    policy.SetCityMaxLimitEnabled(GetInternalBool("BotLevelBrackets.City.MaxLimitEnabled", true));
+    policy.SetCityLimitsMode(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.City.LimitsMode", 1)));
+    policy.SetCityMinBots(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.City.MinBotsPerCity", 0)));
     policy.SetCityMaxBots(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxBotsPerCity", 60)));
-    policy.SetCityHysteresis(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.HysteresisBots", 2)));
+    policy.SetCityHysteresis(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.City.HysteresisBots", 2)));
     policy.SetCityTransitMode(static_cast<TransitMode>(sConfig.GetIntDefault("BotLevelBrackets.City.TransitMode", 2)));
     policy.SetCityPickAllBrackets(sConfig.GetBoolDefault("BotLevelBrackets.City.PickAllBrackets", true));
     policy.SetCityMinLevel(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinLevel", 1)));
     policy.SetCityDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.DwellDurationMs", 300000)));
-    policy.SetCityMinDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MinDwellDurationMs", 300000)));
-    policy.SetCityMaxDwellDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.City.MaxDwellDurationMs", 600000)));
+    policy.SetCityMinDwellDurationMs(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.City.MinDwellDurationMs", 300000)));
+    policy.SetCityMaxDwellDurationMs(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.City.MaxDwellDurationMs", 600000)));
 
     policy.SetCityTarget(0, sConfig.GetIntDefault("BotLevelBrackets.City.StormwindTarget", 10));
     policy.SetCityTarget(1, sConfig.GetIntDefault("BotLevelBrackets.City.IronforgeTarget", 8));
@@ -129,115 +134,63 @@ void LoadModuleConfiguration()
 
     // 3. Outdoor World Distribution Settings
     policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", true));
-    std::string worldDestStr = sConfig.GetStringDefault("BotLevelBrackets.World.DestinationPolicy", "RequireExact");
+    std::string worldDestStr = GetInternalString("BotLevelBrackets.World.DestinationPolicy", "RequireExact");
     policy.SetWorldDestinationPolicy((worldDestStr == "AllowNativeChoice") ? DestinationPolicy::AllowNativeChoice : DestinationPolicy::RequireExact);
     policy.SetFieldReservePct(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.World.FieldReservePct", 70)));
 
     // 4. Level & Population Policy Settings & Active Redistribution
     policy.SetLevelDistributionEnabled(sConfig.GetBoolDefault("BotLevelBrackets.LevelDistribution.Enabled", true));
     policy.SetDistributionCheckFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.CheckFrequency", 300)));
-    policy.SetCheckFlaggedFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.CheckFlaggedFrequency", 15)));
-    policy.SetFlaggedProcessLimit(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.FlaggedProcessLimit", 5)));
-    policy.SetMinBracketChangeThreshold(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.MinBracketChangeThreshold", 2)));
-    policy.SetMaxPendingQueueSize(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.MaxPendingQueueSize", 0)));
-    policy.SetPendingQueueTTL(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.LevelDistribution.PendingQueueTTL", 0)));
+    policy.SetCheckFlaggedFrequency(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.LevelDistribution.CheckFlaggedFrequency", 15)));
+    policy.SetFlaggedProcessLimit(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.LevelDistribution.FlaggedProcessLimit", 5)));
+    policy.SetMinBracketChangeThreshold(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.LevelDistribution.MinBracketChangeThreshold", 2)));
+    policy.SetMaxPendingQueueSize(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.LevelDistribution.MaxPendingQueueSize", 0)));
+    policy.SetPendingQueueTTL(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.LevelDistribution.PendingQueueTTL", 0)));
     policy.SetTeleportOnLevelChange(sConfig.GetBoolDefault("BotLevelBrackets.TeleportOnLevelChange", true));
-    policy.SetArrivalFloorHoldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Teleport.ArrivalFloorHold", true));
-    policy.SetArrivalHoldDurationMs(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Teleport.ArrivalHoldDurationMs", 5000)));
-    policy.SetMaxFloorLifts(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Teleport.MaxFloorLifts", 6)));
+    policy.SetArrivalFloorHoldEnabled(GetInternalBool("BotLevelBrackets.Teleport.ArrivalFloorHold", true));
+    policy.SetArrivalHoldDurationMs(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Teleport.ArrivalHoldDurationMs", 5000)));
+    policy.SetMaxFloorLifts(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Teleport.MaxFloorLifts", 6)));
 
     // Starting-Zone and Wrong-Map Dispersal Settings
     policy.SetStartingZoneDisperseEnabled(sConfig.GetBoolDefault("BotLevelBrackets.StartingZoneDisperse.Enabled", true));
-    policy.SetStartingZoneDisperseFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.StartingZoneDisperse.Frequency", 15)));
+    policy.SetStartingZoneDisperseFrequency(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.StartingZoneDisperse.Frequency", 15)));
     policy.SetWrongMapDisperseEnabled(sConfig.GetBoolDefault("BotLevelBrackets.WrongMapDisperse.Enabled", true));
-    policy.SetWrongMapDisperseFrequency(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.WrongMapDisperse.Frequency", 60)));
+    policy.SetWrongMapDisperseFrequency(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.WrongMapDisperse.Frequency", 60)));
 
-    policy.SetUseDynamicDistribution(sConfig.GetBoolDefault("BotLevelBrackets.LevelPolicy.UseDynamic", false));
-    policy.SetRealPlayerWeight(sConfig.GetFloatDefault("BotLevelBrackets.LevelPolicy.HumanWeight", 1.0f));
-    policy.SetSyncFactions(sConfig.GetBoolDefault("BotLevelBrackets.LevelPolicy.SyncFactions", false));
+    policy.SetUseDynamicDistribution(GetInternalBool("BotLevelBrackets.LevelPolicy.UseDynamic", false));
+    policy.SetRealPlayerWeight(GetInternalFloat("BotLevelBrackets.LevelPolicy.HumanWeight", 1.0f));
+    policy.SetSyncFactions(GetInternalBool("BotLevelBrackets.LevelPolicy.SyncFactions", false));
 
     // 5. Explicit Level Bracket Definitions (Alliance and Horde)
-    uint32_t numRanges = static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.NumRanges", 7));
-    (void)numRanges;
+    struct BracketDef { uint8_t lower; uint8_t upper; };
+    static const BracketDef s_defaultRanges[7] = {
+        { 1,  9},
+        {10, 19},
+        {20, 29},
+        {30, 39},
+        {40, 49},
+        {50, 59},
+        {60, 60}
+    };
 
     std::vector<LevelBracketConfig> allianceBrackets;
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Lower", 1)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Upper", 9)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Pct", 16))
-    });
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Lower", 10)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Upper", 19)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Pct", 14))
-    });
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Lower", 20)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Upper", 29)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Pct", 14))
-    });
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Lower", 30)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Upper", 39)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Pct", 14))
-    });
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Lower", 40)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Upper", 49)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Pct", 14))
-    });
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Lower", 50)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Upper", 59)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Pct", 14))
-    });
-    allianceBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Lower", 60)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Upper", 60)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Pct", 14))
-    });
-    if (numRanges > 0 && numRanges < allianceBrackets.size())
-        allianceBrackets.resize(numRanges);
+    allianceBrackets.push_back({ s_defaultRanges[0].lower, s_defaultRanges[0].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range1.Pct", 16)) });
+    allianceBrackets.push_back({ s_defaultRanges[1].lower, s_defaultRanges[1].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range2.Pct", 14)) });
+    allianceBrackets.push_back({ s_defaultRanges[2].lower, s_defaultRanges[2].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range3.Pct", 14)) });
+    allianceBrackets.push_back({ s_defaultRanges[3].lower, s_defaultRanges[3].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range4.Pct", 14)) });
+    allianceBrackets.push_back({ s_defaultRanges[4].lower, s_defaultRanges[4].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range5.Pct", 14)) });
+    allianceBrackets.push_back({ s_defaultRanges[5].lower, s_defaultRanges[5].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range6.Pct", 14)) });
+    allianceBrackets.push_back({ s_defaultRanges[6].lower, s_defaultRanges[6].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Alliance.Range7.Pct", 14)) });
     policy.SetLevelBrackets(0, allianceBrackets);
 
     std::vector<LevelBracketConfig> hordeBrackets;
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Lower", 1)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Upper", 9)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Pct", 16))
-    });
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Lower", 10)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Upper", 19)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Pct", 14))
-    });
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Lower", 20)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Upper", 29)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Pct", 14))
-    });
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Lower", 30)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Upper", 39)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Pct", 14))
-    });
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Lower", 40)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Upper", 49)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Pct", 14))
-    });
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Lower", 50)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Upper", 59)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Pct", 14))
-    });
-    hordeBrackets.push_back({
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Lower", 60)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Upper", 60)),
-        static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Pct", 14))
-    });
-    if (numRanges > 0 && numRanges < hordeBrackets.size())
-        hordeBrackets.resize(numRanges);
+    hordeBrackets.push_back({ s_defaultRanges[0].lower, s_defaultRanges[0].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range1.Pct", 16)) });
+    hordeBrackets.push_back({ s_defaultRanges[1].lower, s_defaultRanges[1].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range2.Pct", 14)) });
+    hordeBrackets.push_back({ s_defaultRanges[2].lower, s_defaultRanges[2].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range3.Pct", 14)) });
+    hordeBrackets.push_back({ s_defaultRanges[3].lower, s_defaultRanges[3].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range4.Pct", 14)) });
+    hordeBrackets.push_back({ s_defaultRanges[4].lower, s_defaultRanges[4].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range5.Pct", 14)) });
+    hordeBrackets.push_back({ s_defaultRanges[5].lower, s_defaultRanges[5].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range6.Pct", 14)) });
+    hordeBrackets.push_back({ s_defaultRanges[6].lower, s_defaultRanges[6].upper, static_cast<uint8_t>(sConfig.GetIntDefault("BotLevelBrackets.Horde.Range7.Pct", 14)) });
     policy.SetLevelBrackets(1, hordeBrackets);
     policy.ClampAndBalanceBrackets(true);
 
@@ -276,17 +229,17 @@ void LoadModuleConfiguration()
     prot.SetIgnoreFriendListed(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreFriendListed", true));
     prot.SetIgnoreRealPlayerGuilds(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreRealPlayerGuilds", true));
     prot.SetIgnoreArenaTeams(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreArenaTeams", true));
-    prot.SetSocialRefreshCadence(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Protection.SocialRefreshSeconds", 300)));
-    prot.SetGuildTrackerCadence(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Protection.GuildTrackerUpdateSeconds", 600)));
+    prot.SetSocialRefreshCadence(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Protection.SocialRefreshSeconds", 300)));
+    prot.SetGuildTrackerCadence(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Protection.GuildTrackerUpdateSeconds", 600)));
 
     std::string exclNames = sConfig.GetStringDefault("BotLevelBrackets.Protection.ExcludedBotNames", "");
     if (exclNames.empty())
-        exclNames = sConfig.GetStringDefault("BotLevelBrackets.ExcludeNames", "");
+        exclNames = GetInternalString("BotLevelBrackets.ExcludeNames", "");
     prot.SetExcludedNames(exclNames);
 
     // 7. Activity Registry Controls
     reg.SetActivitiesEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Activities.Enabled", true));
-    reg.SetRequireSupported(sConfig.GetBoolDefault("BotLevelBrackets.Activities.RequireSupported", false));
+    reg.SetRequireSupported(GetInternalBool("BotLevelBrackets.Activities.RequireSupported", false));
 
     // Optional dynamic per-activity overrides
     for (auto const& act : reg.GetAllActivities())
@@ -304,7 +257,7 @@ void LoadModuleConfiguration()
         }
     }
 
-    // 7. Debug Settings
+    // 8. Debug Settings
     std::string debugModeStr = sConfig.GetStringDefault("BotLevelBrackets.Debug.Mode", "Off");
     if (debugModeStr == "Summary")
         diag.SetDebugMode(DebugMode::Summary);
@@ -315,8 +268,8 @@ void LoadModuleConfiguration()
     else
         diag.SetDebugMode(DebugMode::Off);
 
-    diag.SetMaxEventsPerSecond(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Debug.MaxEventsPerSecond", 50)));
-    diag.SetRingBufferCapacity(static_cast<size_t>(sConfig.GetIntDefault("BotLevelBrackets.Debug.RingBufferEvents", 2000)));
+    diag.SetMaxEventsPerSecond(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Debug.MaxEventsPerSecond", 50)));
+    diag.SetRingBufferCapacity(static_cast<size_t>(GetInternalInt("BotLevelBrackets.Debug.RingBufferEvents", 2000)));
 
     policy.IncrementConfigGeneration();
     RequestLedger::Instance().WithdrawStaleProposals(policy.GetConfigGeneration());
