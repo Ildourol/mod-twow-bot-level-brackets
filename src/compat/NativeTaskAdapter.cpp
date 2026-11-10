@@ -585,9 +585,10 @@ void NativeTaskAdapter::Update(uint32_t diff)
                 PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
                 if (ai)
                 {
+                    ai->Reset(true);
+                    ai->ResetStrategies();
                     ai->ChangeStrategy("-rpg,-rpg quest,-rpg vendor,-rpg explore,-rpg maintenance,-rpg craft,-rpg guild", BotState::BOT_STATE_NON_COMBAT);
                     ai->ChangeStrategy("+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
-                    ai->Reset(true);
                     ai->DoSpecificAction("choose travel target", Event(), true);
                 }
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
@@ -599,6 +600,12 @@ void NativeTaskAdapter::Update(uint32_t diff)
                     ai->DoSpecificAction("choose travel target", Event(), true);
                 }
 #endif
+                if (it->second.transitMode == TransitMode::Teleport)
+                {
+                    // City to World Teleport: Teleport back to appropriate outdoor leveling zone with full strategy reset
+                    TeleportBotToLevelZone(bot, bot->GetLevel(), bot->GetTeamId());
+                }
+
                 it = s_cityVisits.erase(it);
                 continue;
             }
@@ -894,9 +901,9 @@ bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
     // 4. Riding Skills & Mounts
     factory.InitMounts();
 
-    // 5. Autogear Equipment Pass
+    // 5. Autogear Equipment Pass (based on server configuration caps, not Best/epic gear)
     factory.UsePoolGearCap();
-    factory.UpgradeGearBest();
+    factory.AutogearOwned(sPlayerbotAIConfig.ownedBotAutogearQualityCap, sPlayerbotAIConfig.ownedBotAutogearIlvlCap);
     factory.EnchantEquipment();
 
     // 6. Starter Kit, Projectiles & Consumables
@@ -971,15 +978,20 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
                 travelTarget->SetExpireIn(1000);
             }
         }
-        // AI reset and strategy renewal for open-world outdoor activities
+        // AI reset and strategy renewal for open-world outdoor activities (World-to-World or City-to-World)
         ai->Reset(true);
-        ai->ChangeStrategy("-rpg,+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+        ai->ResetStrategies();
+        ai->ChangeStrategy("-rpg,-rpg quest,-rpg vendor,-rpg explore,-rpg maintenance,-rpg craft,-rpg guild", BotState::BOT_STATE_NON_COMBAT);
+        ai->ChangeStrategy("+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+        ai->DoSpecificAction("choose travel target", Event(), true);
     }
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
     PlayerbotAI* ai = bot->GetPlayerbotAI();
     if (ai)
     {
-        ai->ChangeStrategy("-rpg,+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+        ai->ChangeStrategy("-rpg", BotState::BOT_STATE_NON_COMBAT);
+        ai->ChangeStrategy("+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+        ai->DoSpecificAction("choose travel target", Event(), true);
     }
 #endif
 
