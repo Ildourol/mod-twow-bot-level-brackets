@@ -14,8 +14,8 @@ BotLevelBrackets.Enabled = 1
 BotLevelBrackets.Orchestration.DryRun = 0
 
 # Cadence for the unified scheduling coordinator (in seconds).
-# Default: 90 seconds.
-BotLevelBrackets.Orchestration.CheckSeconds = 90
+# Default: 60 seconds.
+BotLevelBrackets.Orchestration.CheckSeconds = 60
 
 # Maximum new task requests submitted in a single scheduling pass.
 # Default: 5.
@@ -97,27 +97,27 @@ BotLevelBrackets.City.PickAllBrackets = 1
 BotLevelBrackets.City.MinLevel = 10
 
 # Desired dwell duration for bots visiting a city (in milliseconds).
-# Default: 300000 (5 minutes).
-BotLevelBrackets.City.DwellDurationMs = 300000
+# Default: 180000 (3 minutes).
+BotLevelBrackets.City.DwellDurationMs = 180000
 
 # Minimum dwell duration before bot may finish errands and depart (in milliseconds).
-# Default: 300000 (5 minutes).
-BotLevelBrackets.City.MinDwellDurationMs = 300000
+# Default: 180000 (3 minutes).
+BotLevelBrackets.City.MinDwellDurationMs = 180000
 
 # Maximum dwell duration before bot is unconditionally released to open world (in milliseconds).
 # Default: 600000 (10 minutes).
 BotLevelBrackets.City.MaxDwellDurationMs = 600000
 
 # Configured Target Allocation for Racial Capitals (% of faction bots):
-# Alliance: Stormwind (10%), Ironforge (8%), Darnassus (6%), Alah'Thalas (6%) -> Total: 30%
-# Horde: Orgrimmar (10%), Undercity (8%), Thunder Bluff (6%), Sparkwater Port (6%) -> Total: 30%
-BotLevelBrackets.City.StormwindTarget = 10
-BotLevelBrackets.City.IronforgeTarget = 8
+# Alliance: Stormwind (15%), Ironforge (12%), Darnassus (6%), Alah'Thalas (6%) -> Total: 39%
+# Horde: Orgrimmar (15%), Undercity (12%), Thunder Bluff (6%), Sparkwater Port (6%) -> Total: 39%
+BotLevelBrackets.City.StormwindTarget = 15
+BotLevelBrackets.City.IronforgeTarget = 12
 BotLevelBrackets.City.DarnassusTarget = 6
 BotLevelBrackets.City.AlahThalasTarget = 6
 
-BotLevelBrackets.City.OrgrimmarTarget = 10
-BotLevelBrackets.City.UndercityTarget = 8
+BotLevelBrackets.City.OrgrimmarTarget = 15
+BotLevelBrackets.City.UndercityTarget = 12
 BotLevelBrackets.City.ThunderBluffTarget = 6
 BotLevelBrackets.City.SparkwaterTarget = 6
 

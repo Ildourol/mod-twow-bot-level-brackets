@@ -200,7 +200,7 @@ private:
     DestinationPolicy m_cityDestPolicy = DestinationPolicy::RequireExact;
     DestinationPolicy m_worldDestPolicy = DestinationPolicy::RequireExact;
 
-    uint32_t m_checkSeconds = 90;
+    uint32_t m_checkSeconds = 60;
     uint32_t m_maxRequestsPerCycle = 5;
     uint32_t m_maxOutstandingPerFaction = 10;
     uint32_t m_maxLooseRequestsPerCycle = 1;
@@ -210,8 +210,8 @@ private:
     uint32_t m_dispatchTimeoutSeconds = 30;
     uint32_t m_earlyDepartureBackoffSeconds = 3600;
     uint32_t m_fieldReservePct = 70;
-    uint32_t m_cityDwellDurationMs = 300000;
-    uint32_t m_cityMinDwellDurationMs = 300000;
+    uint32_t m_cityDwellDurationMs = 180000;
+    uint32_t m_cityMinDwellDurationMs = 180000;
     uint32_t m_cityMaxDwellDurationMs = 600000;
     TransitMode m_cityTransitMode = TransitMode::Travel;
     bool m_cityPickAllBrackets = true;
@@ -225,7 +225,7 @@ private:
     uint32_t m_cityMaxBots = 60;
     uint32_t m_cityHysteresis = 2;
 
-    int32_t m_cityTargets[8] = { 10, 8, 6, 6, 10, 8, 6, 6 }; // Alliance: SW, IF, Darn, Alah; Horde: Org, UC, TB, Spark
+    int32_t m_cityTargets[8] = { 15, 12, 6, 6, 15, 12, 6, 6 }; // Alliance: SW, IF, Darn, Alah; Horde: Org, UC, TB, Spark
 
     std::vector<LevelBracketConfig> m_allianceBrackets;
     std::vector<LevelBracketConfig> m_hordeBrackets;
