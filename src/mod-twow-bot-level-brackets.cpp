@@ -111,7 +111,7 @@ void LoadModuleConfiguration()
     policy.SetCityTarget(7, sConfig.GetIntDefault("BotLevelBrackets.City.SparkwaterTarget", 6));
 
     // 3. Outdoor World Distribution Settings
-    policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", true));
+    policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", false));
     std::string worldDestStr = sConfig.GetStringDefault("BotLevelBrackets.World.DestinationPolicy", "RequireExact");
     policy.SetWorldDestinationPolicy((worldDestStr == "AllowNativeChoice") ? DestinationPolicy::AllowNativeChoice : DestinationPolicy::RequireExact);
     policy.SetFieldReservePct(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.World.FieldReservePct", 70)));

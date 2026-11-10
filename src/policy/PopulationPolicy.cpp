@@ -26,7 +26,7 @@ void PopulationPolicy::LoadDefaults()
 {
     m_enabled = true;
     m_cityEnabled = true;
-    m_worldEnabled = true;
+    m_worldEnabled = false;
     m_dryRun = false;
 
     m_cityDestPolicy = DestinationPolicy::RequireExact;

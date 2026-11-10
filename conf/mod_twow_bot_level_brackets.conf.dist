@@ -126,8 +126,8 @@ BotLevelBrackets.City.SparkwaterTarget = 6
 ###################################################################################################
 
 # Enable outdoor activity encouragement.
-# 1 = Enabled, 0 = Disabled.
-BotLevelBrackets.World.Enabled = 1
+# 1 = Enabled, 0 = Disabled (Default: 0 - outdoor bots follow 100% native TortoiseBots AI).
+BotLevelBrackets.World.Enabled = 0
 
 # Destination policy for outdoor tasks.
 # RequireExact: Requires exact region parameter (Honest missing control).

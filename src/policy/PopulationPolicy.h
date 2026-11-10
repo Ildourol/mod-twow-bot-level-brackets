@@ -194,7 +194,7 @@ private:
 
     bool m_enabled = true;
     bool m_cityEnabled = true;
-    bool m_worldEnabled = true;
+    bool m_worldEnabled = false;
     bool m_dryRun = false;
 
     DestinationPolicy m_cityDestPolicy = DestinationPolicy::RequireExact;
