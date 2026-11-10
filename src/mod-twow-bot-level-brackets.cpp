@@ -297,34 +297,21 @@ void LoadModuleConfiguration()
     reg.SetActivitiesEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Activities.Enabled", true));
     reg.SetRequireSupported(sConfig.GetBoolDefault("BotLevelBrackets.Activities.RequireSupported", false));
 
-    auto loadAct = [&reg](const std::string& id)
+    // Optional dynamic per-activity overrides
+    for (auto const& act : reg.GetAllActivities())
     {
-        ActivityDefinition* a = reg.GetActivity(id);
-        if (!a)
-            return;
-        std::string prefix = "BotLevelBrackets.Activities." + id + ".";
-        a->enabled = sConfig.GetBoolDefault((prefix + "Enabled").c_str(), a->enabled);
-        a->cityEnabled = sConfig.GetBoolDefault((prefix + "CityEnabled").c_str(), a->cityEnabled);
-        a->worldEnabled = sConfig.GetBoolDefault((prefix + "WorldEnabled").c_str(), a->worldEnabled);
-        a->weight = sConfig.GetFloatDefault((prefix + "Weight").c_str(), a->weight);
-        a->cooldownSeconds = static_cast<uint32_t>(sConfig.GetIntDefault((prefix + "CooldownSeconds").c_str(), a->cooldownSeconds));
-        a->maxOutstandingPerFaction = static_cast<uint32_t>(sConfig.GetIntDefault((prefix + "MaxOutstandingPerFaction").c_str(), a->maxOutstandingPerFaction));
-    };
-
-    loadAct("QuestAccept");
-    loadAct("QuestObjective");
-    loadAct("QuestTurnIn");
-    loadAct("Grinding");
-    loadAct("Exploration");
-    loadAct("GenericRpg");
-    loadAct("VendorSell");
-    loadAct("VendorBuy");
-    loadAct("Repair");
-    loadAct("ClassTraining");
-    loadAct("ProfessionTraining");
-    loadAct("AuctionSell");
-    loadAct("Mailbox");
-    loadAct("FlightDiscovery");
+        std::string prefix = "BotLevelBrackets.Activities." + act.id + ".";
+        ActivityDefinition* a = reg.GetActivity(act.id);
+        if (a)
+        {
+            a->enabled = sConfig.GetBoolDefault((prefix + "Enabled").c_str(), a->enabled);
+            a->cityEnabled = sConfig.GetBoolDefault((prefix + "CityEnabled").c_str(), a->cityEnabled);
+            a->worldEnabled = sConfig.GetBoolDefault((prefix + "WorldEnabled").c_str(), a->worldEnabled);
+            a->weight = sConfig.GetFloatDefault((prefix + "Weight").c_str(), a->weight);
+            a->cooldownSeconds = static_cast<uint32_t>(sConfig.GetIntDefault((prefix + "CooldownSeconds").c_str(), a->cooldownSeconds));
+            a->maxOutstandingPerFaction = static_cast<uint32_t>(sConfig.GetIntDefault((prefix + "MaxOutstandingPerFaction").c_str(), a->maxOutstandingPerFaction));
+        }
+    }
 
     // 7. Debug Settings
     std::string debugModeStr = sConfig.GetStringDefault("BotLevelBrackets.Debug.Mode", "Off");

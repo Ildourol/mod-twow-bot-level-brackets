@@ -430,110 +430,13 @@ BotLevelBrackets.ExcludeNames = ""
 # ACTIVITY REGISTRY CONTROLS
 ###################################################################################################
 
-# Master toggle for activity encouragement
+# Master toggle for activity registry controls and diagnostic telemetry (.blb activities).
+# When enabled (1), all 427 native bot activities from TortoiseBots are active in the registry.
+# 1 = Enabled (Default), 0 = Disabled.
 BotLevelBrackets.Activities.Enabled = 1
 
 # Rejection policy for unsupported activities (1 = fail validation on mismatch, 0 = soft fallback)
 BotLevelBrackets.Activities.RequireSupported = 0
-
-# Individual Activity Toggles (Sample of audited activities)
-BotLevelBrackets.Activities.QuestAccept.Enabled = 1
-BotLevelBrackets.Activities.QuestAccept.CityEnabled = 1
-BotLevelBrackets.Activities.QuestAccept.WorldEnabled = 1
-BotLevelBrackets.Activities.QuestAccept.Weight = 1.0
-BotLevelBrackets.Activities.QuestAccept.CooldownSeconds = 300
-BotLevelBrackets.Activities.QuestAccept.MaxOutstandingPerFaction = 3
-
-BotLevelBrackets.Activities.QuestObjective.Enabled = 1
-BotLevelBrackets.Activities.QuestObjective.CityEnabled = 0
-BotLevelBrackets.Activities.QuestObjective.WorldEnabled = 1
-BotLevelBrackets.Activities.QuestObjective.Weight = 1.2
-BotLevelBrackets.Activities.QuestObjective.CooldownSeconds = 180
-BotLevelBrackets.Activities.QuestObjective.MaxOutstandingPerFaction = 5
-
-BotLevelBrackets.Activities.QuestTurnIn.Enabled = 1
-BotLevelBrackets.Activities.QuestTurnIn.CityEnabled = 1
-BotLevelBrackets.Activities.QuestTurnIn.WorldEnabled = 1
-BotLevelBrackets.Activities.QuestTurnIn.Weight = 1.5
-BotLevelBrackets.Activities.QuestTurnIn.CooldownSeconds = 300
-BotLevelBrackets.Activities.QuestTurnIn.MaxOutstandingPerFaction = 3
-
-BotLevelBrackets.Activities.Grinding.Enabled = 1
-BotLevelBrackets.Activities.Grinding.CityEnabled = 0
-BotLevelBrackets.Activities.Grinding.WorldEnabled = 1
-BotLevelBrackets.Activities.Grinding.Weight = 1.0
-BotLevelBrackets.Activities.Grinding.CooldownSeconds = 600
-BotLevelBrackets.Activities.Grinding.MaxOutstandingPerFaction = 5
-
-BotLevelBrackets.Activities.Exploration.Enabled = 1
-BotLevelBrackets.Activities.Exploration.CityEnabled = 1
-BotLevelBrackets.Activities.Exploration.WorldEnabled = 1
-BotLevelBrackets.Activities.Exploration.Weight = 0.8
-BotLevelBrackets.Activities.Exploration.CooldownSeconds = 900
-BotLevelBrackets.Activities.Exploration.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.GenericRpg.Enabled = 1
-BotLevelBrackets.Activities.GenericRpg.CityEnabled = 1
-BotLevelBrackets.Activities.GenericRpg.WorldEnabled = 1
-BotLevelBrackets.Activities.GenericRpg.Weight = 0.9
-BotLevelBrackets.Activities.GenericRpg.CooldownSeconds = 300
-BotLevelBrackets.Activities.GenericRpg.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.VendorSell.Enabled = 1
-BotLevelBrackets.Activities.VendorSell.CityEnabled = 1
-BotLevelBrackets.Activities.VendorSell.WorldEnabled = 1
-BotLevelBrackets.Activities.VendorSell.Weight = 1.0
-BotLevelBrackets.Activities.VendorSell.CooldownSeconds = 600
-BotLevelBrackets.Activities.VendorSell.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.VendorBuy.Enabled = 1
-BotLevelBrackets.Activities.VendorBuy.CityEnabled = 1
-BotLevelBrackets.Activities.VendorBuy.WorldEnabled = 1
-BotLevelBrackets.Activities.VendorBuy.Weight = 0.8
-BotLevelBrackets.Activities.VendorBuy.CooldownSeconds = 600
-BotLevelBrackets.Activities.VendorBuy.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.Repair.Enabled = 1
-BotLevelBrackets.Activities.Repair.CityEnabled = 1
-BotLevelBrackets.Activities.Repair.WorldEnabled = 1
-BotLevelBrackets.Activities.Repair.Weight = 1.2
-BotLevelBrackets.Activities.Repair.CooldownSeconds = 600
-BotLevelBrackets.Activities.Repair.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.ClassTraining.Enabled = 1
-BotLevelBrackets.Activities.ClassTraining.CityEnabled = 1
-BotLevelBrackets.Activities.ClassTraining.WorldEnabled = 0
-BotLevelBrackets.Activities.ClassTraining.Weight = 1.0
-BotLevelBrackets.Activities.ClassTraining.CooldownSeconds = 1800
-BotLevelBrackets.Activities.ClassTraining.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.ProfessionTraining.Enabled = 1
-BotLevelBrackets.Activities.ProfessionTraining.CityEnabled = 1
-BotLevelBrackets.Activities.ProfessionTraining.WorldEnabled = 0
-BotLevelBrackets.Activities.ProfessionTraining.Weight = 0.7
-BotLevelBrackets.Activities.ProfessionTraining.CooldownSeconds = 1800
-BotLevelBrackets.Activities.ProfessionTraining.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.AuctionSell.Enabled = 1
-BotLevelBrackets.Activities.AuctionSell.CityEnabled = 1
-BotLevelBrackets.Activities.AuctionSell.WorldEnabled = 0
-BotLevelBrackets.Activities.AuctionSell.Weight = 1.0
-BotLevelBrackets.Activities.AuctionSell.CooldownSeconds = 1200
-BotLevelBrackets.Activities.AuctionSell.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.Mailbox.Enabled = 1
-BotLevelBrackets.Activities.Mailbox.CityEnabled = 1
-BotLevelBrackets.Activities.Mailbox.WorldEnabled = 1
-BotLevelBrackets.Activities.Mailbox.Weight = 0.8
-BotLevelBrackets.Activities.Mailbox.CooldownSeconds = 900
-BotLevelBrackets.Activities.Mailbox.MaxOutstandingPerFaction = 2
-
-BotLevelBrackets.Activities.FlightDiscovery.Enabled = 1
-BotLevelBrackets.Activities.FlightDiscovery.CityEnabled = 1
-BotLevelBrackets.Activities.FlightDiscovery.WorldEnabled = 1
-BotLevelBrackets.Activities.FlightDiscovery.Weight = 0.9
-BotLevelBrackets.Activities.FlightDiscovery.CooldownSeconds = 1800
-BotLevelBrackets.Activities.FlightDiscovery.MaxOutstandingPerFaction = 2
 
 ###################################################################################################
 # DEBUGGING & DIAGNOSTICS
