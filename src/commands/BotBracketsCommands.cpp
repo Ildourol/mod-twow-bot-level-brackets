@@ -65,7 +65,7 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
         return HandleLedger(handler);
 
     if (strcmp(subCommand, "pending") == 0)
-        return HandlePending(handler);
+        return HandlePending(handler, args);
 
     if (strcmp(subCommand, "boost") == 0)
         return HandleBoost(handler, args);
@@ -428,8 +428,24 @@ bool BotBracketsCommands::HandleBoost(ChatHandler* handler, const char* args)
     return true;
 }
 
-bool BotBracketsCommands::HandlePending(ChatHandler* handler)
+bool BotBracketsCommands::HandlePending(ChatHandler* handler, const char* args)
 {
+    if (args && (strcmp(args, "clear") == 0 || strcmp(args, "reset") == 0))
+    {
+        WorldSession* session = handler ? handler->GetSession() : nullptr;
+        if (session && session->GetSecurity() < SEC_ADMINISTRATOR)
+        {
+            handler->SendSysMessage("You do not have permission to execute this administrative command.");
+            return false;
+        }
+
+        size_t count = LevelDistributionManager::Instance().GetPendingQueueSize();
+        LevelDistributionManager::Instance().ClearPendingQueue();
+        handler->PSendSysMessage("[BotBrackets] Cleared %u entries from in-memory pending reset queue.",
+            static_cast<uint32_t>(count));
+        return true;
+    }
+
     auto snapshot = LevelDistributionManager::Instance().GetPendingQueueSnapshot();
     handler->PSendSysMessage("=== Pending Level Resets Queue (Total: %u) ===",
         static_cast<uint32_t>(snapshot.size()));
@@ -446,7 +462,7 @@ bool BotBracketsCommands::HandlePending(ChatHandler* handler)
 
     for (const auto& entry : snapshot)
     {
-        Player* p = sObjectAccessor.FindPlayer(ObjectGuid(entry.guidLow));
+        Player* p = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, entry.guidLow));
         std::string name = p ? p->GetName() : "Unknown/Offline";
         uint32_t age = (now >= entry.enqueuedAt) ? (now - entry.enqueuedAt) : 0;
 

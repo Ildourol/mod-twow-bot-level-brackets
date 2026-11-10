@@ -10,8 +10,6 @@
 #include "Objects/Player.h"
 #include "ObjectAccessor.h"
 #include "Chat/Chat.h"
-#include "Database/DatabaseEnv.h"
-#include "Database/QueryResult.h"
 #include "Log.h"
 #include "Util.h"
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
@@ -19,8 +17,6 @@
 #include "Player.h"
 #include "ObjectAccessor.h"
 #include "Chat.h"
-#include "Database/DatabaseEnv.h"
-#include "Database/QueryResult.h"
 #include "Log.h"
 #include "Util.h"
 #else
@@ -28,8 +24,6 @@
 #include "Objects/Player.h"
 #include "ObjectAccessor.h"
 #include "Chat/Chat.h"
-#include "Database/DatabaseEnv.h"
-#include "Database/QueryResult.h"
 #include "Log.h"
 #include "Util.h"
 #endif
@@ -475,7 +469,7 @@ void LevelDistributionManager::ProcessPendingResets()
                 continue;
             }
 
-            Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(it->first));
+            Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, it->first));
             if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
             {
                 it = m_pendingResets.erase(it);
@@ -511,7 +505,7 @@ void LevelDistributionManager::ProcessPendingResets()
     std::vector<uint32_t> processed;
     for (const auto& entry : candidates)
     {
-        Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(entry.guidLow));
+        Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, entry.guidLow));
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
 
