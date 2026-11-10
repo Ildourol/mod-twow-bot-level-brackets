@@ -40,6 +40,8 @@
 #include <unordered_map>
 #include <mutex>
 #include <ctime>
+#include <sstream>
+#include <algorithm>
 
 namespace BotLevelBrackets
 {
@@ -366,20 +368,51 @@ TaskAdmissionResult NativeTaskAdapter::RequestCityVisit(Player* bot, CityId city
             if (bot->IsMounted())
                 bot->Unmount();
 
-            // Disperse arrival coordinates across a 3.0 to 13.0 yard radius with random angle
-            // to avoid stacking multiple teleported bots on top of each other.
+            TeleportDestinationConfig customDest;
+            uint32_t landingMap = def->mapId;
+            float landingX = 0.0f;
+            float landingY = 0.0f;
+            float landingZ = 0.0f;
+            float landingO = 0.0f;
+
+            if (PopulationPolicy::Instance().GetCityLandingDestination(cityId, customDest))
+            {
+                landingMap = customDest.mapId;
+                landingX = customDest.x;
+                landingY = customDest.y;
+                landingZ = customDest.z;
+                landingO = customDest.o;
+            }
+            else
+            {
+#if defined(TEST_DOUBLES_MODE)
+                landingX = def->centerX;
+                landingY = def->centerY;
+                landingZ = def->centerZ;
+                landingO = 0.0f;
+#else
+                landingX = def->bankX;
+                landingY = def->bankY;
+                landingZ = def->bankZ;
+                landingO = def->bankO;
+#endif
+            }
+
+#if !defined(TEST_DOUBLES_MODE)
+            // Disperse arrival coordinates slightly across a 1.0 to 2.5 yard radius
+            // so multiple bots arriving inside the bank do not stack on the exact same tile.
             float angle = static_cast<float>(rand() % 628) / 100.0f;
-            float radius = 3.0f + static_cast<float>(rand() % 100) / 10.0f;
-            float landingX = def->centerX + std::cos(angle) * radius;
-            float landingY = def->centerY + std::sin(angle) * radius;
-            float landingZ = def->centerZ;
-            float landingO = angle;
+            float radius = 1.0f + static_cast<float>(rand() % 15) / 10.0f;
+            landingX += std::cos(angle) * radius;
+            landingY += std::sin(angle) * radius;
+            landingO = angle;
 
             // Cross-map dynamic floor height sampling (mod-twow-arrival-floor)
-            landingZ = SampleFloorHeight(def->mapId, landingX, landingY, def->centerZ, 25.0f);
+            landingZ = SampleFloorHeight(landingMap, landingX, landingY, landingZ, 15.0f);
+#endif
 
-            bot->TeleportTo(def->mapId, landingX, landingY, landingZ, landingO);
-            RegisterArrivalFloor(bot, def->mapId, landingX, landingY, landingZ,
+            bot->TeleportTo(landingMap, landingX, landingY, landingZ, landingO);
+            RegisterArrivalFloor(bot, landingMap, landingX, landingY, landingZ,
                                  PopulationPolicy::Instance().GetArrivalHoldDurationMs());
             rec.state = CityVisitRecord::Traveling;
             rec.arrivedAt = 0;
@@ -943,6 +976,95 @@ bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
     return true;
 }
 
+bool NativeTaskAdapter::ResolveTeleportLocation(const std::string& input, TeleportDestinationConfig& outDest)
+{
+    size_t first = input.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+        return false;
+    size_t last = input.find_last_not_of(" \t\r\n");
+    std::string token = input.substr(first, (last - first + 1));
+    if (token.empty())
+        return false;
+
+    // 1. First, try parsing as raw numbers: "mapId x y z [o]"
+    {
+        std::istringstream iss(token);
+        uint32_t mapId = 0;
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (iss >> mapId >> x >> y >> z)
+        {
+            float o = 0.0f;
+            iss >> o;
+            outDest.mapId = mapId;
+            outDest.x = x;
+            outDest.y = y;
+            outDest.z = z;
+            outDest.o = o;
+            outDest.name = token;
+            return true;
+        }
+    }
+
+    // 2. Try looking up in core's game_tele store via sObjectMgr.GetGameTele(name)
+#if !defined(TEST_DOUBLES_MODE)
+    const GameTele* tele = sObjectMgr.GetGameTele(token);
+    if (tele)
+    {
+        outDest.mapId = tele->mapId;
+        outDest.x = tele->x;
+        outDest.y = tele->y;
+        outDest.z = tele->z;
+        outDest.o = tele->o;
+        outDest.name = tele->name;
+        return true;
+    }
+
+    // Normalized match: strip apostrophes, hyphens, and spaces (e.g. "gromgol" -> "Grom'golBaseCamp")
+    std::string cleanQuery = token;
+    cleanQuery.erase(std::remove_if(cleanQuery.begin(), cleanQuery.end(), [](char c) {
+        return c == '\'' || c == '-' || c == ' ' || c == '_';
+    }), cleanQuery.end());
+    std::transform(cleanQuery.begin(), cleanQuery.end(), cleanQuery.begin(), ::tolower);
+
+    const auto& teleMap = sObjectMgr.GetGameTeleMap();
+    for (const auto& pair : teleMap)
+    {
+        std::string candClean = pair.second.name;
+        candClean.erase(std::remove_if(candClean.begin(), candClean.end(), [](char c) {
+            return c == '\'' || c == '-' || c == ' ' || c == '_';
+        }), candClean.end());
+        std::transform(candClean.begin(), candClean.end(), candClean.begin(), ::tolower);
+
+        if (candClean == cleanQuery || candClean.find(cleanQuery) != std::string::npos || cleanQuery.find(candClean) != std::string::npos)
+        {
+            outDest.mapId = pair.second.mapId;
+            outDest.x = pair.second.x;
+            outDest.y = pair.second.y;
+            outDest.z = pair.second.z;
+            outDest.o = pair.second.o;
+            outDest.name = pair.second.name;
+            return true;
+        }
+    }
+#endif
+
+    return false;
+}
+
+std::vector<TeleportDestinationConfig> NativeTaskAdapter::ParseTeleportLocationPool(const std::string& commaSeparated)
+{
+    std::vector<TeleportDestinationConfig> pool;
+    std::istringstream ss(commaSeparated);
+    std::string token;
+    while (std::getline(ss, token, ','))
+    {
+        TeleportDestinationConfig dest;
+        if (ResolveTeleportLocation(token, dest))
+            pool.push_back(dest);
+    }
+    return pool;
+}
+
 bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, uint8_t teamId)
 {
     if (!bot || !bot->IsInWorld())
@@ -995,79 +1117,129 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
     }
 #endif
 
-    const TeleportZoneDestination* zones = nullptr;
-    size_t zoneCount = 0;
+    const TeleportZoneDestination* defaultZones = nullptr;
+    size_t defaultZoneCount = 0;
     if (teamId == 0) // Alliance
     {
-        zones = s_AllianceZones;
-        zoneCount = s_NumAllianceZones;
+        defaultZones = s_AllianceZones;
+        defaultZoneCount = s_NumAllianceZones;
     }
     else if (teamId == 1) // Horde
     {
-        zones = s_HordeZones;
-        zoneCount = s_NumHordeZones;
+        defaultZones = s_HordeZones;
+        defaultZoneCount = s_NumHordeZones;
     }
     else
         return false;
+
+    uint32_t targetMapId = 0;
+    float landingX = 0.0f;
+    float landingY = 0.0f;
+    float landingZ = 0.0f;
+    float landingO = 0.0f;
+    bool destFound = false;
 
     // Racial starter zone awareness for level 1-9 (bracket 0)
     if (newLevel < 10)
     {
         uint8_t race = bot->GetRace();
-        TeleportZoneDestination racialDest{0, 0.0f, 0.0f, 0.0f, 0.0f};
-        bool hasRacialDest = true;
-
-        switch (race)
+        const auto& starterPool = PopulationPolicy::Instance().GetStarterLocationPool(race);
+        if (!starterPool.empty())
         {
-            case RACE_HIGH_ELF: // High Elf (Turtle WoW) - Thalassian Highlands
-                racialDest = { 0, 3322.0f, -2448.0f, 107.2f, 3.47f };
-                break;
-            case RACE_GOBLIN: // Goblin (Turtle WoW) - Blackstone Island
-                racialDest = { 1, -275.6f, -7474.6f, 73.2f, 2.51f };
-                break;
-            case RACE_HUMAN: // Human - Northshire Valley
-                racialDest = { 0, -8949.9f, -132.5f, 83.5f, 0.0f };
-                break;
-            case RACE_DWARF: // Dwarf / Gnome - Coldridge Valley
-            case RACE_GNOME:
-                racialDest = { 0, -6240.3f, 331.0f, 382.8f, 6.17f };
-                break;
-            case RACE_NIGHTELF: // Night Elf - Shadowglen
-                racialDest = { 1, 10311.3f, 832.5f, 1326.4f, 5.69f };
-                break;
-            case RACE_ORC: // Orc / Troll - Valley of Trials
-            case RACE_TROLL:
-                racialDest = { 1, -618.0f, -4251.0f, 38.0f, 0.0f };
-                break;
-            case RACE_TAUREN: // Tauren - Red Cloud Mesa
-                racialDest = { 1, -2917.6f, -258.0f, 52.9f, 0.0f };
-                break;
-            case RACE_UNDEAD: // Undead - Deathknell
-                racialDest = { 0, 1676.7f, 1678.3f, 121.7f, 2.71f };
-                break;
-            default:
-                hasRacialDest = false;
-                break;
+            const auto& picked = starterPool[rand() % starterPool.size()];
+            targetMapId = picked.mapId;
+            landingX = picked.x;
+            landingY = picked.y;
+            landingZ = picked.z;
+            landingO = picked.o;
+            destFound = true;
         }
-
-        if (hasRacialDest)
+        else
         {
-            float landingZ = SampleFloorHeight(racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, 25.0f);
-            bot->TeleportTo(racialDest.mapId, racialDest.x, racialDest.y, landingZ, racialDest.o);
-            RegisterArrivalFloor(bot, racialDest.mapId, racialDest.x, racialDest.y, landingZ,
-                                 PopulationPolicy::Instance().GetArrivalHoldDurationMs());
-            return true;
+            TeleportZoneDestination racialDest{0, 0.0f, 0.0f, 0.0f, 0.0f};
+            bool hasRacialDest = true;
+
+            switch (race)
+            {
+                case RACE_HIGH_ELF: // High Elf (Turtle WoW) - Thalassian Highlands
+                    racialDest = { 0, 3322.0f, -2448.0f, 107.2f, 3.47f };
+                    break;
+                case RACE_GOBLIN: // Goblin (Turtle WoW) - Blackstone Island
+                    racialDest = { 1, -275.6f, -7474.6f, 73.2f, 2.51f };
+                    break;
+                case RACE_HUMAN: // Human - Northshire Valley
+                    racialDest = { 0, -8949.9f, -132.5f, 83.5f, 0.0f };
+                    break;
+                case RACE_DWARF: // Dwarf / Gnome - Coldridge Valley
+                case RACE_GNOME:
+                    racialDest = { 0, -6240.3f, 331.0f, 382.8f, 6.17f };
+                    break;
+                case RACE_NIGHTELF: // Night Elf - Shadowglen
+                    racialDest = { 1, 10311.3f, 832.5f, 1326.4f, 5.69f };
+                    break;
+                case RACE_ORC: // Orc / Troll - Valley of Trials
+                case RACE_TROLL:
+                    racialDest = { 1, -618.0f, -4251.0f, 38.0f, 0.0f };
+                    break;
+                case RACE_TAUREN: // Tauren - Red Cloud Mesa
+                    racialDest = { 1, -2917.6f, -258.0f, 52.9f, 0.0f };
+                    break;
+                case RACE_UNDEAD: // Undead - Deathknell
+                    racialDest = { 0, 1676.7f, 1678.3f, 121.7f, 2.71f };
+                    break;
+                default:
+                    hasRacialDest = false;
+                    break;
+            }
+
+            if (hasRacialDest)
+            {
+                targetMapId = racialDest.mapId;
+                landingX = racialDest.x;
+                landingY = racialDest.y;
+                landingZ = racialDest.z;
+                landingO = racialDest.o;
+                destFound = true;
+            }
         }
     }
 
-    size_t zoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, zoneCount - 1);
-    const TeleportZoneDestination& dest = zones[zoneIndex];
+    if (!destFound)
+    {
+        size_t zoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, defaultZoneCount - 1);
+        const auto& rangePool = PopulationPolicy::Instance().GetRangeLocationPool(teamId, zoneIndex);
+        if (!rangePool.empty())
+        {
+            const auto& picked = rangePool[rand() % rangePool.size()];
+            targetMapId = picked.mapId;
+            landingX = picked.x;
+            landingY = picked.y;
+            landingZ = picked.z;
+            landingO = picked.o;
+            destFound = true;
+        }
+        else
+        {
+            const TeleportZoneDestination& dest = defaultZones[zoneIndex];
+            targetMapId = dest.mapId;
+            landingX = dest.x;
+            landingY = dest.y;
+            landingZ = dest.z;
+            landingO = dest.o;
+            destFound = true;
+        }
+    }
 
-    float landingZ = SampleFloorHeight(dest.mapId, dest.x, dest.y, dest.z, 25.0f);
-    bot->TeleportTo(dest.mapId, dest.x, dest.y, landingZ, dest.o);
-    RegisterArrivalFloor(bot, dest.mapId, dest.x, dest.y, landingZ,
-                         PopulationPolicy::Instance().GetArrivalHoldDurationMs());
-    return true;
+    if (destFound)
+    {
+        float floorZ = SampleFloorHeight(targetMapId, landingX, landingY, landingZ, 25.0f);
+        bot->TeleportTo(targetMapId, landingX, landingY, floorZ, landingO);
+        RegisterArrivalFloor(bot, targetMapId, landingX, landingY, floorZ,
+                             PopulationPolicy::Instance().GetArrivalHoldDurationMs());
+        return true;
+    }
+
+    return false;
 }
 
 bool NativeTaskAdapter::IsInStarterValley(Player* bot)

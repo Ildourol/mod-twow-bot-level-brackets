@@ -121,6 +121,28 @@ BotLevelBrackets.City.UndercityTarget = 8
 BotLevelBrackets.City.ThunderBluffTarget = 6
 BotLevelBrackets.City.SparkwaterTarget = 6
 
+# Major City Bank Arrival Coordinates / .tele Names
+# Specifies the exact landing coordinates (map x y z o) or .tele command location name
+# when bots teleport to each racial capital city. By default, bots arrive inside the main
+# bank of each capital with a natural 1.0 - 2.5 yard dispersion offset and ground height sampling.
+# Defaults:
+#   Stormwind:    0 -8935.27 613.13 99.61 0.45   (Trade District Bank)
+#   Ironforge:    0 -4886.55 -997.59 504.02 2.23 (The Great Forge Bank)
+#   Darnassus:    1 9938.84 2521.53 1317.66 4.38 (Darnassus Bank Tree)
+#   Alah'Thalas:  0 4261.59 -2842.02 8.45 0.08   (Banker Shalanna, Alah'Thalas Bank)
+#   Orgrimmar:    1 1627.32 -4376.07 11.81 3.44  (Valley of Strength Bank)
+#   Undercity:    0 1599.96 240.65 -52.06 0.09   (Central Bank Ring)
+#   ThunderBluff: 1 -1257.63 19.56 128.27 1.73   (Lower Rise Bank)
+#   Sparkwater:   1 838.27 -5048.73 6.03 1.92    (Sparkwater Port Bank)
+BotLevelBrackets.City.Stormwind.Location = "0 -8935.27 613.13 99.61 0.45"
+BotLevelBrackets.City.Ironforge.Location = "0 -4886.55 -997.59 504.02 2.23"
+BotLevelBrackets.City.Darnassus.Location = "1 9938.84 2521.53 1317.66 4.38"
+BotLevelBrackets.City.AlahThalas.Location = "0 4261.59 -2842.02 8.45 0.08"
+BotLevelBrackets.City.Orgrimmar.Location = "1 1627.32 -4376.07 11.81 3.44"
+BotLevelBrackets.City.Undercity.Location = "0 1599.96 240.65 -52.06 0.09"
+BotLevelBrackets.City.ThunderBluff.Location = "1 -1257.63 19.56 128.27 1.73"
+BotLevelBrackets.City.Sparkwater.Location = "1 838.27 -5048.73 6.03 1.92"
+
 ###################################################################################################
 # OUTDOOR WORLD DISTRIBUTION
 ###################################################################################################
@@ -300,6 +322,56 @@ BotLevelBrackets.Horde.Range7.Upper = 60
 BotLevelBrackets.Horde.Range7.Pct = 14
 
 ###################################################################################################
+# STARTER VALLEYS & RACIAL TELEPORT DESTINATIONS (LEVELS 1-9)
+###################################################################################################
+# Comma-separated list of .tele location names or coordinates (map x y z o) for starting bots.
+# If a race has multiple locations, bots of that race randomly pick one upon creation or reset.
+BotLevelBrackets.Starter.Human.Locations = "northshire"
+BotLevelBrackets.Starter.Dwarf.Locations = "coldridge"
+BotLevelBrackets.Starter.Gnome.Locations = "coldridge"
+BotLevelBrackets.Starter.NightElf.Locations = "shadowglen"
+BotLevelBrackets.Starter.HighElf.Locations = "highelf"
+BotLevelBrackets.Starter.Orc.Locations = "valleyoftrials"
+BotLevelBrackets.Starter.Troll.Locations = "valleyoftrials"
+BotLevelBrackets.Starter.Tauren.Locations = "redcloud"
+BotLevelBrackets.Starter.Undead.Locations = "deathknell"
+BotLevelBrackets.Starter.Goblin.Locations = "blackstone"
+
+###################################################################################################
+# LEVELING ZONE DESTINATIONS & TURTLE WOW ZONE LEVEL CHART
+# Reference: https://turtle-wow.fandom.com/wiki/Zone_Level_Chart
+###################################################################################################
+# For each level bracket and faction, you can specify:
+# 1. A single location (e.g. "westfall" or "0 -10515.0 1070.0 55.0 0.0")
+# 2. A comma-separated pool of locations matching the Turtle WoW Zone Level Chart.
+#    When multiple locations are configured, bots will organically disperse across
+#    all viable leveling hubs across Eastern Kingdoms and Kalimdor upon level scaling.
+#
+# Available Turtle WoW Zones & Supported .tele Names:
+#   Bracket 2 (10-19): Westfall, Thelsamar (Loch Modan), Darkshore (Auberdine), TheCrossroads, SilverpineForest, RazorHill
+#   Bracket 3 (20-29): Redridge, Duskwood, Wetlands, Ashenvale, CampTaurajo, TarrenMill, StonetalonMountains, BalorHorde
+#   Bracket 4 (30-39): RebelCamp, RefugePointe, Southshore, AlteracMountains, Gilneas, Gromgol, Hammerfall, GhostWalker, FreewindPost, Kargath
+#   Bracket 5 (40-49): Feathermoon, Gadgetzan, AeriePeak, SwampOfSorrows, CampMojache, Hinterlands, Stonard, IcepointRock, LapidisIsle
+#   Bracket 6 (50-59): Chillwind, LightshopeChapel, Winterspring, Felwood, MorgansVigil, ThoriumPoint, UnGoro, BlastedLands, FlameCrest, TelAbim
+#   Bracket 7 (60):    LightshopeChapel, Silithus, Winterspring, Chillwind, UnGoro, Stormwind, Orgrimmar
+
+BotLevelBrackets.Alliance.Range1.Locations = "goldshire"
+BotLevelBrackets.Alliance.Range2.Locations = "westfall, thelsamar, darkshore"
+BotLevelBrackets.Alliance.Range3.Locations = "redridge, duskwood, wetlands, ashenvale, balorhorde"
+BotLevelBrackets.Alliance.Range4.Locations = "rebelcamp, refugepointe, southshore, alteracmountains, gilneas"
+BotLevelBrackets.Alliance.Range5.Locations = "feathermoon, gadgetzan, aeriepeak, swampofsorrows, icepointrock, lapidisisle"
+BotLevelBrackets.Alliance.Range6.Locations = "chillwind, lightshopechapel, winterspring, felwood, morgansvigil, thoriumpoint, ungoro, blastedlands, telabim"
+BotLevelBrackets.Alliance.Range7.Locations = "lightshopechapel, silithus, winterspring, chillwind, stormwind"
+
+BotLevelBrackets.Horde.Range1.Locations = "valleyoftrials"
+BotLevelBrackets.Horde.Range2.Locations = "thecrossroads, silverpineforest, razorhill"
+BotLevelBrackets.Horde.Range3.Locations = "camptaurajo, tarrenmill, ashenvale, stonetalonmountains, balorhorde"
+BotLevelBrackets.Horde.Range4.Locations = "gromgol, hammerfall, ghostwalker, freewindpost, kargath, gilneas"
+BotLevelBrackets.Horde.Range5.Locations = "campmojache, gadgetzan, hinterlands, stonard, icepointrock, lapidisisle"
+BotLevelBrackets.Horde.Range6.Locations = "ungoro, lightshopechapel, westernplaguelands, winterspring, felwood, flamecrest, thoriumpoint, silithus, telabim"
+BotLevelBrackets.Horde.Range7.Locations = "lightshopechapel, silithus, winterspring, ungoro, orgrimmar"
+
+###################################################################################################
 # SOCIAL & IDENTITY PROTECTIONS
 ###################################################################################################
 
@@ -322,6 +394,7 @@ BotLevelBrackets.Protection.GuildTrackerUpdateSeconds = 600
 
 # Comma-separated list of bot names immune from module task orchestration.
 BotLevelBrackets.Protection.ExcludedBotNames = ""
+BotLevelBrackets.ExcludeNames = ""
 
 ###################################################################################################
 # ACTIVITY REGISTRY CONTROLS

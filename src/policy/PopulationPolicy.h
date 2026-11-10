@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 namespace BotLevelBrackets
 {
@@ -26,6 +27,16 @@ struct LevelBracketConfig
     uint8_t lower;
     uint8_t upper;
     uint8_t desiredPercent;
+};
+
+struct TeleportDestinationConfig
+{
+    uint32_t mapId = 0;
+    float x = 0.0f;
+    float y = 0.0f;
+    float z = 0.0f;
+    float o = 0.0f;
+    std::string name;
 };
 
 class PopulationPolicy
@@ -189,6 +200,53 @@ public:
     uint32_t GetConfigGeneration() const { return m_configGeneration; }
     void IncrementConfigGeneration() { ++m_configGeneration; }
 
+    // City bank / arrival custom destinations
+    void SetCityLandingDestination(CityId id, const TeleportDestinationConfig& dest)
+    {
+        m_cityLandingDestinations[id] = dest;
+    }
+    bool GetCityLandingDestination(CityId id, TeleportDestinationConfig& outDest) const
+    {
+        auto it = m_cityLandingDestinations.find(id);
+        if (it != m_cityLandingDestinations.end())
+        {
+            outDest = it->second;
+            return true;
+        }
+        return false;
+    }
+
+    // Starter race leveling destination pools
+    void SetStarterLocationPool(uint8_t race, const std::vector<TeleportDestinationConfig>& pool)
+    {
+        m_starterLocationPools[race] = pool;
+    }
+    const std::vector<TeleportDestinationConfig>& GetStarterLocationPool(uint8_t race) const
+    {
+        static const std::vector<TeleportDestinationConfig> emptyPool;
+        auto it = m_starterLocationPools.find(race);
+        if (it != m_starterLocationPools.end())
+            return it->second;
+        return emptyPool;
+    }
+
+    // Faction range leveling destination pools
+    void SetRangeLocationPool(uint8_t team, size_t rangeIndex, const std::vector<TeleportDestinationConfig>& pool)
+    {
+        auto& pools = (team == 0) ? m_allianceRangePools : m_hordeRangePools;
+        if (rangeIndex >= pools.size())
+            pools.resize(rangeIndex + 1);
+        pools[rangeIndex] = pool;
+    }
+    const std::vector<TeleportDestinationConfig>& GetRangeLocationPool(uint8_t team, size_t rangeIndex) const
+    {
+        static const std::vector<TeleportDestinationConfig> emptyPool;
+        const auto& pools = (team == 0) ? m_allianceRangePools : m_hordeRangePools;
+        if (rangeIndex < pools.size())
+            return pools[rangeIndex];
+        return emptyPool;
+    }
+
 private:
     PopulationPolicy();
 
@@ -253,6 +311,11 @@ private:
     bool m_syncFactions = false;
 
     uint32_t m_configGeneration = 1;
+
+    std::unordered_map<CityId, TeleportDestinationConfig> m_cityLandingDestinations;
+    std::unordered_map<uint8_t, std::vector<TeleportDestinationConfig>> m_starterLocationPools;
+    std::vector<std::vector<TeleportDestinationConfig>> m_allianceRangePools;
+    std::vector<std::vector<TeleportDestinationConfig>> m_hordeRangePools;
 };
 
 } // namespace BotLevelBrackets

@@ -34,6 +34,10 @@ struct CityDefinition
     float centerY;
     float centerZ;
     float radius;
+    float bankX;
+    float bankY;
+    float bankZ;
+    float bankO;
 };
 
 struct OutdoorRegion

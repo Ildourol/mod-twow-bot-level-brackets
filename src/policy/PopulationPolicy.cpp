@@ -94,6 +94,13 @@ void PopulationPolicy::LoadDefaults()
 
     m_wrongMapDisperseEnabled = true;
     m_wrongMapDisperseFrequency = 60;
+
+    m_cityLandingDestinations.clear();
+    m_starterLocationPools.clear();
+    m_allianceRangePools.clear();
+    m_allianceRangePools.resize(7);
+    m_hordeRangePools.clear();
+    m_hordeRangePools.resize(7);
 }
 
 int32_t PopulationPolicy::GetCityTarget(size_t cityIndex) const

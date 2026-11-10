@@ -110,6 +110,22 @@ void LoadModuleConfiguration()
     policy.SetCityTarget(6, sConfig.GetIntDefault("BotLevelBrackets.City.ThunderBluffTarget", 6));
     policy.SetCityTarget(7, sConfig.GetIntDefault("BotLevelBrackets.City.SparkwaterTarget", 6));
 
+    auto loadCityLoc = [&](CityId cId, const char* key, const char* defaultVal) {
+        std::string locStr = sConfig.GetStringDefault(key, defaultVal);
+        TeleportDestinationConfig dest;
+        if (NativeTaskAdapter::ResolveTeleportLocation(locStr, dest))
+            policy.SetCityLandingDestination(cId, dest);
+    };
+
+    loadCityLoc(CityId::Stormwind, "BotLevelBrackets.City.Stormwind.Location", "0 -8935.27 613.13 99.61 0.45");
+    loadCityLoc(CityId::Ironforge, "BotLevelBrackets.City.Ironforge.Location", "0 -4886.55 -997.59 504.02 2.23");
+    loadCityLoc(CityId::Darnassus, "BotLevelBrackets.City.Darnassus.Location", "1 9938.84 2521.53 1317.66 4.38");
+    loadCityLoc(CityId::AlahThalas, "BotLevelBrackets.City.AlahThalas.Location", "0 4261.59 -2842.02 8.45 0.08");
+    loadCityLoc(CityId::Orgrimmar, "BotLevelBrackets.City.Orgrimmar.Location", "1 1627.32 -4376.07 11.81 3.44");
+    loadCityLoc(CityId::Undercity, "BotLevelBrackets.City.Undercity.Location", "0 1599.96 240.65 -52.06 0.09");
+    loadCityLoc(CityId::ThunderBluff, "BotLevelBrackets.City.ThunderBluff.Location", "1 -1257.63 19.56 128.27 1.73");
+    loadCityLoc(CityId::Sparkwater, "BotLevelBrackets.City.Sparkwater.Location", "1 838.27 -5048.73 6.03 1.92");
+
     // 3. Outdoor World Distribution Settings
     policy.SetWorldEnabled(sConfig.GetBoolDefault("BotLevelBrackets.World.Enabled", true));
     std::string worldDestStr = sConfig.GetStringDefault("BotLevelBrackets.World.DestinationPolicy", "RequireExact");
@@ -224,13 +240,58 @@ void LoadModuleConfiguration()
     policy.SetLevelBrackets(1, hordeBrackets);
     policy.ClampAndBalanceBrackets(true);
 
+    // Starter race leveling destination pools (Levels 1-9)
+    auto loadStarterPool = [&](uint8_t race, const char* key, const char* defaultPool) {
+        std::string poolStr = sConfig.GetStringDefault(key, defaultPool);
+        auto pool = NativeTaskAdapter::ParseTeleportLocationPool(poolStr);
+        policy.SetStarterLocationPool(race, pool);
+    };
+
+    loadStarterPool(RACE_HUMAN, "BotLevelBrackets.Starter.Human.Locations", "northshire");
+    loadStarterPool(RACE_DWARF, "BotLevelBrackets.Starter.Dwarf.Locations", "coldridge");
+    loadStarterPool(RACE_GNOME, "BotLevelBrackets.Starter.Gnome.Locations", "coldridge");
+    loadStarterPool(RACE_NIGHTELF, "BotLevelBrackets.Starter.NightElf.Locations", "shadowglen");
+    loadStarterPool(RACE_HIGH_ELF, "BotLevelBrackets.Starter.HighElf.Locations", "highelf");
+    loadStarterPool(RACE_ORC, "BotLevelBrackets.Starter.Orc.Locations", "valleyoftrials");
+    loadStarterPool(RACE_TROLL, "BotLevelBrackets.Starter.Troll.Locations", "valleyoftrials");
+    loadStarterPool(RACE_TAUREN, "BotLevelBrackets.Starter.Tauren.Locations", "redcloud");
+    loadStarterPool(RACE_UNDEAD, "BotLevelBrackets.Starter.Undead.Locations", "deathknell");
+    loadStarterPool(RACE_GOBLIN, "BotLevelBrackets.Starter.Goblin.Locations", "blackstone");
+
+    // Leveling zone destination pools (Turtle WoW Zone Level Chart)
+    auto loadRangePool = [&](uint8_t team, size_t rangeIndex, const char* key, const char* defaultPool) {
+        std::string poolStr = sConfig.GetStringDefault(key, defaultPool);
+        auto pool = NativeTaskAdapter::ParseTeleportLocationPool(poolStr);
+        policy.SetRangeLocationPool(team, rangeIndex, pool);
+    };
+
+    loadRangePool(0, 0, "BotLevelBrackets.Alliance.Range1.Locations", "goldshire");
+    loadRangePool(0, 1, "BotLevelBrackets.Alliance.Range2.Locations", "westfall, thelsamar, darkshore");
+    loadRangePool(0, 2, "BotLevelBrackets.Alliance.Range3.Locations", "redridge, duskwood, wetlands, ashenvale, balorhorde");
+    loadRangePool(0, 3, "BotLevelBrackets.Alliance.Range4.Locations", "rebelcamp, refugepointe, southshore, alteracmountains, gilneas");
+    loadRangePool(0, 4, "BotLevelBrackets.Alliance.Range5.Locations", "feathermoon, gadgetzan, aeriepeak, swampofsorrows, icepointrock, lapidisisle");
+    loadRangePool(0, 5, "BotLevelBrackets.Alliance.Range6.Locations", "chillwind, lightshopechapel, winterspring, felwood, morgansvigil, thoriumpoint, ungoro, blastedlands, telabim");
+    loadRangePool(0, 6, "BotLevelBrackets.Alliance.Range7.Locations", "lightshopechapel, silithus, winterspring, chillwind, stormwind");
+
+    loadRangePool(1, 0, "BotLevelBrackets.Horde.Range1.Locations", "valleyoftrials");
+    loadRangePool(1, 1, "BotLevelBrackets.Horde.Range2.Locations", "thecrossroads, silverpineforest, razorhill");
+    loadRangePool(1, 2, "BotLevelBrackets.Horde.Range3.Locations", "camptaurajo, tarrenmill, ashenvale, stonetalonmountains, balorhorde");
+    loadRangePool(1, 3, "BotLevelBrackets.Horde.Range4.Locations", "gromgol, hammerfall, ghostwalker, freewindpost, kargath, gilneas");
+    loadRangePool(1, 4, "BotLevelBrackets.Horde.Range5.Locations", "campmojache, gadgetzan, hinterlands, stonard, icepointrock, lapidisisle");
+    loadRangePool(1, 5, "BotLevelBrackets.Horde.Range6.Locations", "ungoro, lightshopechapel, westernplaguelands, winterspring, felwood, flamecrest, thoriumpoint, silithus, telabim");
+    loadRangePool(1, 6, "BotLevelBrackets.Horde.Range7.Locations", "lightshopechapel, silithus, winterspring, ungoro, orgrimmar");
+
     // 6. Social & Identity Protections
     prot.SetIgnoreFriendListed(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreFriendListed", true));
     prot.SetIgnoreRealPlayerGuilds(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreRealPlayerGuilds", true));
     prot.SetIgnoreArenaTeams(sConfig.GetBoolDefault("BotLevelBrackets.Protection.IgnoreArenaTeams", true));
     prot.SetSocialRefreshCadence(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Protection.SocialRefreshSeconds", 300)));
     prot.SetGuildTrackerCadence(static_cast<uint32_t>(sConfig.GetIntDefault("BotLevelBrackets.Protection.GuildTrackerUpdateSeconds", 600)));
-    prot.SetExcludedNames(sConfig.GetStringDefault("BotLevelBrackets.Protection.ExcludedBotNames", ""));
+
+    std::string exclNames = sConfig.GetStringDefault("BotLevelBrackets.Protection.ExcludedBotNames", "");
+    if (exclNames.empty())
+        exclNames = sConfig.GetStringDefault("BotLevelBrackets.ExcludeNames", "");
+    prot.SetExcludedNames(exclNames);
 
     // 7. Activity Registry Controls
     reg.SetActivitiesEnabled(sConfig.GetBoolDefault("BotLevelBrackets.Activities.Enabled", true));

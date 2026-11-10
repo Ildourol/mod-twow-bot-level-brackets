@@ -4,6 +4,7 @@
 #include "../world/ReadOnlyCatalog.h"
 #include <cstdint>
 #include <string>
+#include <vector>
 
 class Player;
 struct ObjectGuid;
@@ -12,6 +13,7 @@ namespace BotLevelBrackets
 {
 
 enum class TransitMode : uint8_t;
+struct TeleportDestinationConfig;
 
 enum class EngineKind : uint8_t
 {
@@ -85,6 +87,10 @@ public:
     // Level Adjustment & Complete Provisioning
     static bool AdjustBotLevel(Player* bot, uint8_t newLevel);
     static bool TeleportBotToLevelZone(Player* bot, uint8_t newLevel, uint8_t teamId);
+
+    // Destination Resolution & Pool Parsing
+    static bool ResolveTeleportLocation(const std::string& input, TeleportDestinationConfig& outDest);
+    static std::vector<TeleportDestinationConfig> ParseTeleportLocationPool(const std::string& commaSeparated);
 
     // Dispersal Checks & Operations
     static bool IsInStarterValley(Player* bot);
