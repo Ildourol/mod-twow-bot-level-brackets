@@ -905,7 +905,15 @@ bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
     factory.AddConsumes();
     factory.AddBandages();
 
-    // 7. AI Travel Target Expiration & State Reset
+    // 7. Full Item Durability Maintenance & Vital Stat Recovery
+    bot->DurabilityRepairAll(false, 0.0f);
+    bot->SetHealth(bot->GetMaxHealth());
+    if (bot->GetMaxPower(POWER_MANA) > 0)
+        bot->SetPower(POWER_MANA, bot->GetMaxPower(POWER_MANA));
+    else if (bot->GetMaxPower(POWER_ENERGY) > 0)
+        bot->SetPower(POWER_ENERGY, bot->GetMaxPower(POWER_ENERGY));
+
+    // 8. AI Travel Target Expiration & State Reset
     if (ai->GetAiObjectContext())
     {
         TravelTarget* travelTarget = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
@@ -932,6 +940,48 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
 {
     if (!bot || !bot->IsInWorld())
         return false;
+
+    // Clear active movement generators to stop bot running on old path
+    if (bot->GetMotionMaster())
+        bot->GetMotionMaster()->Clear(false);
+
+    if (bot->IsMounted())
+        bot->Unmount();
+
+    // Item durability maintenance and vital stat replenishment upon teleportation
+    bot->DurabilityRepairAll(false, 0.0f);
+    bot->SetHealth(bot->GetMaxHealth());
+    if (bot->GetMaxPower(POWER_MANA) > 0)
+        bot->SetPower(POWER_MANA, bot->GetMaxPower(POWER_MANA));
+    else if (bot->GetMaxPower(POWER_ENERGY) > 0)
+        bot->SetPower(POWER_ENERGY, bot->GetMaxPower(POWER_ENERGY));
+
+#if defined(HAVE_TORTOISEBOTS)
+    PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+    if (ai)
+    {
+        // Expire any stale travel target pointing to old zone/continent
+        if (ai->GetAiObjectContext())
+        {
+            TravelTarget* travelTarget = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+            if (travelTarget)
+            {
+                sTravelMgr.SetNullTravelTarget(travelTarget);
+                travelTarget->SetStatus(TravelStatus::TRAVEL_STATUS_EXPIRED);
+                travelTarget->SetExpireIn(1000);
+            }
+        }
+        // AI reset and strategy renewal for open-world outdoor activities
+        ai->Reset(true);
+        ai->ChangeStrategy("-rpg,+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+    }
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+    PlayerbotAI* ai = bot->GetPlayerbotAI();
+    if (ai)
+    {
+        ai->ChangeStrategy("-rpg,+travel,+grind", BotState::BOT_STATE_NON_COMBAT);
+    }
+#endif
 
     const TeleportZoneDestination* zones = nullptr;
     size_t zoneCount = 0;
@@ -990,8 +1040,6 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
 
         if (hasRacialDest)
         {
-            if (bot->IsMounted())
-                bot->Unmount();
             float landingZ = SampleFloorHeight(racialDest.mapId, racialDest.x, racialDest.y, racialDest.z, 25.0f);
             bot->TeleportTo(racialDest.mapId, racialDest.x, racialDest.y, landingZ, racialDest.o);
             RegisterArrivalFloor(bot, racialDest.mapId, racialDest.x, racialDest.y, landingZ,
@@ -1002,9 +1050,6 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
 
     size_t zoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, zoneCount - 1);
     const TeleportZoneDestination& dest = zones[zoneIndex];
-
-    if (bot->IsMounted())
-        bot->Unmount();
 
     float landingZ = SampleFloorHeight(dest.mapId, dest.x, dest.y, dest.z, 25.0f);
     bot->TeleportTo(dest.mapId, dest.x, dest.y, landingZ, dest.o);
