@@ -126,8 +126,8 @@ BotLevelBrackets.City.SparkwaterTarget = 6
 ###################################################################################################
 
 # Enable outdoor activity encouragement.
-# 1 = Enabled, 0 = Disabled (Default: 0 - outdoor bots follow 100% native TortoiseBots AI).
-BotLevelBrackets.World.Enabled = 0
+# 1 = Enabled, 0 = Disabled (Default: 1).
+BotLevelBrackets.World.Enabled = 1
 
 # Destination policy for outdoor tasks.
 # RequireExact: Requires exact region parameter (Honest missing control).
@@ -203,16 +203,16 @@ BotLevelBrackets.Teleport.MaxFloorLifts = 6
 BotLevelBrackets.StartingZoneDisperse.Enabled = 1
 
 # Frequency (in seconds) at which starting-zone dispersal runs.
-# Default: 120 seconds.
-BotLevelBrackets.StartingZoneDisperse.Frequency = 120
+# Default: 15 seconds (matching responsive WotLK baseline).
+BotLevelBrackets.StartingZoneDisperse.Frequency = 15
 
 # Enable automatic evacuation of bots stranded on invalid or non-continental maps.
 # 1 = Enabled, 0 = Disabled.
 BotLevelBrackets.WrongMapDisperse.Enabled = 1
 
 # Frequency (in seconds) at which wrong-map dispersal runs.
-# Default: 180 seconds.
-BotLevelBrackets.WrongMapDisperse.Frequency = 180
+# Default: 60 seconds (matching responsive WotLK baseline).
+BotLevelBrackets.WrongMapDisperse.Frequency = 60
 
 ###################################################################################################
 # LEVEL & POPULATION POLICIES

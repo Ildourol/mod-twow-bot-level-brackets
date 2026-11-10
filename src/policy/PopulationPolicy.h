@@ -194,7 +194,7 @@ private:
 
     bool m_enabled = true;
     bool m_cityEnabled = true;
-    bool m_worldEnabled = false;
+    bool m_worldEnabled = true;
     bool m_dryRun = false;
 
     DestinationPolicy m_cityDestPolicy = DestinationPolicy::RequireExact;
@@ -243,10 +243,10 @@ private:
     uint32_t m_maxFloorLifts = 6;
 
     bool m_startingZoneDisperseEnabled = true;
-    uint32_t m_startingZoneDisperseFrequency = 120;
+    uint32_t m_startingZoneDisperseFrequency = 15;
 
     bool m_wrongMapDisperseEnabled = true;
-    uint32_t m_wrongMapDisperseFrequency = 180;
+    uint32_t m_wrongMapDisperseFrequency = 60;
 
     bool m_useDynamicDistribution = false;
     float m_realPlayerWeight = 1.0f;

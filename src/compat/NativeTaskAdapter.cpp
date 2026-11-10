@@ -1137,7 +1137,13 @@ bool NativeTaskAdapter::IsBotSafeForDispersal(Player* bot)
     if (!bot || !bot->IsInWorld() || !bot->IsAlive())
         return false;
 
-    if (bot->IsInCombat() || bot->IsBeingTeleported())
+    if (bot->IsInCombat() || bot->IsBeingTeleported() || bot->IsTaxiFlying() || bot->m_duel != nullptr)
+        return false;
+
+    if (bot->InBattleGround() || bot->InBattleGroundQueue())
+        return false;
+
+    if (bot->GetMap() && (bot->GetMap()->IsDungeon() || bot->GetMap()->IsRaid() || bot->GetMap()->IsBattleGround()))
         return false;
 
     if (!IsFreeBot(bot))

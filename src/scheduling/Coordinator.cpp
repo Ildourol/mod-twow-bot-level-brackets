@@ -387,104 +387,10 @@ void Coordinator::ProcessCityDemands(const CensusSnapshot& snap, uint32_t now, u
 void Coordinator::ProcessOutdoorActivities(const CensusSnapshot& snap, uint32_t now, uint32_t& requestsRemaining)
 {
     (void)snap;
-    const auto& policy = PopulationPolicy::Instance();
-    const auto& reg = ActivityRegistry::Instance();
-    auto& ledger = RequestLedger::Instance();
-    bool isDryRun = policy.IsDryRun() || DiagnosticManager::Instance().IsDryRun();
-
-    if (!reg.IsActivitiesEnabled() || requestsRemaining == 0)
-        return;
-
-    // Pick requestable outdoor activities (e.g. GenericRpg, Grinding, FlightDiscovery)
-    std::vector<const ActivityDefinition*> requestableActivities;
-    for (const auto& act : reg.GetAllActivities())
-    {
-        if (act.enabled && act.worldEnabled &&
-            (act.supportClass == SupportClass::RequestableNativeChoice ||
-             act.supportClass == SupportClass::LocalOnly))
-        {
-            requestableActivities.push_back(&act);
-        }
-    }
-
-    if (requestableActivities.empty())
-        return;
-
-    const auto& playerMap = sObjectAccessor.GetPlayers();
-    for (const auto& kv : playerMap)
-    {
-        if (requestsRemaining == 0)
-            break;
-
-        Player* p = kv.second;
-        if (!p || !p->IsInWorld() || !p->IsAlive())
-            continue;
-
-        if (!NativeTaskAdapter::IsFreeBot(p))
-            continue;
-
-        uint32_t guidLow = p->GetObjectGuid().GetCounter();
-        if (ledger.HasActiveRequest(guidLow) || ledger.IsOnCooldown(guidLow, now))
-            continue;
-
-        if (ProtectionCache::Instance().IsBotProtected(p))
-            continue;
-
-        // Select an activity based on weights
-        const ActivityDefinition* act = requestableActivities[guidLow % requestableActivities.size()];
-        if (!act)
-            continue;
-
-        if (isDryRun)
-        {
-            DiagnosticManager::Instance().LogEvent(
-                "DryRun", "WouldRequestActivity", "Simulated",
-                "DryRun mode: simulated outdoor activity request",
-                0, guidLow, "", "", act->id);
-            --requestsRemaining;
-            continue;
-        }
-
-        uint64_t reqId = ledger.ProposeActivityRequest(
-            guidLow, p->GetTeamId(), act->id, act->supportClass,
-            policy.GetConfigGeneration(), now);
-
-        if (reqId == 0)
-            continue;
-
-        ledger.MarkSubmitted(reqId, now);
-        m_totalRequestsSubmitted.fetch_add(1, std::memory_order_relaxed);
-
-        bool ok = false;
-        if (!act->nativeActionName.empty())
-        {
-            ok = NativeTaskAdapter::DispatchNativeAction(p, act->nativeActionName);
-        }
-
-        if (ok)
-        {
-            ledger.MarkActivityObserved(reqId, now);
-            ledger.ApplyCooldown(guidLow, act->cooldownSeconds, now);
-            m_totalRequestsAccepted.fetch_add(1, std::memory_order_relaxed);
-            --requestsRemaining;
-
-            DiagnosticManager::Instance().LogEvent(
-                "ActivityRequests", "ActionDispatched", "Success",
-                "Dispatched native action",
-                reqId, guidLow, "", "", act->id);
-        }
-        else
-        {
-            ledger.MarkRejected(reqId, "ActionUselessOrImpossible", now);
-            ledger.ApplyCooldown(guidLow, policy.GetRejectionBackoffSeconds(), now);
-            m_totalRequestsRejected.fetch_add(1, std::memory_order_relaxed);
-
-            DiagnosticManager::Instance().LogEvent(
-                "ActivityRequests", "ActionRefused", "UselessOrImpossible",
-                "Action isUseful/isPossible returned false",
-                reqId, guidLow, "", "", act->id);
-        }
-    }
+    (void)now;
+    (void)requestsRemaining;
+    // Outdoor bot behavior is handled 100% natively by TortoiseBots once boosted and teleported.
+    // The module never alters or forces actions on outdoor bots in the open world, matching WotLK parity.
 }
 
 } // namespace BotLevelBrackets

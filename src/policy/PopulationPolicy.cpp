@@ -26,7 +26,7 @@ void PopulationPolicy::LoadDefaults()
 {
     m_enabled = true;
     m_cityEnabled = true;
-    m_worldEnabled = false;
+    m_worldEnabled = true;
     m_dryRun = false;
 
     m_cityDestPolicy = DestinationPolicy::RequireExact;
@@ -90,10 +90,10 @@ void PopulationPolicy::LoadDefaults()
     m_maxFloorLifts = 6;
 
     m_startingZoneDisperseEnabled = true;
-    m_startingZoneDisperseFrequency = 120;
+    m_startingZoneDisperseFrequency = 15;
 
     m_wrongMapDisperseEnabled = true;
-    m_wrongMapDisperseFrequency = 180;
+    m_wrongMapDisperseFrequency = 60;
 }
 
 int32_t PopulationPolicy::GetCityTarget(size_t cityIndex) const

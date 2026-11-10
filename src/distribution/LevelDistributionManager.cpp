@@ -82,6 +82,53 @@ LevelDistributionManager& LevelDistributionManager::Instance()
     return instance;
 }
 
+void LevelDistributionManager::Initialize()
+{
+    LoadPendingResetsFromDB();
+}
+
+void LevelDistributionManager::LoadPendingResetsFromDB()
+{
+    QueryResult* result = CharacterDatabase.Query(
+        "SELECT bot_guid, target_range, is_alliance, enqueued_at FROM bot_level_brackets_pending_resets");
+    if (!result)
+        return;
+
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    do
+    {
+        Field* fields = result->Fetch();
+        if (fields)
+        {
+            uint32_t guidLow = fields[0].GetUInt32();
+            uint8_t targetRange = fields[1].GetUInt8();
+            uint8_t teamId = (fields[2].GetUInt8() != 0) ? 0 : 1;
+            uint32_t enqueuedAt = fields[3].GetUInt32();
+
+            const auto& brackets = PopulationPolicy::Instance().GetLevelBrackets(teamId);
+            uint8_t targetLevel = 1;
+            if (targetRange < brackets.size())
+            {
+                const auto& b = brackets[targetRange];
+                targetLevel = (b.lower == b.upper) ? b.lower : static_cast<uint8_t>(urand(b.lower, b.upper));
+            }
+
+            PendingResetEntry entry{};
+            entry.guidLow = guidLow;
+            entry.targetRange = targetRange;
+            entry.targetLevel = targetLevel;
+            entry.teamId = teamId;
+            entry.enqueuedAt = enqueuedAt;
+
+            m_pendingResets[guidLow] = entry;
+        }
+    } while (result->NextRow());
+    delete result;
+
+    sLog.outString("[BotLevelBrackets] Loaded %u pending resets from database.",
+        static_cast<uint32_t>(m_pendingResets.size()));
+}
+
 void LevelDistributionManager::Update(uint32_t diff)
 {
     const auto& policy = PopulationPolicy::Instance();
@@ -189,6 +236,12 @@ bool LevelDistributionManager::EnqueueReset(Player* bot, uint8_t targetRange, ui
     entry.enqueuedAt = static_cast<uint32_t>(time(nullptr));
 
     m_pendingResets[guidLow] = entry;
+
+    CharacterDatabase.PExecute(
+        "REPLACE INTO bot_level_brackets_pending_resets (bot_guid, target_range, is_alliance, enqueued_at) "
+        "VALUES (%u, %u, %u, %u)",
+        guidLow, targetRange, (teamId == 0 ? 1 : 0), entry.enqueuedAt);
+
     return true;
 }
 
@@ -203,6 +256,8 @@ bool LevelDistributionManager::BoostBotDirect(Player* bot, uint8_t targetLevel)
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         m_pendingResets.erase(guidLow);
+        CharacterDatabase.PExecute(
+            "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = %u", guidLow);
     }
 
     // Cleanly cancel city visit if active
@@ -247,12 +302,15 @@ void LevelDistributionManager::RemoveBot(uint32_t guidLow)
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
     m_pendingResets.erase(guidLow);
+    CharacterDatabase.PExecute(
+        "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = %u", guidLow);
 }
 
 void LevelDistributionManager::ClearPendingQueue()
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
     m_pendingResets.clear();
+    CharacterDatabase.Execute("DELETE FROM bot_level_brackets_pending_resets");
 }
 
 void LevelDistributionManager::RunDistributionPass(ChatHandler* handler)
@@ -471,6 +529,8 @@ void LevelDistributionManager::ProcessPendingResets()
         {
             if (ttl > 0 && now >= it->second.enqueuedAt && (now - it->second.enqueuedAt) > ttl)
             {
+                CharacterDatabase.PExecute(
+                    "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = %u", it->first);
                 it = m_pendingResets.erase(it);
                 continue;
             }
@@ -478,19 +538,25 @@ void LevelDistributionManager::ProcessPendingResets()
             Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(it->first));
             if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
             {
+                CharacterDatabase.PExecute(
+                    "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = %u", it->first);
                 it = m_pendingResets.erase(it);
                 continue;
             }
 
             if (ProtectionCache::Instance().IsBotProtected(bot))
             {
+                CharacterDatabase.PExecute(
+                    "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = %u", it->first);
                 it = m_pendingResets.erase(it);
                 continue;
             }
 
-            // Check if bot is temporarily unsafe for level reset (combat, taxi flight, dead, trading, looting)
+            // Check if bot is temporarily unsafe for level reset (combat, taxi flight, dead, trading, looting, duel, BG, dungeon/raid)
             if (!bot->IsAlive() || bot->IsInCombat() || bot->IsTaxiFlying() || bot->IsBeingTeleported() ||
-                bot->GetTrader() || !bot->GetLootGuid().IsEmpty())
+                bot->GetTrader() || !bot->GetLootGuid().IsEmpty() || bot->m_duel != nullptr ||
+                bot->InBattleGround() || bot->InBattleGroundQueue() ||
+                (bot->GetMap() && (bot->GetMap()->IsDungeon() || bot->GetMap()->IsRaid() || bot->GetMap()->IsBattleGround())))
             {
                 // Temporarily busy - leave in queue for next tick!
                 m_statsBotsSkipped.fetch_add(1, std::memory_order_relaxed);
@@ -533,13 +599,15 @@ void LevelDistributionManager::ProcessPendingResets()
         }
     }
 
-    // Remove successfully adjusted candidates from queue
+    // Remove successfully adjusted candidates from queue and database
     if (!processed.empty())
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         for (uint32_t guidLow : processed)
         {
             m_pendingResets.erase(guidLow);
+            CharacterDatabase.PExecute(
+                "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = %u", guidLow);
         }
     }
 }
@@ -551,6 +619,9 @@ void LevelDistributionManager::ProcessStartingZoneDisperse()
 
     for (const auto& kv : playerMap)
     {
+        if (count >= 50)
+            break;
+
         Player* bot = kv.second;
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
@@ -601,6 +672,9 @@ void LevelDistributionManager::ProcessWrongMapDisperse()
 
     for (const auto& kv : playerMap)
     {
+        if (count >= 50)
+            break;
+
         Player* bot = kv.second;
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;

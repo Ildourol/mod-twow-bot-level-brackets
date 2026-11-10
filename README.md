@@ -177,8 +177,8 @@ BotLevelBrackets.City.UndercityTarget = 8
 BotLevelBrackets.City.ThunderBluffTarget = 6
 BotLevelBrackets.City.SparkwaterTarget = 6
 
-# Outdoor World Distribution & Field Reserve (0 = disabled, bots outside cities guided 100% by native TortoiseBots AI)
-BotLevelBrackets.World.Enabled = 0
+# Outdoor World Distribution & Field Reserve (1 = enabled, outdoor bots follow 100% native TortoiseBots AI)
+BotLevelBrackets.World.Enabled = 1
 BotLevelBrackets.World.DestinationPolicy = RequireExact
 BotLevelBrackets.World.FieldReservePct = 70
 

@@ -82,13 +82,13 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
     if (strcmp(subCommand, "force") == 0)
         return HandleForce(handler, args);
 
-    if (strcmp(subCommand, "cleanup") == 0)
+    if (strcmp(subCommand, "cleanup") == 0 || strcmp(subCommand, "guildcleanup") == 0)
         return HandleCleanup(handler);
 
     if (strcmp(subCommand, "debug") == 0)
         return HandleDebug(handler, args);
 
-    handler->SendSysMessage("Unknown BLB subcommand. Valid: status, cities, world, brackets, boost, pending, activities, ledger, stats, explain, reload, force, cleanup, debug.");
+    handler->SendSysMessage("Unknown BLB subcommand. Valid: status, cities, world, brackets, boost, pending, activities, ledger, stats, explain, reload, force, cleanup, guildcleanup, debug.");
     return true;
 }
 
@@ -113,7 +113,7 @@ bool BotBracketsCommands::HandleStatus(ChatHandler* handler)
         policy.GetWorldDestinationPolicy() == DestinationPolicy::RequireExact ? "RequireExact" : "AllowNativeChoice");
     handler->PSendSysMessage("Ledger: Alliance Outstanding=%u, Horde Outstanding=%u",
         RequestLedger::Instance().GetOutstandingCount(0), RequestLedger::Instance().GetOutstandingCount(1));
-    return true;
+    return HandleBrackets(handler);
 }
 
 bool BotBracketsCommands::HandleCities(ChatHandler* handler)
