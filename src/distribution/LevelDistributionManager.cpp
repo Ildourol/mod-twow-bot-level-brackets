@@ -306,6 +306,19 @@ std::vector<PendingResetEntry> LevelDistributionManager::GetPendingQueueSnapshot
     return snapshot;
 }
 
+void LevelDistributionManager::RemoveBot(uint32_t guidLow)
+{
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    auto it = m_pendingResets.find(guidLow);
+    if (it != m_pendingResets.end())
+    {
+        CharacterDatabase.PExecute(
+            "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
+            ObjectGuid(guidLow).GetRawValue());
+        m_pendingResets.erase(it);
+    }
+}
+
 void LevelDistributionManager::ClearPendingQueue()
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
@@ -515,6 +528,7 @@ void LevelDistributionManager::ProcessPendingResets()
     uint32_t now = static_cast<uint32_t>(time(nullptr));
 
     std::vector<PendingResetEntry> candidates;
+    std::vector<uint32_t> toErase;
 
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
@@ -529,10 +543,33 @@ void LevelDistributionManager::ProcessPendingResets()
         {
             if (ttl > 0 && now >= it->second.enqueuedAt && (now - it->second.enqueuedAt) > ttl)
             {
-                CharacterDatabase.PExecute(
-                    "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
-                    ObjectGuid(it->second.guidLow).GetRawValue());
+                toErase.push_back(it->first);
                 it = m_pendingResets.erase(it);
+                continue;
+            }
+
+            Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(it->first));
+            if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
+            {
+                toErase.push_back(it->first);
+                it = m_pendingResets.erase(it);
+                continue;
+            }
+
+            if (ProtectionCache::Instance().IsBotProtected(bot))
+            {
+                toErase.push_back(it->first);
+                it = m_pendingResets.erase(it);
+                continue;
+            }
+
+            // Check if bot is temporarily unsafe for level reset (combat, taxi flight, dead, trading, looting)
+            if (!bot->IsAlive() || bot->IsInCombat() || bot->IsTaxiFlying() || bot->IsBeingTeleported() ||
+                bot->GetTrader() || !bot->GetLootGuid().IsEmpty())
+            {
+                // Temporarily busy - leave in queue for next tick!
+                m_statsBotsSkipped.fetch_add(1, std::memory_order_relaxed);
+                ++it;
                 continue;
             }
 
@@ -540,28 +577,30 @@ void LevelDistributionManager::ProcessPendingResets()
                 break;
 
             candidates.push_back(it->second);
-            it = m_pendingResets.erase(it);
+            ++it;
         }
     }
 
-    for (const auto& entry : candidates)
+    // Erase dropped/expired entries from database
+    for (uint32_t guidLow : toErase)
     {
-        // Remove from database table
         CharacterDatabase.PExecute(
             "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
-            ObjectGuid(entry.guidLow).GetRawValue());
+            ObjectGuid(guidLow).GetRawValue());
+    }
 
+    std::vector<uint32_t> processed;
+    for (const auto& entry : candidates)
+    {
         Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(entry.guidLow));
-        if (!bot || !bot->IsInWorld() || !bot->IsAlive() || bot->IsInCombat() || bot->IsBeingTeleported())
-            continue;
-
-        if (ProtectionCache::Instance().IsBotProtected(bot))
+        if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
 
         bool inCity = NativeTaskAdapter::HasActiveCityVisit(bot->GetObjectGuid());
 
         if (NativeTaskAdapter::AdjustBotLevel(bot, entry.targetLevel))
         {
+            processed.push_back(entry.guidLow);
             m_statsBotsAdjusted.fetch_add(1, std::memory_order_relaxed);
 
             if (inCity)
@@ -574,6 +613,19 @@ void LevelDistributionManager::ProcessPendingResets()
                 NativeTaskAdapter::TeleportBotToLevelZone(bot, entry.targetLevel, entry.teamId);
                 m_statsBotsTeleported.fetch_add(1, std::memory_order_relaxed);
             }
+        }
+    }
+
+    // Remove successfully adjusted candidates from queue and database
+    if (!processed.empty())
+    {
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        for (uint32_t guidLow : processed)
+        {
+            m_pendingResets.erase(guidLow);
+            CharacterDatabase.PExecute(
+                "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
+                ObjectGuid(guidLow).GetRawValue());
         }
     }
 }

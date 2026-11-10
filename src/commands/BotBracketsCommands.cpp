@@ -250,6 +250,8 @@ bool BotBracketsCommands::HandleStats(ChatHandler* handler)
         static_cast<unsigned long long>(distMgr.GetTotalCyclesRun()));
     handler->PSendSysMessage("Total Bots Level-Adjusted / Boosted: %llu",
         static_cast<unsigned long long>(distMgr.GetTotalBotsAdjusted()));
+    handler->PSendSysMessage("Total Bots Deferred (In Combat/Busy): %llu",
+        static_cast<unsigned long long>(distMgr.GetTotalBotsSkipped()));
     handler->PSendSysMessage("Total Bots Teleported to Leveling Zones: %llu",
         static_cast<unsigned long long>(distMgr.GetTotalBotsTeleported()));
     handler->PSendSysMessage("Total Over-Leveled Bots Dispersed from Starters: %llu",

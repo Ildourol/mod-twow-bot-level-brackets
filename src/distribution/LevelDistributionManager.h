@@ -35,6 +35,7 @@ public:
 
     bool EnqueueReset(Player* bot, uint8_t targetRange, uint8_t teamId);
     bool BoostBotDirect(Player* bot, uint8_t targetLevel);
+    void RemoveBot(uint32_t guidLow);
 
     size_t GetPendingQueueSize() const;
     std::vector<PendingResetEntry> GetPendingQueueSnapshot() const;
@@ -42,6 +43,7 @@ public:
 
     uint64_t GetTotalBotsAdjusted() const { return m_statsBotsAdjusted.load(); }
     uint64_t GetTotalBotsTeleported() const { return m_statsBotsTeleported.load(); }
+    uint64_t GetTotalBotsSkipped() const { return m_statsBotsSkipped.load(); }
     uint64_t GetTotalDispersedStarter() const { return m_statsDispersedStarter.load(); }
     uint64_t GetTotalDispersedWrongMap() const { return m_statsDispersedWrongMap.load(); }
     uint64_t GetTotalCyclesRun() const { return m_statsCyclesRun.load(); }
@@ -65,6 +67,7 @@ private:
 
     std::atomic<uint64_t> m_statsBotsAdjusted{0};
     std::atomic<uint64_t> m_statsBotsTeleported{0};
+    std::atomic<uint64_t> m_statsBotsSkipped{0};
     std::atomic<uint64_t> m_statsDispersedStarter{0};
     std::atomic<uint64_t> m_statsDispersedWrongMap{0};
     std::atomic<uint64_t> m_statsCyclesRun{0};

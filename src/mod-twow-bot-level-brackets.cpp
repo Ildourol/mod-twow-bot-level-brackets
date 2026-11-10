@@ -340,6 +340,7 @@ public:
             return;
 
         uint32_t guidLow = player->GetObjectGuid().GetCounter();
+        LevelDistributionManager::Instance().RemoveBot(guidLow);
         const LedgerEntry* active = RequestLedger::Instance().GetActiveEntryForBot(guidLow);
         if (active)
         {
