@@ -310,23 +310,15 @@ void NativeTaskAdapter::ApplyCityArrivalProtocol(Player* bot, CityId cityId)
         // 1. Full AI reset to clean up stale open-world travel targets, expired combat state, and queues
         ai->Reset(true);
 
-        // 2. Configure non-combat strategies to enforce TortoiseBots city protocol
-        // Drop open-world grinding and travel while visiting racial capitals
-        ai->ChangeStrategy("-travel,-grind", BotState::BOT_STATE_NON_COMBAT);
-
-        // Add standard TortoiseBots city activities (quests, vendors, AH, mail, trainers, repairs, professions)
-        ai->ChangeStrategy("+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft,+collision", BotState::BOT_STATE_NON_COMBAT);
-
-        // 3. Initiate first city RPG action so bot immediately begins interacting with NPCs
-        ai->DoSpecificAction("choose rpg target", Event(), true);
-        ai->DoSpecificAction("move to rpg target", Event(), true);
+        // 2. Configure non-combat strategies to enforce pure native TortoiseBots city protocol
+        // Drop open-world grinding and travel, and activate native RPG strategy family
+        ai->ChangeStrategy("-travel,-grind,+rpg,+collision", BotState::BOT_STATE_NON_COMBAT);
     }
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
     PlayerbotAI* ai = bot->GetPlayerbotAI();
     if (ai)
     {
         ai->ChangeStrategy("-travel,-grind,+rpg", BotState::BOT_STATE_NON_COMBAT);
-        ai->DoSpecificAction("choose rpg target", Event(), true);
     }
 #endif
 }
@@ -556,7 +548,7 @@ void NativeTaskAdapter::Update(uint32_t diff)
                 continue;
             }
 
-            // Anti-AFK engine pulse: every 5 seconds, keep bot following TortoiseBots city protocol
+            // State maintenance: ensure visiting bot maintains native TortoiseBots city protocol
             if (now - it->second.lastPulseAt >= 5)
             {
                 it->second.lastPulseAt = now;
@@ -569,17 +561,7 @@ void NativeTaskAdapter::Update(uint32_t diff)
                     if (ai->HasStrategy("grind", BotState::BOT_STATE_NON_COMBAT))
                         ai->ChangeStrategy("-grind", BotState::BOT_STATE_NON_COMBAT);
                     if (!ai->HasStrategy("rpg", BotState::BOT_STATE_NON_COMBAT))
-                        ai->ChangeStrategy("+rpg,+rpg quest,+rpg vendor,+rpg explore,+rpg maintenance,+rpg craft", BotState::BOT_STATE_NON_COMBAT);
-
-                    if (ai->GetAiObjectContext())
-                    {
-                        GuidPosition currentRpgTarget = ai->GetAiObjectContext()->GetValue<GuidPosition>("rpg target")->Get();
-                        if (!currentRpgTarget && !bot->IsMoving())
-                        {
-                            ai->DoSpecificAction("choose rpg target", Event(), true);
-                            ai->DoSpecificAction("move to rpg target", Event(), true);
-                        }
-                    }
+                        ai->ChangeStrategy("+rpg", BotState::BOT_STATE_NON_COMBAT);
                 }
 #endif
             }
