@@ -82,58 +82,6 @@ LevelDistributionManager& LevelDistributionManager::Instance()
     return instance;
 }
 
-void LevelDistributionManager::LoadPendingResetsFromDB()
-{
-    QueryResult* result = CharacterDatabase.Query(
-        "SELECT bot_guid, target_range, is_alliance, enqueued_at FROM bot_level_brackets_pending_resets");
-
-    if (!result)
-        return;
-
-    const auto& policy = PopulationPolicy::Instance();
-    std::lock_guard<std::mutex> lock(m_queueMutex);
-    uint32_t count = 0;
-
-    do
-    {
-        Field* fields = result->Fetch();
-        if (!fields)
-            continue;
-
-        uint64_t rawGuid = fields[0].GetUInt64();
-        uint8_t targetRange = fields[1].GetUInt8();
-        uint8_t isAlliance = fields[2].GetUInt8();
-        uint32_t enqueuedAt = fields[3].GetUInt32();
-
-        uint8_t teamId = isAlliance ? 0 : 1;
-        const auto& brackets = policy.GetLevelBrackets(teamId);
-        uint8_t targetLevel = 1;
-        if (targetRange < brackets.size())
-        {
-            const auto& b = brackets[targetRange];
-            targetLevel = (b.lower == b.upper) ? b.lower : static_cast<uint8_t>(urand(b.lower, b.upper));
-        }
-
-        uint32_t guidLow = ObjectGuid(rawGuid).GetCounter();
-        PendingResetEntry entry{};
-        entry.guidLow = guidLow;
-        entry.targetRange = targetRange;
-        entry.targetLevel = targetLevel;
-        entry.teamId = teamId;
-        entry.enqueuedAt = enqueuedAt;
-
-        m_pendingResets[guidLow] = entry;
-        ++count;
-    } while (result->NextRow());
-
-    delete result;
-
-    if (count > 0)
-    {
-        sLog.outString("[BotLevelBrackets] Loaded %u pending level resets from persistent database table.", count);
-    }
-}
-
 void LevelDistributionManager::Update(uint32_t diff)
 {
     const auto& policy = PopulationPolicy::Instance();
@@ -241,14 +189,6 @@ bool LevelDistributionManager::EnqueueReset(Player* bot, uint8_t targetRange, ui
     entry.enqueuedAt = static_cast<uint32_t>(time(nullptr));
 
     m_pendingResets[guidLow] = entry;
-
-    // Persist to database table
-    CharacterDatabase.PExecute(
-        "REPLACE INTO bot_level_brackets_pending_resets (bot_guid, target_range, is_alliance, enqueued_at) "
-        "VALUES ('" UI64FMTD "', %u, %u, %u)",
-        bot->GetObjectGuid().GetRawValue(), static_cast<uint32_t>(targetRange),
-        teamId == 0 ? 1 : 0, entry.enqueuedAt);
-
     return true;
 }
 
@@ -263,9 +203,6 @@ bool LevelDistributionManager::BoostBotDirect(Player* bot, uint8_t targetLevel)
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         m_pendingResets.erase(guidLow);
-        CharacterDatabase.PExecute(
-            "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
-            bot->GetObjectGuid().GetRawValue());
     }
 
     // Cleanly cancel city visit if active
@@ -309,21 +246,13 @@ std::vector<PendingResetEntry> LevelDistributionManager::GetPendingQueueSnapshot
 void LevelDistributionManager::RemoveBot(uint32_t guidLow)
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
-    auto it = m_pendingResets.find(guidLow);
-    if (it != m_pendingResets.end())
-    {
-        CharacterDatabase.PExecute(
-            "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
-            ObjectGuid(guidLow).GetRawValue());
-        m_pendingResets.erase(it);
-    }
+    m_pendingResets.erase(guidLow);
 }
 
 void LevelDistributionManager::ClearPendingQueue()
 {
     std::lock_guard<std::mutex> lock(m_queueMutex);
     m_pendingResets.clear();
-    CharacterDatabase.PExecute("TRUNCATE TABLE bot_level_brackets_pending_resets");
 }
 
 void LevelDistributionManager::RunDistributionPass(ChatHandler* handler)
@@ -528,7 +457,6 @@ void LevelDistributionManager::ProcessPendingResets()
     uint32_t now = static_cast<uint32_t>(time(nullptr));
 
     std::vector<PendingResetEntry> candidates;
-    std::vector<uint32_t> toErase;
 
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
@@ -543,7 +471,6 @@ void LevelDistributionManager::ProcessPendingResets()
         {
             if (ttl > 0 && now >= it->second.enqueuedAt && (now - it->second.enqueuedAt) > ttl)
             {
-                toErase.push_back(it->first);
                 it = m_pendingResets.erase(it);
                 continue;
             }
@@ -551,14 +478,12 @@ void LevelDistributionManager::ProcessPendingResets()
             Player* bot = sObjectAccessor.FindPlayer(ObjectGuid(it->first));
             if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
             {
-                toErase.push_back(it->first);
                 it = m_pendingResets.erase(it);
                 continue;
             }
 
             if (ProtectionCache::Instance().IsBotProtected(bot))
             {
-                toErase.push_back(it->first);
                 it = m_pendingResets.erase(it);
                 continue;
             }
@@ -579,14 +504,6 @@ void LevelDistributionManager::ProcessPendingResets()
             candidates.push_back(it->second);
             ++it;
         }
-    }
-
-    // Erase dropped/expired entries from database
-    for (uint32_t guidLow : toErase)
-    {
-        CharacterDatabase.PExecute(
-            "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
-            ObjectGuid(guidLow).GetRawValue());
     }
 
     std::vector<uint32_t> processed;
@@ -616,16 +533,13 @@ void LevelDistributionManager::ProcessPendingResets()
         }
     }
 
-    // Remove successfully adjusted candidates from queue and database
+    // Remove successfully adjusted candidates from queue
     if (!processed.empty())
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         for (uint32_t guidLow : processed)
         {
             m_pendingResets.erase(guidLow);
-            CharacterDatabase.PExecute(
-                "DELETE FROM bot_level_brackets_pending_resets WHERE bot_guid = '" UI64FMTD "'",
-                ObjectGuid(guidLow).GetRawValue());
         }
     }
 }

@@ -29,7 +29,6 @@ public:
     static LevelDistributionManager& Instance();
 
     void Update(uint32_t diff);
-    void LoadPendingResetsFromDB();
     void ForceDistributionCycle(ChatHandler* handler = nullptr);
     void ForceDispersalCycle(ChatHandler* handler = nullptr);
 

@@ -162,11 +162,11 @@ BotLevelBrackets.LevelDistribution.FlaggedProcessLimit = 5
 # Default: 2.
 BotLevelBrackets.LevelDistribution.MinBracketChangeThreshold = 2
 
-# Maximum size of the pending reset queue (0 = unlimited).
+# Maximum size of the in-memory pending reset queue (0 = unlimited).
 # Default: 0.
 BotLevelBrackets.LevelDistribution.MaxPendingQueueSize = 0
 
-# Maximum time a bot can remain in the pending reset queue (in seconds, 0 = no TTL).
+# Maximum time a bot can remain in the in-memory pending reset queue (in seconds, 0 = no TTL).
 # Default: 0.
 BotLevelBrackets.LevelDistribution.PendingQueueTTL = 0
 

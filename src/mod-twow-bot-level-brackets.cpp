@@ -297,7 +297,6 @@ public:
 
         LoadModuleConfiguration();
         ProtectionCache::Instance().Initialize();
-        LevelDistributionManager::Instance().LoadPendingResetsFromDB();
     }
 
     void OnAfterConfigLoad(bool reload) override
