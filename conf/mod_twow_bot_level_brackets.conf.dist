@@ -92,9 +92,8 @@ BotLevelBrackets.City.TransitMode = 2
 BotLevelBrackets.City.PickAllBrackets = 1
 
 # Minimum level required for a bot to be eligible for a capital city visit.
-# Characters under level 10 remain in starting zones (Northshire, Coldridge, Shadowglen, Valley of Trials, etc.)
-# Default: 10
-BotLevelBrackets.City.MinLevel = 10
+# Default: 1 (allowing bots from all brackets 1-7 to visit capital cities)
+BotLevelBrackets.City.MinLevel = 1
 
 # Desired dwell duration for bots visiting a city (in milliseconds).
 # Default: 300000 (5 minutes).
@@ -338,68 +337,68 @@ BotLevelBrackets.Horde.Range7.Pct = 14
 # Comma-separated list of .tele location names or coordinates (map x y z o) for starting bots.
 # If a race has multiple locations, bots of that race randomly pick one upon creation or reset.
 BotLevelBrackets.Starter.Human.Locations = "northshire, goldshire"
-BotLevelBrackets.Starter.Dwarf.Locations = "coldridge, kharanos"
-BotLevelBrackets.Starter.Gnome.Locations = "coldridge, kharanos"
+BotLevelBrackets.Starter.Dwarf.Locations = "coldridge, kharanos, brewnallvillage"
+BotLevelBrackets.Starter.Gnome.Locations = "coldridge, kharanos, brewnallvillage"
 BotLevelBrackets.Starter.NightElf.Locations = "shadowglen, dolanaar"
-BotLevelBrackets.Starter.HighElf.Locations = "highelf, alahthalasarrival"
+BotLevelBrackets.Starter.HighElf.Locations = "highelf, thalassianhighlands"
 BotLevelBrackets.Starter.Orc.Locations = "valleyoftrials, razorhill"
 BotLevelBrackets.Starter.Troll.Locations = "valleyoftrials, senjinvillage"
 BotLevelBrackets.Starter.Tauren.Locations = "redcloud, campnarache, bloodhoofvillage"
 BotLevelBrackets.Starter.Undead.Locations = "deathknell, brill"
-BotLevelBrackets.Starter.Goblin.Locations = "blackstone, sparkwater"
+BotLevelBrackets.Starter.Goblin.Locations = "blackstone"
 
 ###################################################################################################
 # LEVELING ZONE DESTINATIONS & TURTLE WOW ZONE LEVEL CHART
 # Reference: https://turtle-wow.fandom.com/wiki/Zone_Level_Chart
 ###################################################################################################
-# For each level bracket and faction, you can specify:
-# 1. A single location (e.g. "westfall" or "0 -10515.0 1070.0 55.0 0.0")
-# 2. A comma-separated pool of locations matching the Turtle WoW Zone Level Chart.
-#    When multiple locations are configured, bots will organically disperse across
-#    all viable questing zones, outposts, and capital cities across Eastern Kingdoms
-#    and Kalimdor upon level scaling.
+# For each level bracket and faction, specify a comma-separated pool of locations.
+# Leveling zone destinations strictly contain open-world questing zones and settlements
+# matching that bracket's level range. Capital cities are NOT included in world leveling
+# pools; capital cities are managed separately via the dedicated Capital City Ladder
+# (BotLevelBrackets.City.*) where bots of all brackets (1-7) can be teleported to cities.
 #
 # Available Turtle WoW Zones & Supported .tele Names:
-#   Bracket 1 (1-10):   Goldshire, Northshire, Coldridge, Kharanos, Shadowglen, Dolanaar, High Elf,
-#                       Valley of Trials, Razor Hill, Sen'jin Village, Deathknell, Brill, Camp Narache,
-#                       Bloodhoof Village, Red Cloud, Blackstone Island, and all 8 Capital Cities
+#   Bracket 1 (1-9):    Goldshire, Northshire, Coldridge, Kharanos, Brewnall Village,
+#                       Shadowglen, Dolanaar, High Elf, Thalassian Highlands,
+#                       Valley of Trials, Razor Hill, Sen'jin Village, Deathknell, Brill,
+#                       Camp Narache, Bloodhoof Village, Red Cloud, Blackstone Island
 #   Bracket 2 (10-19):  Westfall, Sentinel Hill, Thelsamar, Loch Modan, Darkshore, Auberdine,
-#                       The Crossroads, Barrens, Silverpine Forest, The Sepulcher, Razor Hill, Capital Cities
+#                       The Crossroads, Barrens, Silverpine Forest, The Sepulcher, Razor Hill
 #   Bracket 3 (20-29):  Redridge Mountains, Lakeshire, Duskwood, Darkshire, Wetlands, Menethil Harbor,
 #                       Ashenvale, Astranaar, Splintertree Post, Zoram'gar Outpost, Stonetalon Mountains,
-#                       Sun Rock Retreat, Tarren Mill, Southshore, Balor, Capital Cities
-#   Bracket 4 (30-39):  Refuge Pointe, Hammerfall, Arathi Highlands, Southshore, Alterac Mountains,
+#                       Stonetalon Peak, Sun Rock Retreat, Tarren Mill, Hillsbrad Foothills, Southshore,
+#                       Freewind Post, Balor
+#   Bracket 4 (30-39):  Refuge Pointe, Hammerfall, Arathi Highlands, Alterac Mountains,
 #                       Rebel Camp, Grom'gol Base Camp, Stranglethorn Vale, Booty Bay, Desolace,
 #                       Nijel's Point, Ghost Walker Post, Theramore, Brackenwall Village, Dustwallow Marsh,
 #                       Freewind Post, Thousand Needles, Kargath, Badlands, Stonard, Swamp of Sorrows,
-#                       Gilneas, Gilneas City, Capital Cities
+#                       Gilneas, Gilneas City
 #   Bracket 5 (40-49):  Feathermoon Stronghold, Camp Mojache, Feralas, Gadgetzan, Tanaris, Aerie Peak,
 #                       Revantusk Village, The Hinterlands, Kargath, Badlands, Thorium Point, Searing Gorge,
-#                       Stonard, Swamp of Sorrows, Icepoint Rock, Lapidis Isle, Capital Cities
+#                       Stonard, Swamp of Sorrows, Blasted Lands, Azshara, Valormok, Icepoint Rock, Lapidis Isle
 #   Bracket 6 (50-59):  Western Plaguelands, Eastern Plaguelands, Light's Hope Chapel, Winterspring,
 #                       Everlook, Felwood, Bloodvenom Post, Morgan's Vigil, Flame Crest, Burning Steppes,
-#                       Thorium Point, Un'Goro Crater, Marshal's Refuge, Blasted Lands, Azshara, Valormok,
-#                       Silithus, Cenarion Hold, Tel'Abim, Capital Cities
-#   Bracket 7 (60):     All Capital Cities (Stormwind, Ironforge, Darnassus, Alah'Thalas, Orgrimmar,
-#                       Undercity, Thunder Bluff, Sparkwater Port), Light's Hope Chapel, Silithus,
-#                       Cenarion Hold, Winterspring, Everlook, Western Plaguelands, Burning Steppes,
-#                       Morgan's Vigil, Flame Crest, Thorium Point, Un'Goro Crater, Valormok
+#                       Thorium Point, Un'Goro Crater, Marshal's Refuge, Blasted Lands, Silithus, Cenarion Hold,
+#                       Tel'Abim, Hyjal Entrance
+#   Bracket 7 (60):     Western Plaguelands, Eastern Plaguelands, Light's Hope Chapel, Silithus,
+#                       Cenarion Hold, Winterspring, Everlook, Burning Steppes, Morgan's Vigil, Flame Crest,
+#                       Thorium Point, Un'Goro Crater, Marshal's Refuge, Tel'Abim, Hyjal Entrance
 
-BotLevelBrackets.Alliance.Range1.Locations = "goldshire, northshire, coldridge, kharanos, shadowglen, dolanaar, highelf, stormwind, ironforge, darnassus, alahthalasarrival"
-BotLevelBrackets.Alliance.Range2.Locations = "westfall, sentinelhill, thelsamar, lochmodan, darkshore, auberdine, stormwind, ironforge, darnassus, alahthalasarrival"
-BotLevelBrackets.Alliance.Range3.Locations = "redridgemountains, lakeshire, duskwood, darkshire, wetlands, menethilharbor, ashenvale, astranaar, stonetalonpeak, southshore, balorhorde, stormwind, ironforge, darnassus, alahthalasarrival"
-BotLevelBrackets.Alliance.Range4.Locations = "refugepointe, arathihighlands, southshore, alteracmountains, rebelcamp, bootybay, desolace, nijelspoint, theramore, dustwallowmarsh, thousandneedles, gilneas, gilneascity, stormwind, ironforge, darnassus, alahthalasarrival"
-BotLevelBrackets.Alliance.Range5.Locations = "feathermoonstronghold, feralas, gadgetzan, tanaris, aeriepeak, thehinterlands, thoriumpoint, searinggorge, swampofsorrows, icepointrock, lapidisisle, lapidis, stormwind, ironforge, darnassus, alahthalasarrival"
-BotLevelBrackets.Alliance.Range6.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, felwood, morgansvigil, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, azshara, silithus, cenarionhold, telabim, stormwind, ironforge, darnassus, alahthalasarrival"
-BotLevelBrackets.Alliance.Range7.Locations = "stormwind, ironforge, darnassus, alahthalasarrival, lightshopechapel, silithus, cenarionhold, winterspring, everlook, westernplaguelands, burningsteppes, morgansvigil, thoriumpoint, ungorocrater"
+BotLevelBrackets.Alliance.Range1.Locations = "goldshire, northshire, coldridge, kharanos, brewnallvillage, shadowglen, dolanaar, highelf, thalassianhighlands"
+BotLevelBrackets.Alliance.Range2.Locations = "westfall, sentinelhill, thelsamar, lochmodan, darkshore, auberdine"
+BotLevelBrackets.Alliance.Range3.Locations = "redridgemountains, lakeshire, duskwood, darkshire, wetlands, menethilharbor, ashenvale, astranaar, stonetalonpeak, southshore, balorhorde"
+BotLevelBrackets.Alliance.Range4.Locations = "refugepointe, arathihighlands, alteracmountains, rebelcamp, bootybay, desolace, nijelspoint, theramore, dustwallowmarsh, thousandneedles, badlands, swampofsorrows, gilneas, gilneascity"
+BotLevelBrackets.Alliance.Range5.Locations = "feathermoonstronghold, feralas, gadgetzan, tanaris, aeriepeak, thehinterlands, thoriumpoint, searinggorge, blastedlands, azshara, icepointrock, lapidisisle, lapidis"
+BotLevelBrackets.Alliance.Range6.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, felwood, morgansvigil, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, silithus, cenarionhold, telabim, hyjalentrance"
+BotLevelBrackets.Alliance.Range7.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, silithus, cenarionhold, winterspring, everlook, burningsteppes, morgansvigil, thoriumpoint, ungorocrater, marshalsrefuge, telabim, hyjalentrance"
 
-BotLevelBrackets.Horde.Range1.Locations = "valleyoftrials, razorhill, senjinvillage, deathknell, brill, campnarache, bloodhoofvillage, redcloud, blackstone, orgrimmar, undercity, thunderbluff, sparkwater"
-BotLevelBrackets.Horde.Range2.Locations = "thecrossroads, barrens, silverpineforest, thesepulcher, razorhill, orgrimmar, undercity, thunderbluff, sparkwater"
-BotLevelBrackets.Horde.Range3.Locations = "camptaurajo, thecrossroads, splintertreepost, ashenvale, zoramgaroutpost, sunrockretreat, stonetalonmountains, tarrenmill, thesepulcher, balorhorde, orgrimmar, undercity, thunderbluff, sparkwater"
-BotLevelBrackets.Horde.Range4.Locations = "hammerfall, arathihighlands, alteracmountains, gromgolbasecamp, stranglethornvale, bootybay, ghostwalkerpost, desolace, brackenwallvillage, dustwallowmarsh, freewindpost, thousandneedles, kargath, badlands, stonard, swampofsorrows, gilneas, gilneascity, orgrimmar, undercity, thunderbluff, sparkwater"
-BotLevelBrackets.Horde.Range5.Locations = "campmojache, feralas, gadgetzan, tanaris, revantuskvillage, thehinterlands, kargath, badlands, thoriumpoint, searinggorge, stonard, swampofsorrows, icepointrock, lapidisisle, lapidis, orgrimmar, undercity, thunderbluff, sparkwater"
-BotLevelBrackets.Horde.Range6.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, bloodvenompost, felwood, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, blastedlands, valormok, azshara, silithus, cenarionhold, telabim, orgrimmar, undercity, thunderbluff, sparkwater"
-BotLevelBrackets.Horde.Range7.Locations = "orgrimmar, undercity, thunderbluff, sparkwater, lightshopechapel, silithus, cenarionhold, winterspring, everlook, westernplaguelands, flamecrest, thoriumpoint, ungorocrater, valormok"
+BotLevelBrackets.Horde.Range1.Locations = "valleyoftrials, razorhill, senjinvillage, deathknell, brill, campnarache, bloodhoofvillage, redcloud, blackstone"
+BotLevelBrackets.Horde.Range2.Locations = "thecrossroads, barrens, silverpineforest, thesepulcher, razorhill"
+BotLevelBrackets.Horde.Range3.Locations = "camptaurajo, splintertreepost, ashenvale, zoramgaroutpost, sunrockretreat, stonetalonmountains, tarrenmill, hillsbradfoothills, freewindpost, balorhorde"
+BotLevelBrackets.Horde.Range4.Locations = "hammerfall, arathihighlands, alteracmountains, gromgolbasecamp, stranglethornvale, bootybay, ghostwalkerpost, desolace, brackenwallvillage, dustwallowmarsh, freewindpost, thousandneedles, kargath, badlands, stonard, swampofsorrows, gilneas, gilneascity"
+BotLevelBrackets.Horde.Range5.Locations = "campmojache, feralas, gadgetzan, tanaris, revantuskvillage, thehinterlands, kargath, badlands, thoriumpoint, searinggorge, stonard, swampofsorrows, blastedlands, azshara, valormok, icepointrock, lapidisisle, lapidis"
+BotLevelBrackets.Horde.Range6.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, winterspring, everlook, bloodvenompost, felwood, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, silithus, cenarionhold, telabim, hyjalentrance"
+BotLevelBrackets.Horde.Range7.Locations = "westernplaguelands, lightshopechapel, easternplaguelands, silithus, cenarionhold, winterspring, everlook, flamecrest, burningsteppes, thoriumpoint, ungorocrater, marshalsrefuge, telabim, hyjalentrance"
 
 ###################################################################################################
 # SOCIAL & IDENTITY PROTECTIONS

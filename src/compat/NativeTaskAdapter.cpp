@@ -858,29 +858,201 @@ static const StarterValleyArea s_StartingAreas[] =
 };
 static constexpr size_t s_NumStartingAreas = sizeof(s_StartingAreas) / sizeof(s_StartingAreas[0]);
 
-static const TeleportZoneDestination s_AllianceZones[] =
+// Turtle WoW Zone Level Chart - Canonical Hardcoded Leveling Destinations per Bracket (No Cities)
+static const std::vector<TeleportZoneDestination> s_AllianceBracketZones[7] =
 {
-    { 0,  -9464.0f,    62.0f,  56.0f, 0.0f },     // 1-9:   Elwynn Forest (Goldshire)
-    { 0, -10515.0f,  1070.0f,  55.0f, 0.0f },     // 10-19: Westfall (Sentinel Hill)
-    { 0,  -9250.0f, -2160.0f,  64.0f, 0.0f },     // 20-29: Redridge Mountains (Lakeshire)
-    { 0, -11340.0f,  -200.0f,  75.0f, 0.0f },     // 30-39: Northern STV (Rebel Camp)
-    { 1,  -4380.0f,  2060.0f,  49.0f, 0.0f },     // 40-49: Feralas (Feathermoon Stronghold)
-    { 0,    940.0f, -1450.0f,  63.0f, 0.0f },     // 50-59: Western Plaguelands (Chillwind Camp)
-    { 0,    940.0f, -1450.0f,  63.0f, 0.0f }      // 60:    Western Plaguelands (outdoors)
+    // Bracket 0: 1-9 (Elwynn Forest, Dun Morogh, Teldrassil, Thalassian Highlands)
+    {
+        { 0, -8921.09f,  -119.14f,  82.20f, 5.83f }, // Northshire Valley
+        { 0, -9448.55f,    68.24f,  56.32f, 2.11f }, // Goldshire
+        { 0, -6231.77f,   332.99f, 383.17f, 0.48f }, // Coldridge Valley
+        { 0, -5597.31f,  -483.40f, 396.98f, 3.18f }, // Kharanos
+        { 0, -5385.04f,   310.28f, 394.15f, 5.20f }, // Brewnall Village
+        { 1, 10334.00f,   833.90f, 1326.11f, 3.62f }, // Shadowglen
+        { 1,  9848.37f,   966.95f, 1306.38f, 3.77f }, // Dolanaar
+        { 0,  3321.97f, -2447.81f,  107.18f, 3.47f }, // High Elf Starter / Thalassian Highlands
+        { 0,  3625.95f, -2434.33f,   67.09f, 0.07f }  // Thalassian Highlands
+    },
+    // Bracket 1: 10-19 (Westfall, Loch Modan, Darkshore)
+    {
+        { 0, -10235.20f,  1222.47f,  43.63f, 6.24f }, // Westfall
+        { 0, -10624.50f,  1096.66f,  33.76f, 1.31f }, // Sentinel Hill
+        { 0,  -5202.94f, -2855.18f, 336.82f, 0.38f }, // Loch Modan
+        { 0,  -5352.54f, -2948.53f, 323.78f, 5.34f }, // Thelsamar
+        { 1,   5756.25f,   298.51f,  20.60f, 5.97f }, // Darkshore
+        { 1,   6376.26f,   558.12f,  15.11f, 2.59f }  // Auberdine
+    },
+    // Bracket 2: 20-29 (Redridge Mountains, Duskwood, Wetlands, Ashenvale, Stonetalon, Southshore, Balor)
+    {
+        { 0,  -9551.81f, -2204.73f,  93.47f, 5.47f }, // Redridge Mountains
+        { 0,  -9266.59f, -2188.77f,  64.09f, 2.10f }, // Lakeshire
+        { 0, -10898.30f,  -364.78f,  39.27f, 3.05f }, // Duskwood
+        { 0, -10573.00f, -1182.51f,  28.01f, 0.31f }, // Darkshire
+        { 0,  -3242.81f, -2469.04f,  15.92f, 6.04f }, // Wetlands
+        { 0,  -3769.32f,  -744.26f,   8.01f, 1.96f }, // Menethil Harbor
+        { 1,   2676.19f,  -422.91f, 107.12f, 0.65f }, // Astranaar (Ashenvale)
+        { 1,   2678.38f,  1497.46f, 233.87f, 6.26f }, // Stonetalon Peak
+        { 0,   -853.22f,  -533.53f,   9.99f, 0.24f }, // Southshore (Hillsbrad)
+        { 0,  -9180.10f,  2573.64f,   9.47f, 0.40f }  // Balor (Turtle WoW)
+    },
+    // Bracket 3: 30-39 (Arathi Highlands, Alterac, STV, Desolace, Dustwallow, 1000 Needles, Badlands, Swamp of Sorrows, Gilneas)
+    {
+        { 0,  -1508.51f, -2732.06f,  32.50f, 3.36f }, // Arathi Highlands
+        { 0,  -1246.61f, -2529.32f,  20.61f, 0.74f }, // Refuge Pointe
+        { 0,    370.76f,  -491.36f, 175.36f, 5.38f }, // Alterac Mountains
+        { 0, -11322.40f,  -202.49f,  75.64f, 0.43f }, // Rebel Camp (Northern STV)
+        { 0, -14297.20f,   530.99f,   8.78f, 3.99f }, // Booty Bay
+        { 1,   -606.40f,  2211.75f,  92.98f, 0.81f }, // Desolace
+        { 1,    176.43f,  1309.76f, 190.18f, 0.56f }, // Nijel's Point
+        { 1,  -3641.30f, -4358.93f,   8.35f, 3.82f }, // Theramore (Dustwallow Marsh)
+        { 1,  -4969.02f, -1726.89f, -62.13f, 3.79f }, // Thousand Needles
+        { 0,  -6779.20f, -3423.64f, 241.67f, 0.65f }, // Badlands
+        { 0, -10345.40f, -2773.42f,  21.99f, 5.08f }, // Swamp of Sorrows
+        { 0,   -696.85f,  1498.40f,   8.70f, 2.72f }, // Gilneas (Turtle WoW)
+        { 815,-1095.44f,  2234.75f, 182.86f, 2.60f }  // Gilneas City (Turtle WoW)
+    },
+    // Bracket 4: 40-49 (Feralas, Tanaris, The Hinterlands, Searing Gorge, Blasted Lands, Azshara, Icepoint Rock, Lapidis)
+    {
+        { 1,  -4841.19f,  1309.44f,  81.39f, 1.49f }, // Feralas
+        { 1,  -4317.47f,  3287.35f,  18.29f, 3.13f }, // Feathermoon Stronghold
+        { 1,  -7931.20f, -3414.28f,  80.74f, 0.67f }, // Tanaris
+        { 1,  -7177.15f, -3785.34f,   8.37f, 6.10f }, // Gadgetzan
+        { 0,    119.39f, -3190.37f, 117.33f, 2.34f }, // The Hinterlands
+        { 0,    260.37f, -2125.21f, 119.57f, 3.18f }, // Aerie Peak
+        { 0,  -7012.47f, -1065.13f, 241.79f, 5.63f }, // Searing Gorge
+        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f }, // Thorium Point
+        { 0, -11182.50f, -3016.67f,   7.42f, 4.00f }, // Blasted Lands
+        { 1,   3341.36f, -4603.79f,  92.50f, 5.28f }, // Azshara
+        { 1,  13675.00f, -6593.94f,   3.04f, 0.88f }, // Icepoint Rock (Turtle WoW)
+        { 0, -12533.20f,  3631.64f,  14.56f, 0.19f }  // Lapidis Isle (Turtle WoW)
+    },
+    // Bracket 5: 50-59 (Western Plaguelands, Eastern Plaguelands, Winterspring, Felwood, Burning Steppes, Un'Goro, Silithus, Tel'Abim, Hyjal)
+    {
+        { 0,   1728.65f, -1602.25f,  63.43f, 1.66f }, // Western Plaguelands
+        { 0,   2300.97f, -4613.36f,  73.62f, 0.37f }, // Eastern Plaguelands
+        { 0,   2289.89f, -5281.52f,  82.13f, 4.55f }, // Light's Hope Chapel
+        { 1,   6759.18f, -4419.63f, 763.21f, 4.43f }, // Winterspring
+        { 1,   6725.69f, -4619.44f, 720.91f, 4.67f }, // Everlook
+        { 1,   4102.25f, -1006.79f, 272.72f, 0.79f }, // Felwood
+        { 0,  -8118.54f, -1633.83f, 132.99f, 0.09f }, // Burning Steppes
+        { 0,  -8372.77f, -2754.46f, 186.62f, 3.43f }, // Morgan's Vigil
+        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f }, // Thorium Point
+        { 1,  -7943.22f, -2119.09f,-218.34f, 6.07f }, // Un'Goro Crater
+        { 1,  -6152.25f, -1087.60f,-201.44f, 0.71f }, // Marshal's Refuge
+        { 1,  -7426.87f,  1005.31f,   1.13f, 2.96f }, // Silithus
+        { 1,  -6818.09f,   733.81f,  41.57f, 2.31f }, // Cenarion Hold
+        { 1,  -8878.96f, -6536.87f,  13.48f, 1.53f }, // Tel'Abim (Turtle WoW)
+        { 1,   4602.55f, -3881.32f, 944.18f, 0.95f }  // Hyjal Entrance (Turtle WoW)
+    },
+    // Bracket 6: 60 (Endgame Level 60 Zones)
+    {
+        { 0,   1728.65f, -1602.25f,  63.43f, 1.66f }, // Western Plaguelands
+        { 0,   2289.89f, -5281.52f,  82.13f, 4.55f }, // Light's Hope Chapel (EPL)
+        { 1,  -6818.09f,   733.81f,  41.57f, 2.31f }, // Cenarion Hold (Silithus)
+        { 1,   6725.69f, -4619.44f, 720.91f, 4.67f }, // Everlook (Winterspring)
+        { 0,  -8372.77f, -2754.46f, 186.62f, 3.43f }, // Morgan's Vigil (Burning Steppes)
+        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f }, // Thorium Point
+        { 1,  -6152.25f, -1087.60f,-201.44f, 0.71f }, // Marshal's Refuge (Un'Goro)
+        { 1,  -8878.96f, -6536.87f,  13.48f, 1.53f }, // Tel'Abim (Turtle WoW)
+        { 1,   4602.55f, -3881.32f, 944.18f, 0.95f }  // Hyjal Entrance (Turtle WoW)
+    }
 };
-static constexpr size_t s_NumAllianceZones = sizeof(s_AllianceZones) / sizeof(s_AllianceZones[0]);
 
-static const TeleportZoneDestination s_HordeZones[] =
+static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
 {
-    { 1,   -618.0f, -4251.0f,  38.0f, 0.0f },     // 1-9:   Durotar (Valley of Trials)
-    { 1,    310.0f, -4680.0f,  16.0f, 0.0f },     // 10-19: Durotar (Razor Hill)
-    { 1,   -440.0f, -2650.0f,  96.0f, 0.0f },     // 20-29: The Barrens (Crossroads)
-    { 0,    -24.0f,  -870.0f,  55.0f, 0.0f },     // 30-39: Hillsbrad Foothills (Tarren Mill)
-    { 1,  -4400.0f,   190.0f,  25.0f, 0.0f },     // 40-49: Feralas (Camp Mojache)
-    { 1,  -7180.0f, -1070.0f, -188.0f, 0.0f },    // 50-59: Un'Goro Crater (Entrance)
-    { 1,  -7180.0f, -1070.0f, -188.0f, 0.0f }     // 60:    Un'Goro Crater (outdoors)
+    // Bracket 0: 1-9 (Durotar, Tirisfal Glades, Mulgore, Blackstone Island)
+    {
+        { 1,  -601.29f, -4296.76f,  37.81f, 1.65f }, // Valley of Trials
+        { 1,   326.81f, -4706.65f,  15.37f, 4.16f }, // Razor Hill
+        { 1,  -828.00f, -4927.10f,  20.16f, 1.58f }, // Sen'jin Village
+        { 0,  1843.50f,  1590.00f,  93.30f, 3.09f }, // Deathknell
+        { 0,  2259.25f,   290.43f,  34.11f, 0.99f }, // Brill
+        { 1, -2919.35f,  -264.54f,  53.62f, 0.41f }, // Camp Narache
+        { 1, -2240.91f,  -399.17f,  -9.42f, 2.53f }, // Bloodhoof Village
+        { 1,  -275.60f, -7474.59f,  73.19f, 2.51f }  // Blackstone Island (Goblin)
+    },
+    // Bracket 1: 10-19 (Northern Barrens, Silverpine Forest, Durotar)
+    {
+        { 1,  -452.84f, -2650.76f,  95.52f, 0.24f }, // The Crossroads
+        { 1,    48.00f, -2715.55f,  91.67f, 0.16f }, // Barrens
+        { 0,   878.74f,  1359.33f,  50.36f, 5.90f }, // Silverpine Forest
+        { 0,   504.53f,  1539.08f, 129.50f, 1.36f }, // The Sepulcher
+        { 1,   326.81f, -4706.65f,  15.37f, 4.16f }  // Razor Hill
+    },
+    // Bracket 2: 20-29 (Southern Barrens, Ashenvale, Stonetalon, Hillsbrad, Thousand Needles, Balor)
+    {
+        { 1, -2372.00f, -1960.00f,  96.00f, 0.00f }, // Camp Taurajo
+        { 1,  2270.94f, -2538.19f,  93.92f, 0.06f }, // Splintertree Post (Ashenvale)
+        { 1,  3376.86f,  1013.05f,   3.34f, 3.82f }, // Zoram'gar Outpost
+        { 1,  1570.92f,  1031.52f, 137.96f, 3.33f }, // Stonetalon Mountains
+        { 1,   966.15f,   926.50f, 104.65f, 1.27f }, // Sun Rock Retreat
+        { 0,   -34.15f,  -923.37f,  54.56f, 0.15f }, // Tarren Mill (Hillsbrad)
+        { 0,  -436.66f,  -581.25f,  53.59f, 1.26f }, // Hillsbrad Foothills
+        { 1, -5431.78f, -2449.38f,  89.28f, 2.33f }, // Freewind Post (Thousand Needles)
+        { 0, -9180.10f,  2573.64f,   9.47f, 0.40f }  // Balor (Turtle WoW)
+    },
+    // Bracket 3: 30-39 (Arathi Highlands, Alterac, STV, Desolace, Dustwallow, 1000 Needles, Badlands, Swamp of Sorrows, Gilneas)
+    {
+        { 0,  -941.01f, -3526.66f,  70.94f, 3.49f }, // Hammerfall (Arathi)
+        { 0,  -1508.51f, -2732.06f,  32.50f, 3.36f }, // Arathi Highlands
+        { 0,    370.76f,  -491.36f, 175.36f, 5.38f }, // Alterac Mountains
+        { 0, -12388.90f,   172.58f,   2.83f, 1.92f }, // Grom'gol Base Camp (STV)
+        { 0, -14297.20f,   530.99f,   8.78f, 3.99f }, // Booty Bay
+        { 1,  -606.40f,  2211.75f,  92.98f, 0.81f }, // Desolace
+        { 1, -1690.00f,  3280.00f,  65.00f, 0.00f }, // Ghost Walker Post
+        { 1, -3130.67f, -2908.43f,  34.10f, 1.43f }, // Brackenwall Village (Dustwallow)
+        { 1, -5431.78f, -2449.38f,  89.28f, 2.33f }, // Freewind Post (Thousand Needles)
+        { 0, -6692.48f, -2175.31f, 244.15f, 0.43f }, // Kargath (Badlands)
+        { 0, -10446.90f, -3261.91f,  20.18f, 5.02f }, // Stonard (Swamp of Sorrows)
+        { 0,   -696.85f,  1498.40f,   8.70f, 2.72f }, // Gilneas (Turtle WoW)
+        { 815,-1095.44f,  2234.75f, 182.86f, 2.60f }  // Gilneas City (Turtle WoW)
+    },
+    // Bracket 4: 40-49 (Feralas, Tanaris, The Hinterlands, Searing Gorge, Badlands, Swamp of Sorrows, Blasted Lands, Azshara, Icepoint, Lapidis)
+    {
+        { 1, -4396.70f,   224.84f,  25.41f, 4.94f }, // Camp Mojache (Feralas)
+        { 1, -7931.20f, -3414.28f,  80.74f, 0.67f }, // Tanaris
+        { 1, -7177.15f, -3785.34f,   8.37f, 6.10f }, // Gadgetzan
+        { 0,  -557.23f, -4581.27f,   9.59f, 1.02f }, // Revantusk Village (Hinterlands)
+        { 0, -7012.47f, -1065.13f, 241.79f, 5.63f }, // Searing Gorge
+        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f }, // Thorium Point
+        { 0, -6692.48f, -2175.31f, 244.15f, 0.43f }, // Kargath
+        { 0, -10446.90f, -3261.91f,  20.18f, 5.02f }, // Stonard
+        { 0, -11182.50f, -3016.67f,   7.42f, 4.00f }, // Blasted Lands
+        { 1,  3341.36f, -4603.79f,  92.50f, 5.28f }, // Azshara
+        { 1,  1980.00f, -4250.00f,  45.00f, 0.00f }, // Valormok
+        { 1, 13675.00f, -6593.94f,   3.04f, 0.88f }, // Icepoint Rock (Turtle WoW)
+        { 0, -12533.20f,  3631.64f,  14.56f, 0.19f }  // Lapidis Isle (Turtle WoW)
+    },
+    // Bracket 5: 50-59 (Western Plaguelands, Eastern Plaguelands, Winterspring, Felwood, Burning Steppes, Un'Goro, Silithus, Tel'Abim, Hyjal)
+    {
+        { 0,  1728.65f, -1602.25f,  63.43f, 1.66f }, // Western Plaguelands
+        { 0,  2300.97f, -4613.36f,  73.62f, 0.37f }, // Eastern Plaguelands
+        { 0,  2289.89f, -5281.52f,  82.13f, 4.55f }, // Light's Hope Chapel
+        { 1,  6759.18f, -4419.63f, 763.21f, 4.43f }, // Winterspring
+        { 1,  6725.69f, -4619.44f, 720.91f, 4.67f }, // Everlook
+        { 1,  2380.00f, -1170.00f, 318.00f, 0.00f }, // Bloodvenom Post (Felwood)
+        { 0, -7501.51f, -2183.08f, 165.93f, 6.07f }, // Flame Crest (Burning Steppes)
+        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f }, // Thorium Point
+        { 1, -7943.22f, -2119.09f,-218.34f, 6.07f }, // Un'Goro Crater
+        { 1, -6152.25f, -1087.60f,-201.44f, 0.71f }, // Marshal's Refuge
+        { 1, -7426.87f,  1005.31f,   1.13f, 2.96f }, // Silithus
+        { 1, -6818.09f,   733.81f,  41.57f, 2.31f }, // Cenarion Hold
+        { 1, -8878.96f, -6536.87f,  13.48f, 1.53f }, // Tel'Abim (Turtle WoW)
+        { 1,  4602.55f, -3881.32f, 944.18f, 0.95f }  // Hyjal Entrance (Turtle WoW)
+    },
+    // Bracket 6: 60 (Endgame Level 60 Zones)
+    {
+        { 0,  1728.65f, -1602.25f,  63.43f, 1.66f }, // Western Plaguelands
+        { 0,  2289.89f, -5281.52f,  82.13f, 4.55f }, // Light's Hope Chapel (EPL)
+        { 1, -6818.09f,   733.81f,  41.57f, 2.31f }, // Cenarion Hold (Silithus)
+        { 1,  6725.69f, -4619.44f, 720.91f, 4.67f }, // Everlook (Winterspring)
+        { 0, -7501.51f, -2183.08f, 165.93f, 6.07f }, // Flame Crest (Burning Steppes)
+        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f }, // Thorium Point
+        { 1, -6152.25f, -1087.60f,-201.44f, 0.71f }, // Marshal's Refuge (Un'Goro)
+        { 1, -8878.96f, -6536.87f,  13.48f, 1.53f }, // Tel'Abim (Turtle WoW)
+        { 1,  4602.55f, -3881.32f, 944.18f, 0.95f }  // Hyjal Entrance (Turtle WoW)
+    }
 };
-static constexpr size_t s_NumHordeZones = sizeof(s_HordeZones) / sizeof(s_HordeZones[0]);
 
 bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
 {
@@ -1125,19 +1297,7 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
     }
 #endif
 
-    const TeleportZoneDestination* defaultZones = nullptr;
-    size_t defaultZoneCount = 0;
-    if (teamId == 0) // Alliance
-    {
-        defaultZones = s_AllianceZones;
-        defaultZoneCount = s_NumAllianceZones;
-    }
-    else if (teamId == 1) // Horde
-    {
-        defaultZones = s_HordeZones;
-        defaultZoneCount = s_NumHordeZones;
-    }
-    else
+    if (teamId > 1)
         return false;
 
     uint32_t targetMapId = 0;
@@ -1214,7 +1374,7 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
 
     if (!destFound)
     {
-        size_t zoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, defaultZoneCount - 1);
+        size_t zoneIndex = newLevel < 10 ? 0 : std::min<size_t>(newLevel / 10, 6);
         const auto& rangePool = PopulationPolicy::Instance().GetRangeLocationPool(teamId, zoneIndex);
         if (!rangePool.empty())
         {
@@ -1228,13 +1388,17 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
         }
         else
         {
-            const TeleportZoneDestination& dest = defaultZones[zoneIndex];
-            targetMapId = dest.mapId;
-            landingX = dest.x;
-            landingY = dest.y;
-            landingZ = dest.z;
-            landingO = dest.o;
-            destFound = true;
+            const auto& hardcodedPool = (teamId == 0) ? s_AllianceBracketZones[zoneIndex] : s_HordeBracketZones[zoneIndex];
+            if (!hardcodedPool.empty())
+            {
+                const auto& dest = hardcodedPool[rand() % hardcodedPool.size()];
+                targetMapId = dest.mapId;
+                landingX = dest.x;
+                landingY = dest.y;
+                landingZ = dest.z;
+                landingO = dest.o;
+                destFound = true;
+            }
         }
     }
 
@@ -1248,6 +1412,18 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
     }
 
     return false;
+}
+
+bool NativeTaskAdapter::TeleportBotToCity(Player* bot, CityId cityId)
+{
+    if (!bot || !bot->IsInWorld())
+        return false;
+
+    uint64_t reqId = 0;
+    uint32_t minDwell = PopulationPolicy::Instance().GetCityMinDwellDurationMs();
+    uint32_t maxDwell = PopulationPolicy::Instance().GetCityMaxDwellDurationMs();
+    TaskAdmissionResult res = RequestCityVisit(bot, cityId, minDwell, maxDwell, TransitMode::Teleport, 0, reqId);
+    return (res == TaskAdmissionResult::Accepted);
 }
 
 bool NativeTaskAdapter::IsInStarterValley(Player* bot)

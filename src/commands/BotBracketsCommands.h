@@ -16,6 +16,7 @@ public:
 private:
     static bool HandleStatus(ChatHandler* handler);
     static bool HandleCities(ChatHandler* handler);
+    static bool HandleCity(ChatHandler* handler, const char* args);
     static bool HandleWorld(ChatHandler* handler);
     static bool HandleBrackets(ChatHandler* handler);
     static bool HandleActivities(ChatHandler* handler);

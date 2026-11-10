@@ -52,6 +52,9 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
     if (strcmp(subCommand, "cities") == 0 || strcmp(subCommand, "hubs") == 0)
         return HandleCities(handler);
 
+    if (strcmp(subCommand, "city") == 0)
+        return HandleCity(handler, args);
+
     if (strcmp(subCommand, "world") == 0 || strcmp(subCommand, "regions") == 0)
         return HandleWorld(handler);
 
@@ -88,7 +91,7 @@ bool BotBracketsCommands::HandleCommand(ChatHandler* handler, const char* subCom
     if (strcmp(subCommand, "debug") == 0)
         return HandleDebug(handler, args);
 
-    handler->SendSysMessage("Unknown BLB subcommand. Valid: status, cities, world, brackets, boost, pending, activities, ledger, stats, explain, reload, force, cleanup, guildcleanup, debug.");
+    handler->SendSysMessage("Unknown BLB subcommand. Valid: status, cities, city, world, brackets, boost, pending, activities, ledger, stats, explain, reload, force, cleanup, guildcleanup, debug.");
     return true;
 }
 
@@ -133,6 +136,99 @@ bool BotBracketsCommands::HandleCities(ChatHandler* handler)
             c.residents, c.confirmedInbound, c.pendingReservations, c.effective,
             c.feasibleTarget, c.shortfall, status);
     }
+    return true;
+}
+
+bool BotBracketsCommands::HandleCity(ChatHandler* handler, const char* args)
+{
+    if (!args || strlen(args) == 0)
+    {
+        handler->SendSysMessage("Usage: .blb city <botName> <cityName> OR .blb city <cityName> (with bot selected)");
+        handler->SendSysMessage("Available Cities: stormwind, ironforge, darnassus, alahthalas, orgrimmar, undercity, thunderbluff, sparkwater");
+        return true;
+    }
+
+    std::stringstream ss(args);
+    std::string token1, token2;
+    ss >> token1;
+    ss >> token2;
+
+    Player* targetBot = nullptr;
+    std::string cityName;
+
+    if (token2.empty())
+    {
+        // 1 token passed: token1 is city name, target is selected player
+        cityName = token1;
+        if (handler->GetPlayer() && handler->GetPlayer()->GetSelectionGuid())
+            targetBot = sObjectMgr.GetPlayer(handler->GetPlayer()->GetSelectionGuid());
+        else if (handler->GetPlayer())
+            targetBot = handler->GetPlayer();
+    }
+    else
+    {
+        // 2 tokens: token1 is bot name, token2 is city name
+        targetBot = sObjectAccessor.FindPlayerByName(token1.c_str());
+        cityName = token2;
+    }
+
+    if (!targetBot)
+    {
+        handler->SendSysMessage("Target bot not found or no bot currently selected.");
+        return true;
+    }
+
+    if (!NativeTaskAdapter::IsBot(targetBot))
+    {
+        handler->PSendSysMessage("Player '%s' is a real player, not an autonomous bot.", targetBot->GetName());
+        return true;
+    }
+
+    // Resolve CityId from cityName
+    CityId resolvedCity = CityId::None;
+    std::string cleanCity = cityName;
+    cleanCity.erase(std::remove_if(cleanCity.begin(), cleanCity.end(), [](char c) {
+        return c == '\'' || c == '-' || c == ' ' || c == '_';
+    }), cleanCity.end());
+    std::transform(cleanCity.begin(), cleanCity.end(), cleanCity.begin(), ::tolower);
+
+    if (cleanCity == "stormwind" || cleanCity == "sw")
+        resolvedCity = CityId::Stormwind;
+    else if (cleanCity == "ironforge" || cleanCity == "if")
+        resolvedCity = CityId::Ironforge;
+    else if (cleanCity == "darnassus" || cleanCity == "darn")
+        resolvedCity = CityId::Darnassus;
+    else if (cleanCity == "alahthalas" || cleanCity == "silvermoon" || cleanCity == "highelf")
+        resolvedCity = CityId::AlahThalas;
+    else if (cleanCity == "orgrimmar" || cleanCity == "org")
+        resolvedCity = CityId::Orgrimmar;
+    else if (cleanCity == "undercity" || cleanCity == "uc")
+        resolvedCity = CityId::Undercity;
+    else if (cleanCity == "thunderbluff" || cleanCity == "tb")
+        resolvedCity = CityId::ThunderBluff;
+    else if (cleanCity == "sparkwater" || cleanCity == "goblin")
+        resolvedCity = CityId::Sparkwater;
+
+    if (resolvedCity == CityId::None)
+    {
+        handler->PSendSysMessage("Unknown city '%s'. Valid: stormwind, ironforge, darnassus, alahthalas, orgrimmar, undercity, thunderbluff, sparkwater.", cityName.c_str());
+        return true;
+    }
+
+    handler->PSendSysMessage("Teleporting bot '%s' (Level %u) to %s (Separate City Ladder Bank Landing)...",
+        targetBot->GetName(), targetBot->GetLevel(), GetCityName(resolvedCity));
+
+    if (NativeTaskAdapter::TeleportBotToCity(targetBot, resolvedCity))
+    {
+        handler->PSendSysMessage("Success: Bot '%s' (Level %u) arrived at %s bank!",
+            targetBot->GetName(), targetBot->GetLevel(), GetCityName(resolvedCity));
+    }
+    else
+    {
+        handler->PSendSysMessage("Failed to teleport bot '%s' to %s. Bot may already be visiting or protected.",
+            targetBot->GetName(), GetCityName(resolvedCity));
+    }
+
     return true;
 }
 

@@ -47,7 +47,7 @@ void PopulationPolicy::LoadDefaults()
     m_cityMaxDwellDurationMs = 600000;
     m_cityTransitMode = TransitMode::Travel;
     m_cityPickAllBrackets = true;
-    m_cityMinLevel = 10;
+    m_cityMinLevel = 1;
 
     m_cityQuotaMode = 2;
     m_cityMinLimitEnabled = false;

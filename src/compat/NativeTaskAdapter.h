@@ -87,6 +87,7 @@ public:
     // Level Adjustment & Complete Provisioning
     static bool AdjustBotLevel(Player* bot, uint8_t newLevel);
     static bool TeleportBotToLevelZone(Player* bot, uint8_t newLevel, uint8_t teamId);
+    static bool TeleportBotToCity(Player* bot, CityId cityId);
 
     // Destination Resolution & Pool Parsing
     static bool ResolveTeleportLocation(const std::string& input, TeleportDestinationConfig& outDest);
