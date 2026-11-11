@@ -261,7 +261,7 @@ powershell -ExecutionPolicy Bypass -File tools/verify_core_immutability.ps1
 
 ## 📚 Documentation Index
 
-- **[`TELEPORT_LOCATIONS_GUIDE.md`](TELEPORT_LOCATIONS_GUIDE.md)**: Master directory of teleport destinations, XYZ coordinates for all 7 level brackets (including custom Turtle WoW zones and villages), and comprehensive guide to the teleportation and anti-thrashing engine.
+- **[`docs/TELEPORT_LOCATIONS_GUIDE.md`](docs/TELEPORT_LOCATIONS_GUIDE.md)** *(and [`TELEPORT_LOCATIONS_GUIDE.md`](TELEPORT_LOCATIONS_GUIDE.md))*: Master directory of teleport destinations, XYZ coordinates for all 7 level brackets (including custom Turtle WoW zones and villages), and comprehensive guide to the teleportation and anti-thrashing engine.
 - **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**: Deep dive into internal class hierarchy, data flows, and concurrency.
 - **[`docs/GUIDE.md`](docs/GUIDE.md)**: Comprehensive operator, configuration, and troubleshooting manual.
 

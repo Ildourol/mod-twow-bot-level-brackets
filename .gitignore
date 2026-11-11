@@ -4,9 +4,6 @@ AGENTS.md
 tests/
 t/
 test_*
-docs/
-!docs/images/
-!docs/images/**
 .github/
 
 # Build artifacts and editor directories
