@@ -22,6 +22,12 @@ enum class TransitMode : uint8_t
     Teleport = 2  // Direct instant teleport to city
 };
 
+enum class CityLandingTarget : uint8_t
+{
+    Teleport = 0, // Canonical .teleport command location / city entrance (Default)
+    Bank     = 1  // City bank landing location (Reverts to bank landing)
+};
+
 struct LevelBracketConfig
 {
     uint8_t lower;
@@ -200,6 +206,9 @@ public:
     uint32_t GetConfigGeneration() const { return m_configGeneration; }
     void IncrementConfigGeneration() { ++m_configGeneration; }
 
+    CityLandingTarget GetCityLandingTarget() const { return m_cityLandingTarget; }
+    void SetCityLandingTarget(CityLandingTarget target) { m_cityLandingTarget = target; }
+
     // City bank / arrival custom destinations
     void SetCityLandingDestination(CityId id, const TeleportDestinationConfig& dest)
     {
@@ -312,6 +321,7 @@ private:
 
     uint32_t m_configGeneration = 1;
 
+    CityLandingTarget m_cityLandingTarget = CityLandingTarget::Teleport;
     std::unordered_map<CityId, TeleportDestinationConfig> m_cityLandingDestinations;
     std::unordered_map<uint8_t, std::vector<TeleportDestinationConfig>> m_starterLocationPools;
     std::vector<std::vector<TeleportDestinationConfig>> m_allianceRangePools;

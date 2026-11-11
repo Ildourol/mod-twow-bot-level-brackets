@@ -75,7 +75,7 @@ BotLevelBrackets.City.Enabled = 1
 
 # City Transit Mode:
 # 1 = Travel / Walk (bot receives travel directions to walk or use flight paths)
-# 2 = Teleport (Directly teleports the bot to the city bank landing tile - Default)
+# 2 = Teleport (Directly teleports the bot to the city landing location - Default)
 BotLevelBrackets.City.TransitMode = 2
 
 # Maximum bots permitted concurrently in any single capital city.

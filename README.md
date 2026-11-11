@@ -53,25 +53,33 @@ flowchart TD
 2. **Strict Immutability (The Unediting Doctrine):**
    `tortoise-wow` (core) and `TortoiseBots` (bot engine) are 100% read-only. All scheduling, telemetry, state tracking, and commands reside exclusively within standalone module space.
 3. **Active Level Redistribution & Full Native Provisioning:**
-   Maintains healthy population distribution across 7 level brackets (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60). Leveled bots receive complete `TortoiseBots` provisioning: spells, talents, defense/weapon skills, Plate/Mail at 40, Riding 75/150, racial mounts, primary & secondary professions with tools, and autogear. Teleport on level adjustment is enabled by default (`BotLevelBrackets.TeleportOnLevelChange = 1`) to route bots to leveling zones and native racial starter valleys (including Turtle WoW High Elf and Goblin custom zones).
-4. **Automated Starter & Wrong-Map Dispersal:**
-   Background checks automatically evacuate over-leveled bots (> Level 9) from the 8 starter valleys and return stranded bots from invalid maps back to the open world.
-4. **Native Need & Feasibility Gates Preserved:**
+   Maintains healthy population distribution across 7 level brackets (1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60). Leveled bots receive complete `TortoiseBots` provisioning: spells, talents, defense/weapon skills, Plate/Mail at 40, Riding 75/150, racial mounts, primary & secondary professions with tools, and autogear. Teleport on level adjustment is enabled by default (`BotLevelBrackets.TeleportOnLevelChange = 1`) to route bots to authentic multi-village destination pools mapped directly from the official **Turtle WoW Zone Level Chart**.
+4. **Multi-Village Network & Faction-Segregated Contested Hubs:**
+   Destination pools include canonical towns, villages, and outposts (e.g. Westfall: Sentinel Hill, Saldean's Farm, Moonbrook; Loch Modan: Thelsamar, Farstrider Lodge; Silverpine: Sepulcher, Pyrewood; Ashenvale: Astranaar vs Splintertree/Zoram'gar; Hillsbrad: Southshore vs Tarren Mill; Balor, Gilneas, Lapidis, Gillijim, Tel'Abim, Hyjal). Contested (`B`) zones strictly separate Alliance and Horde landing outposts.
+5. **High-Resiliency Teleportation Engine:**
+   - **Asynchronous In-Combat Queue (`s_pendingTeleports`)**: Bots engaged in combat, on flight paths, or in battlegrounds are never interrupted or dropped; requests are deferred with a 60-second TTL until the bot safely exits combat.
+   - **Anti-Ping-Pong Backoff**: Rejection cooldown prevents rapid thrashing between city errands and outdoor leveling zones.
+   - **Rolling Window Hourly Throttle**: Protects the server against mass-relocation lag spikes during server boots or large rebalancing passes.
+   - **Terrain Floor Sampling & Anti-Fall Engine (`mod-twow-arrival-floor`)**: Validates VMap/MMap ground geometry (`SampleFloorHeight`) and anchors arriving bots for 5 seconds to eliminate world geometry fall-through glitches.
+   - **Bot AI Realignment**: Clears stale `TravelTarget` instances in `sTravelMgr`, resets strategies from `-rpg` to `+travel,+grind`, and dispatches `choose travel target` to orient the bot immediately.
+6. **Automated Starter & Wrong-Map Dispersal:**
+   Background checks automatically evacuate over-leveled bots (> Level 9) from the 8 starter valleys and return stranded bots from invalid expansion maps back to the open world.
+7. **Native Need & Feasibility Gates Preserved:**
    Every dispatched action flows through `PlayerbotAI::DoSpecificAction`, which evaluates `action->isUseful()` and `action->isPossible()` before execution. If a bot cannot perform an action, the native engine refuses it safely.
-5. **Transient 1-Task-per-Bot Deduplication Barrier:**
+8. **Transient 1-Task-per-Bot Deduplication Barrier:**
    The `RequestLedger` ensures bots never receive duplicate or competing task requests while an existing request is pending or executing, backed by exponential backoff on native rejections.
-6. **Round-Robin Anti-Starvation Scheduling:**
+9. **Round-Robin Anti-Starvation Scheduling:**
    A rotating cursor eliminates first-GUID bias, guaranteeing that candidate bots are evaluated fairly across the entire online population.
-7. **8 Racial Capital City Hubs:**
-   Full support for classic and custom Turtle WoW racial capitals:
+10. **8 Racial Capital City Hubs:**
+   Full support for classic and custom Turtle WoW racial capitals with canonical `.teleport <city>` entry coordinates:
    - **Alliance:** Stormwind, Ironforge, Darnassus, and Alah'Thalas (High Elf capital).
    - **Horde:** Orgrimmar, Undercity, Thunder Bluff, and Sparkwater Port (Goblin capital).
-8. **42 Audited Native Activities:**
+11. **42 Audited Native Activities:**
    Typed capability registry with individual configuration toggles for quest turn-ins, grinding, exploration, vendor visits, auction house, repairs, training, and gathering.
-9. **Multi-Tier Social Safeguards:**
+12. **Multi-Tier Social Safeguards:**
    Protects bots grouped with real players, on human friend lists, in human guilds (online or offline), or named in `ExcludedNames`.
-10. **Comprehensive Administration & Telemetry:**
-    Full in-game `.blb` command suite with a real-time diagnostic decision engine (`.blb explain <guid>`), 2000-event circular ring buffer, token-bucket rate limiter, and dry-run execution mode.
+13. **Comprehensive Administration & Telemetry:**
+   Full in-game `.blb` command suite with a real-time diagnostic decision engine (`.blb explain <guid>`), 2000-event circular ring buffer, token-bucket rate limiter, and dry-run execution mode.
 
 ---
 
@@ -253,6 +261,7 @@ powershell -ExecutionPolicy Bypass -File tools/verify_core_immutability.ps1
 
 ## 📚 Documentation Index
 
+- **[`TELEPORT_LOCATIONS_GUIDE.md`](TELEPORT_LOCATIONS_GUIDE.md)**: Master directory of teleport destinations, XYZ coordinates for all 7 level brackets (including custom Turtle WoW zones and villages), and comprehensive guide to the teleportation and anti-thrashing engine.
 - **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**: Deep dive into internal class hierarchy, data flows, and concurrency.
 - **[`docs/GUIDE.md`](docs/GUIDE.md)**: Comprehensive operator, configuration, and troubleshooting manual.
 

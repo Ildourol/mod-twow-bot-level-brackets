@@ -215,13 +215,17 @@ bool BotBracketsCommands::HandleCity(ChatHandler* handler, const char* args)
         return true;
     }
 
-    handler->PSendSysMessage("Teleporting bot '%s' (Level %u) to %s (Separate City Ladder Bank Landing)...",
-        targetBot->GetName(), targetBot->GetLevel(), GetCityName(resolvedCity));
+    const char* landingDesc = (PopulationPolicy::Instance().GetCityLandingTarget() == CityLandingTarget::Bank)
+        ? "Separate City Ladder Bank Landing"
+        : "City Teleport Landing";
+
+    handler->PSendSysMessage("Teleporting bot '%s' (Level %u) to %s (%s)...",
+        targetBot->GetName(), targetBot->GetLevel(), GetCityName(resolvedCity), landingDesc);
 
     if (NativeTaskAdapter::TeleportBotToCity(targetBot, resolvedCity))
     {
-        handler->PSendSysMessage("Success: Bot '%s' (Level %u) arrived at %s bank!",
-            targetBot->GetName(), targetBot->GetLevel(), GetCityName(resolvedCity));
+        handler->PSendSysMessage("Success: Bot '%s' (Level %u) arrived at %s (%s)!",
+            targetBot->GetName(), targetBot->GetLevel(), GetCityName(resolvedCity), landingDesc);
     }
     else
     {

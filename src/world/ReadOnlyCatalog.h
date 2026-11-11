@@ -26,6 +26,7 @@ struct CityDefinition
 {
     CityId id;
     const char* name;
+    const char* teleName;
     uint32_t mapId;
     uint32_t zoneId;
     std::vector<uint32_t> subAreaIds;
@@ -34,6 +35,10 @@ struct CityDefinition
     float centerY;
     float centerZ;
     float radius;
+    float teleX;
+    float teleY;
+    float teleZ;
+    float teleO;
     float bankX;
     float bankY;
     float bankZ;

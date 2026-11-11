@@ -115,7 +115,13 @@ void LoadModuleConfiguration()
     policy.SetCityTarget(6, sConfig.GetIntDefault("BotLevelBrackets.City.ThunderBluffTarget", 6));
     policy.SetCityTarget(7, sConfig.GetIntDefault("BotLevelBrackets.City.SparkwaterTarget", 6));
 
-    // Optional city landing location overrides (defaults to hardcoded bank landing coordinates)
+    std::string landingTargetStr = GetInternalString("BotLevelBrackets.City.LandingTarget", "Teleport");
+    if (landingTargetStr == "Bank" || landingTargetStr == "bank")
+        policy.SetCityLandingTarget(CityLandingTarget::Bank);
+    else
+        policy.SetCityLandingTarget(CityLandingTarget::Teleport);
+
+    // Optional city landing location overrides (defaults to .teleport command or bank landing coordinates)
     static const char* s_cityNames[] = {
         "Stormwind", "Ironforge", "Darnassus", "AlahThalas",
         "Orgrimmar", "Undercity", "ThunderBluff", "Sparkwater"
@@ -126,9 +132,27 @@ void LoadModuleConfiguration()
         std::string val = sConfig.GetStringDefault(key.c_str(), "");
         if (!val.empty())
         {
-            TeleportDestinationConfig dest;
-            if (NativeTaskAdapter::ResolveTeleportLocation(val, dest))
-                policy.SetCityLandingDestination(static_cast<CityId>(i + 1), dest);
+            if (val == "bank" || val == "Bank")
+            {
+                const CityDefinition* def = ReadOnlyCatalog::Instance().GetCity(static_cast<CityId>(i + 1));
+                if (def)
+                {
+                    TeleportDestinationConfig bankDest;
+                    bankDest.mapId = def->mapId;
+                    bankDest.x = def->bankX;
+                    bankDest.y = def->bankY;
+                    bankDest.z = def->bankZ;
+                    bankDest.o = def->bankO;
+                    bankDest.name = "Bank";
+                    policy.SetCityLandingDestination(static_cast<CityId>(i + 1), bankDest);
+                }
+            }
+            else
+            {
+                TeleportDestinationConfig dest;
+                if (NativeTaskAdapter::ResolveTeleportLocation(val, dest))
+                    policy.SetCityLandingDestination(static_cast<CityId>(i + 1), dest);
+            }
         }
     }
 

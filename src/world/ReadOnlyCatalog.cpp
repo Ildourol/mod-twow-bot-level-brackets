@@ -34,18 +34,18 @@ ReadOnlyCatalog& ReadOnlyCatalog::Instance()
 
 ReadOnlyCatalog::ReadOnlyCatalog()
 {
-    // Canonical 8 Turtle WoW racial capitals with default bank landing coordinates
+    // Canonical 8 Turtle WoW racial capitals with .teleport command landing and bank landing coordinates
     // Alliance: Stormwind, Ironforge, Darnassus, Alah'Thalas (High Elf capital)
-    m_cities.push_back({ CityId::Stormwind,   "Stormwind",       0, 1519, {},       0, -8810.0f,   640.0f,   94.0f, 250.0f, -8935.27f,   613.13f,   99.61f, 0.45f });
-    m_cities.push_back({ CityId::Ironforge,   "Ironforge",       0, 1537, {},       0, -4980.0f,  -940.0f,  501.0f, 200.0f, -4886.55f,  -997.59f,  504.02f, 2.23f });
-    m_cities.push_back({ CityId::Darnassus,   "Darnassus",       1, 1657, {},       0,  9950.0f,  2330.0f, 1330.0f, 200.0f,  9938.84f,  2521.53f, 1317.66f, 4.38f });
-    m_cities.push_back({ CityId::AlahThalas,  "Alah'Thalas",      0, 2040, { 5225 }, 0,  3212.6f, -2501.4f,  111.7f, 200.0f,  4261.59f, -2842.02f,    8.45f, 0.08f });
+    m_cities.push_back({ CityId::Stormwind,   "Stormwind",       "Stormwind",          0, 1519, {},       0, -8810.0f,   640.0f,   94.0f, 250.0f, -8833.38f,  628.628f,   94.0066f, 1.06535f, -8935.27f,   613.13f,   99.61f, 0.45f });
+    m_cities.push_back({ CityId::Ironforge,   "Ironforge",       "Ironforge",          0, 1537, {},       0, -4980.0f,  -940.0f,  501.0f, 200.0f, -4918.88f, -940.406f,  501.564f,  5.42347f, -4886.55f,  -997.59f,  504.02f, 2.23f });
+    m_cities.push_back({ CityId::Darnassus,   "Darnassus",       "Darnassus",          1, 1657, {},       0,  9950.0f,  2330.0f, 1330.0f, 200.0f,  9949.56f, 2284.21f,  1341.40f,   1.59587f,  9938.84f,  2521.53f, 1317.66f, 4.38f });
+    m_cities.push_back({ CityId::AlahThalas,  "Alah'Thalas",      "alahthalasarrival", 0, 2040, { 5225 }, 0,  3212.6f, -2501.4f,  111.7f, 200.0f,  4226.82f,-2722.43f,   121.874f,  5.30635f,  4261.59f, -2842.02f,    8.45f, 0.08f });
 
     // Horde: Orgrimmar, Undercity, Thunder Bluff, Sparkwater Port (Goblin capital)
-    m_cities.push_back({ CityId::Orgrimmar,   "Orgrimmar",       1, 1637, {},       1,  1570.0f, -4400.0f,    8.0f, 250.0f,  1627.32f, -4376.07f,   11.81f, 3.44f });
-    m_cities.push_back({ CityId::Undercity,   "Undercity",       0, 1497, {},       1,  1620.0f,   240.0f,   60.0f, 200.0f,  1599.96f,   240.65f,  -52.06f, 0.09f });
-    m_cities.push_back({ CityId::ThunderBluff,"Thunder Bluff",   1, 1638, {},       1, -1290.0f,   150.0f,  130.0f, 200.0f, -1257.63f,    19.56f,  128.27f, 1.73f });
-    m_cities.push_back({ CityId::Sparkwater,  "Sparkwater Port", 1, 4021, {},       1,   840.0f, -5060.0f,    6.0f, 200.0f,   838.27f, -5048.73f,    6.03f, 1.92f });
+    m_cities.push_back({ CityId::Orgrimmar,   "Orgrimmar",       "Orgrimmar",          1, 1637, {},       1,  1570.0f, -4400.0f,    8.0f, 250.0f,  1629.36f,-4373.39f,   31.2564f,  3.54839f,  1627.32f, -4376.07f,   11.81f, 3.44f });
+    m_cities.push_back({ CityId::Undercity,   "Undercity",       "Undercity",          0, 1497, {},       1,  1620.0f,   240.0f,   60.0f, 200.0f,  1584.07f,  241.987f, -52.1534f, 0.049647f, 1599.96f,   240.65f,  -52.06f, 0.09f });
+    m_cities.push_back({ CityId::ThunderBluff,"Thunder Bluff",   "ThunderBluff",       1, 1638, {},       1, -1290.0f,   150.0f,  130.0f, 200.0f, -1277.37f,  124.804f, 131.287f,  5.22274f, -1257.63f,    19.56f,  128.27f, 1.73f });
+    m_cities.push_back({ CityId::Sparkwater,  "Sparkwater Port", "sparkwater",         1, 4021, {},       1,   840.0f, -5060.0f,    6.0f, 200.0f,   948.335f,-5033.39f,    5.73102f, 2.94837f,   838.27f, -5048.73f,    6.03f, 1.92f });
 
     // Representative sample of outdoor regions across both continents
     m_regions.push_back({ 1,  "Elwynn Forest",      0, 12,   0, 1,  10 });

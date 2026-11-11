@@ -61,6 +61,8 @@ void PopulationPolicy::LoadDefaults()
     for (size_t i = 0; i < 8; ++i)
         m_cityTargets[i] = defaults[i];
 
+    m_cityLandingTarget = CityLandingTarget::Teleport;
+
     // Default 7 brackets for 1-60 progression: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60
     m_allianceBrackets = {
         { 1,   9,  16 },
