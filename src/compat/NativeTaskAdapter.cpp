@@ -293,7 +293,7 @@ struct PendingTeleportRequest
     enum class TargetType : uint8_t { Zone = 0, City = 1 } targetType = TargetType::Zone;
     uint8_t newLevel = 0;
     uint8_t teamId = 0;
-    CityId cityId = CITY_STORMWIND;
+    CityId cityId = CityId::Stormwind;
     uint32_t enqueuedAt = 0;
 };
 
@@ -1073,7 +1073,7 @@ static const std::vector<TeleportZoneDestination> s_AllianceBracketZones[7] =
         { 0,  -2165.31f,   974.40f,   2.22f, 2.72f }, // Gilneas (B) - Ravenshire
         { 815,-1095.44f,  2234.75f, 182.86f, 2.60f }  // Gilneas (B) - Gilneas City
     },
-    // Bracket 4: 40-49 (Hinterlands, Feralas, Tanaris, Searing Gorge, Blasted Lands, Azshara, Lapidis, Icepoint)
+    // Bracket 4: 40-49 (Hinterlands, Feralas, Tanaris, Searing Gorge, Blasted Lands, Azshara, Lapidis, Icepoint, Maraudon)
     {
         { 0,    260.37f, -2125.21f, 119.57f, 3.18f }, // Hinterlands (B) - Aerie Peak
         { 1,  -4317.47f,  3287.35f,  18.29f, 3.13f }, // Feralas (B) - Feathermoon Stronghold
@@ -1082,9 +1082,10 @@ static const std::vector<TeleportZoneDestination> s_AllianceBracketZones[7] =
         { 0, -10999.80f, -3380.08f,  62.25f, 4.64f }, // Blasted Lands (B) - Nethergarde Keep
         { 1,   2735.06f, -3867.44f,  98.65f, 3.56f }, // Azshara (B) - Talrendis Point
         { 0, -11864.90f,  3188.40f,  20.00f, 0.19f }, // Lapidis Isle (B) - Caelan's Rest
-        { 1,  13675.00f, -6593.94f,   3.04f, 0.88f }  // Icepoint Rock (B)
+        { 1,  13675.00f, -6593.94f,   3.04f, 0.88f }, // Icepoint Rock (B)
+        { 1,  -1419.13f,  2908.14f, 137.46f, 1.57f }  // Maraudon (B) - Valley of the Centaur
     },
-    // Bracket 5: 50-59 (WPL, EPL, Felwood, Burning Steppes, Un'Goro, Winterspring, Silithus, Tel'Abim, Hyjal)
+    // Bracket 5: 50-59 (WPL, EPL, Felwood, Burning Steppes, Un'Goro, Winterspring, Silithus, Tel'Abim, Hyjal, Moonglade, Deadwind, BRM)
     {
         { 0,    931.32f, -1430.11f,  64.67f, 0.00f }, // WPL (B) - Chillwind Camp
         { 0,   2289.89f, -5281.52f,  82.13f, 4.55f }, // EPL (B) - Light's Hope Chapel
@@ -1095,7 +1096,10 @@ static const std::vector<TeleportZoneDestination> s_AllianceBracketZones[7] =
         { 1,   6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring (B) - Everlook
         { 1,  -6818.09f,   733.81f,  41.57f, 2.31f }, // Silithus (B) - Cenarion Hold
         { 1,  -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim (B) - Tel Co. Basecamp
-        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f }  // Hyjal (B) - Nordanaar
+        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal (B) - Nordanaar
+        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain (B)
+        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade (B) - Nighthaven
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass (B)
     },
     // Bracket 6: 60 (Endgame Maximum Level Destinations)
     {
@@ -1107,7 +1111,10 @@ static const std::vector<TeleportZoneDestination> s_AllianceBracketZones[7] =
         { 1,   6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring - Everlook
         { 1,  -6113.82f, -1142.70f,-187.63f, 0.71f }, // Un'Goro - Marshal's Refuge
         { 1,  -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim - Tel Co. Basecamp
-        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f }  // Hyjal - Nordanaar
+        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal - Nordanaar
+        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain
+        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade - Nighthaven
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass
     }
 };
 
@@ -1163,7 +1170,7 @@ static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
         { 0, -1300.59f,  1160.95f, 126.86f, 2.72f }, // Gilneas (B) - Stillward Church
         { 815,-1095.44f,  2234.75f, 182.86f, 2.60f }  // Gilneas (B) - Gilneas City
     },
-    // Bracket 4: 40-49 (Hinterlands, Feralas, Tanaris, Searing Gorge, Blasted Lands, Azshara, Gillijim, Icepoint)
+    // Bracket 4: 40-49 (Hinterlands, Feralas, Tanaris, Searing Gorge, Blasted Lands, Azshara, Gillijim, Icepoint, Maraudon)
     {
         { 0,  -557.23f, -4581.27f,   9.59f, 1.02f }, // Hinterlands (B) - Revantusk Village
         { 1, -4396.70f,   224.84f,  25.41f, 4.94f }, // Feralas (B) - Camp Mojache
@@ -1172,9 +1179,10 @@ static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
         { 0, -11182.50f, -3016.67f,   7.42f, 4.00f }, // Blasted Lands (B) - Dreadmaul Hold
         { 1,  3608.59f, -4414.43f, 113.05f, 1.62f }, // Azshara (B) - Valormok
         { 0, -14087.20f,  2269.20f,  67.00f, 1.29f }, // Gillijim's Isle (B) - Maul'Ogg Refuge
-        { 1, 13675.00f, -6593.94f,   3.04f, 0.88f }  // Icepoint Rock (B)
+        { 1, 13675.00f, -6593.94f,   3.04f, 0.88f }, // Icepoint Rock (B)
+        { 1,  -1419.13f,  2908.14f, 137.46f, 1.57f }  // Maraudon (B) - Valley of the Centaur
     },
-    // Bracket 5: 50-59 (WPL, EPL, Felwood, Burning Steppes, Un'Goro, Winterspring, Silithus, Tel'Abim, Hyjal)
+    // Bracket 5: 50-59 (WPL, EPL, Felwood, Burning Steppes, Un'Goro, Winterspring, Silithus, Tel'Abim, Hyjal, Moonglade, Deadwind, BRM)
     {
         { 0,  1711.99f,  -719.76f,  54.34f, 4.66f }, // WPL (B) - The Bulwark
         { 0,  2289.89f, -5281.52f,  82.13f, 4.55f }, // EPL (B) - Light's Hope Chapel
@@ -1185,7 +1193,10 @@ static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
         { 1,  6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring (B) - Everlook
         { 1, -6818.09f,   733.81f,  41.57f, 2.31f }, // Silithus (B) - Cenarion Hold
         { 1, -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim (B) - Tel Co. Basecamp
-        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f }  // Hyjal (B) - Nordanaar
+        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal (B) - Nordanaar
+        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain (B)
+        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade (B) - Nighthaven
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass (B)
     },
     // Bracket 6: 60 (Endgame Maximum Level Destinations)
     {
@@ -1197,7 +1208,10 @@ static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
         { 1,  6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring - Everlook
         { 1, -6113.82f, -1142.70f,-187.63f, 0.71f }, // Un'Goro - Marshal's Refuge
         { 1, -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim - Tel Co. Basecamp
-        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f }  // Hyjal - Nordanaar
+        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal - Nordanaar
+        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain
+        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade - Nighthaven
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass
     }
 };
 

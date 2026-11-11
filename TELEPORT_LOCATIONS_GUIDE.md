@@ -201,6 +201,7 @@ All coordinates are extracted directly from official Turtle WoW server database 
 | **Azshara** *(B)* | Talrendis Point | 1 | 2735.06 | -3867.44 | 98.65 | 3.56 | Night Elf Outpost |
 | **Lapidis Isle** *(B - TWoW)*| Caelan's Rest | 0 | -11864.90 | 3188.40 | 20.00 | 0.19 | Alliance Base (TWoW) |
 | **Icepoint Rock** *(B - TWoW)*| Icepoint Rock | 1 | 13675.00 | -6593.94 | 3.04 | 0.88 | Frozen Offshore Rock |
+| **Desolace / Maraudon** *(B)*| Valley of the Centaur | 1 | -1419.13 | 2908.14 | 137.46 | 1.57 | Maraudon Exterior Valley |
 
 #### Horde
 | Zone | Settlement / Village | Map ID | X | Y | Z | Orientation | Notes |
@@ -213,6 +214,7 @@ All coordinates are extracted directly from official Turtle WoW server database 
 | **Azshara** *(B)* | Valormok | 1 | 3608.59 | -4414.43 | 113.05 | 1.62 | Horde Mountain Post |
 | **Gillijim's Isle** *(B - TWoW)*| Maul'Ogg Refuge | 0 | -14087.20 | 2269.20 | 67.00 | 1.29 | Ogre Outpost (TWoW) |
 | **Icepoint Rock** *(B - TWoW)*| Icepoint Rock | 1 | 13675.00 | -6593.94 | 3.04 | 0.88 | Frozen Offshore Rock |
+| **Desolace / Maraudon** *(B)*| Valley of the Centaur | 1 | -1419.13 | 2908.14 | 137.46 | 1.57 | Maraudon Exterior Valley |
 
 ---
 
@@ -231,6 +233,9 @@ All coordinates are extracted directly from official Turtle WoW server database 
 | **Silithus** *(B)* | Cenarion Hold | 1 | -6818.09 | 733.81 | 41.57 | 2.31 | Cenarion Circle Fort |
 | **Tel'Abim** *(B - TWoW)* | Tel Co. Basecamp | 1 | -8892.64 | -6455.32 | 7.80 | 1.53 | Tropical Isle (TWoW) |
 | **Mount Hyjal** *(B - TWoW)* | Nordanaar | 1 | 5497.70 | -3690.70 | 1594.21 | 2.88 | Hyjal Mountain Hub |
+| **Blackrock Mountain** *(B)*| Mountain Entrance | 0 | -7494.94 | -1123.49 | 265.55 | 3.31 | BRD / BRS Approach |
+| **Moonglade** *(B)* | Nighthaven | 1 | 7654.30 | -2232.87 | 462.11 | 5.97 | Neutral Druid Sanctuary |
+| **Deadwind Pass** *(B)* | Deadwind Pass Approach | 0 | -10438.80 | -1932.75 | 104.62 | 4.77 | Karazhan Approach |
 
 #### Horde
 | Zone | Settlement / Village | Map ID | X | Y | Z | Orientation | Notes |
@@ -245,6 +250,9 @@ All coordinates are extracted directly from official Turtle WoW server database 
 | **Silithus** *(B)* | Cenarion Hold | 1 | -6818.09 | 733.81 | 41.57 | 2.31 | Cenarion Circle Fort |
 | **Tel'Abim** *(B - TWoW)* | Tel Co. Basecamp | 1 | -8892.64 | -6455.32 | 7.80 | 1.53 | Tropical Isle (TWoW) |
 | **Mount Hyjal** *(B - TWoW)* | Nordanaar | 1 | 5497.70 | -3690.70 | 1594.21 | 2.88 | Hyjal Mountain Hub |
+| **Blackrock Mountain** *(B)*| Mountain Entrance | 0 | -7494.94 | -1123.49 | 265.55 | 3.31 | BRD / BRS Approach |
+| **Moonglade** *(B)* | Nighthaven | 1 | 7654.30 | -2232.87 | 462.11 | 5.97 | Neutral Druid Sanctuary |
+| **Deadwind Pass** *(B)* | Deadwind Pass Approach | 0 | -10438.80 | -1932.75 | 104.62 | 4.77 | Karazhan Approach |
 
 ---
 
@@ -262,6 +270,9 @@ All coordinates are extracted directly from official Turtle WoW server database 
 | **Un'Goro Crater** | Marshal's Refuge | 1 | -6113.82 | -1142.70 | -187.63 | 0.71 | Elemental Grinding |
 | **Tel'Abim** | Tel Co. Basecamp | 1 | -8892.64 | -6455.32 | 7.80 | 1.53 | Turtle WoW Custom |
 | **Mount Hyjal** | Nordanaar | 1 | 5497.70 | -3690.70 | 1594.21 | 2.88 | World Boss / Hyjal |
+| **Blackrock Mountain** | Mountain Entrance | 0 | -7494.94 | -1123.49 | 265.55 | 3.31 | BRD / BRS Approach |
+| **Moonglade** | Nighthaven | 1 | 7654.30 | -2232.87 | 462.11 | 5.97 | Neutral Druid Sanctuary |
+| **Deadwind Pass** | Deadwind Pass Approach | 0 | -10438.80 | -1932.75 | 104.62 | 4.77 | Karazhan Approach |
 
 #### Horde
 | Zone | Settlement / Landmark | Map ID | X | Y | Z | Orientation | Notes |
@@ -275,6 +286,9 @@ All coordinates are extracted directly from official Turtle WoW server database 
 | **Un'Goro Crater** | Marshal's Refuge | 1 | -6113.82 | -1142.70 | -187.63 | 0.71 | Elemental Grinding |
 | **Tel'Abim** | Tel Co. Basecamp | 1 | -8892.64 | -6455.32 | 7.80 | 1.53 | Turtle WoW Custom |
 | **Mount Hyjal** | Nordanaar | 1 | 5497.70 | -3690.70 | 1594.21 | 2.88 | World Boss / Hyjal |
+| **Blackrock Mountain** | Mountain Entrance | 0 | -7494.94 | -1123.49 | 265.55 | 3.31 | BRD / BRS Approach |
+| **Moonglade** | Nighthaven | 1 | 7654.30 | -2232.87 | 462.11 | 5.97 | Neutral Druid Sanctuary |
+| **Deadwind Pass** | Deadwind Pass Approach | 0 | -10438.80 | -1932.75 | 104.62 | 4.77 | Karazhan Approach |
 
 ---
 
