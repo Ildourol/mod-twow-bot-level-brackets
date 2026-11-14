@@ -9,6 +9,7 @@
 #include "ObjectMgr.h"
 #include "Maps/Map.h"
 #include "Maps/MapManager.h"
+#include "Maps/GridMap.h"
 #include "Movement/MovementPacketSender.h"
 #include "Movement/MotionMaster.h"
 #include "runtime/BotActivityLease.h"
@@ -989,7 +990,35 @@ struct TeleportZoneDestination
     float y;
     float z;
     float o;
+    uint32_t zoneId;  // Area/Zone ID for homebind and resting
+    uint32_t weight;  // Priority weight (6 = Major Hub, 3 = Outpost, 1 = Flavor/Custom)
+    const char* name; // Hub / Inn description
 };
+
+static const TeleportZoneDestination* PickWeightedDestination(const std::vector<TeleportZoneDestination>& pool)
+{
+    if (pool.empty())
+        return nullptr;
+
+    uint32_t totalWeight = 0;
+    for (const auto& dest : pool)
+        totalWeight += (dest.weight > 0 ? dest.weight : 1);
+
+    if (totalWeight == 0)
+        return &pool[rand() % pool.size()];
+
+    uint32_t roll = urand(0, totalWeight - 1);
+    uint32_t currentWeight = 0;
+
+    for (const auto& dest : pool)
+    {
+        currentWeight += (dest.weight > 0 ? dest.weight : 1);
+        if (roll < currentWeight)
+            return &dest;
+    }
+
+    return &pool.back();
+}
 
 struct StarterValleyArea
 {
@@ -1017,104 +1046,104 @@ static const StarterValleyArea s_StartingAreas[] =
 };
 static constexpr size_t s_NumStartingAreas = sizeof(s_StartingAreas) / sizeof(s_StartingAreas[0]);
 
-// Turtle WoW Zone Level Chart - Canonical Hardcoded Leveling Destinations per Bracket (No Cities)
+// Turtle WoW Zone Level Chart - Canonical Hardcoded Leveling Destinations & Inns per Bracket (Prioritized)
 static const std::vector<TeleportZoneDestination> s_AllianceBracketZones[7] =
 {
     // Bracket 0: 1-9 (Elwynn Forest, Dun Morogh, Teldrassil, Thalassian Highlands)
     {
-        { 0, -8921.09f,  -119.14f,  82.20f, 5.83f }, // Northshire Valley
-        { 0, -9448.55f,    68.24f,  56.32f, 2.11f }, // Goldshire
-        { 0, -6231.77f,   332.99f, 383.17f, 0.48f }, // Coldridge Valley
-        { 0, -5597.31f,  -483.40f, 396.98f, 3.18f }, // Kharanos
-        { 0, -5385.04f,   310.28f, 394.15f, 5.20f }, // Brewnall Village
-        { 1, 10334.00f,   833.90f, 1326.11f, 3.62f }, // Shadowglen
-        { 1,  9848.37f,   966.95f, 1306.38f, 3.77f }, // Dolanaar
-        { 0,  3321.97f, -2447.81f,  107.18f, 3.47f }, // High Elf Academy / Thalassian
-        { 0,  3625.95f, -2434.33f,   67.09f, 0.07f }, // Thalassian Highlands
-        { 0,  4321.99f, -2806.02f,    5.10f, 3.14f }  // Alah'Thalas
+        { 0, -8921.09f,  -119.14f,  82.20f, 5.83f, 12,   6, "Northshire Abbey" },
+        { 0, -9448.55f,    68.24f,  56.32f, 2.11f, 12,   6, "Lion's Pride Inn (Goldshire)" },
+        { 0, -6231.77f,   332.99f, 383.17f, 0.48f, 1,    6, "Anvilmar (Coldridge)" },
+        { 0, -5597.31f,  -483.40f, 396.98f, 3.18f, 1,    6, "Thunderbrew Distillery (Kharanos)" },
+        { 0, -5385.04f,   310.28f, 394.15f, 5.20f, 1,    3, "Brewnall Village" },
+        { 1, 10334.00f,   833.90f, 1326.11f, 3.62f, 141, 6, "Shadowglen" },
+        { 1,  9848.37f,   966.95f, 1306.38f, 3.77f, 141, 6, "Dolanaar Inn" },
+        { 0,  3321.97f, -2447.81f,  107.18f, 3.47f, 3433, 3, "Thalassian Academy" },
+        { 0,  3625.95f, -2434.33f,   67.09f, 0.07f, 3433, 3, "Thalassian Highlands" },
+        { 0,  4321.99f, -2806.02f,    5.10f, 3.14f, 3433, 6, "Alah'Thalas City" }
     },
     // Bracket 1: 10-19 (Westfall Villages, Loch Modan, Darkshore, Ratchet, Redridge/Wetlands starter)
     {
-        { 0, -10624.50f,  1096.66f,  33.76f, 1.31f }, // Westfall - Sentinel Hill
-        { 0, -10128.70f,  1055.21f,  36.43f, 2.44f }, // Westfall - Saldean's Farm
-        { 0, -10986.70f,  1542.75f,  44.79f, 2.62f }, // Westfall - Moonbrook
-        { 0,  -5352.54f, -2948.53f, 323.78f, 5.34f }, // Loch Modan - Thelsamar
-        { 0,  -5650.46f, -4290.58f, 407.81f, 2.03f }, // Loch Modan - Farstrider Lodge
-        { 1,   6376.26f,   558.12f,  15.11f, 2.59f }, // Darkshore - Auberdine
-        { 1,   -956.66f, -3754.71f,   5.33f, 1.00f }, // Barrens (Contested B) - Ratchet
-        { 0,  -9266.59f, -2188.77f,  64.09f, 2.10f }, // Redridge (15-25) - Lakeshire
-        { 0,  -3769.32f,  -744.26f,   8.01f, 1.96f }  // Wetlands (15-25) - Menethil Harbor
+        { 0, -10624.50f,  1096.66f,  33.76f, 1.31f, 40,  6, "Sentinel Hill Inn" },
+        { 0, -10128.70f,  1055.21f,  36.43f, 2.44f, 40,  3, "Saldean's Farm" },
+        { 0, -10986.70f,  1542.75f,  44.79f, 2.62f, 40,  3, "Moonbrook" },
+        { 0,  -5352.54f, -2948.53f, 323.78f, 5.34f, 38,  6, "Thelsamar Stoutlager Inn" },
+        { 0,  -5650.46f, -4290.58f, 407.81f, 2.03f, 38,  3, "Farstrider Lodge" },
+        { 1,   6376.26f,   558.12f,  15.11f, 2.59f, 148, 6, "Auberdine Inn" },
+        { 1,   -956.66f, -3754.71f,   5.33f, 1.00f, 17,  3, "Ratchet Shady Rest Inn" },
+        { 0,  -9266.59f, -2188.77f,  64.09f, 2.10f, 44,  6, "Lakeshire Town Hall & Inn" },
+        { 0,  -3769.32f,  -744.26f,   8.01f, 1.96f, 11,  3, "Deepwater Tavern (Menethil)" }
     },
     // Bracket 2: 20-29 (Redridge, Duskwood, Wetlands, Ashenvale, Stonetalon, Hillsbrad, Thousand Needles, Balor)
     {
-        { 0,  -9266.59f, -2188.77f,  64.09f, 2.10f }, // Redridge - Lakeshire
-        { 0, -10573.00f, -1182.51f,  28.01f, 0.31f }, // Duskwood - Darkshire
-        { 0, -10742.20f,   330.57f,  38.25f, 0.55f }, // Duskwood - Raven Hill
-        { 0,  -3769.32f,  -744.26f,   8.01f, 1.96f }, // Wetlands - Menethil Harbor
-        { 0,  -3951.50f, -1331.74f, 148.73f, 4.36f }, // Wetlands - Dun Agrath
-        { 1,   2676.19f,  -422.91f, 107.12f, 0.65f }, // Ashenvale (B) - Astranaar
-        { 1,   2678.38f,  1497.46f, 233.87f, 6.26f }, // Stonetalon (B) - Stonetalon Peak
-        { 1,    875.28f,  -836.36f, 170.90f, 0.00f }, // Stonetalon (B) - Bael Hardul
-        { 0,   -853.22f,  -533.53f,   9.99f, 0.24f }, // Hillsbrad (B) - Southshore
-        { 1,  -4491.88f,  -775.89f, -39.52f, 0.00f }, // Thousand Needles (B) - Thalanaar
-        { 1,  -6221.35f, -3927.64f, -58.75f, 0.76f }, // Thousand Needles (B) - Mirage Raceway
-        { 0,  -9199.12f,  2573.07f,   9.50f, 0.40f }  // Balor (B) - SI:7 Outpost
+        { 0,  -9266.59f, -2188.77f,  64.09f, 2.10f, 44,   3, "Lakeshire Inn" },
+        { 0, -10573.00f, -1182.51f,  28.01f, 0.31f, 10,   6, "Scarlet Raven Inn (Darkshire)" },
+        { 0, -10742.20f,   330.57f,  38.25f, 0.55f, 10,   3, "Raven Hill Outpost" },
+        { 0,  -3769.32f,  -744.26f,   8.01f, 1.96f, 11,   6, "Deepwater Tavern (Menethil)" },
+        { 0,  -3951.50f, -1331.74f, 148.73f, 4.36f, 11,   3, "Dun Agrath" },
+        { 1,   2676.19f,  -422.91f, 107.12f, 0.65f, 331,  6, "Astranaar Inn" },
+        { 1,   2678.38f,  1497.46f, 233.87f, 6.26f, 406,  3, "Stonetalon Peak" },
+        { 1,    875.28f,  -836.36f, 170.90f, 0.00f, 406,  1, "Bael Hardul" },
+        { 0,   -853.22f,  -533.53f,   9.99f, 0.24f, 267,  6, "Southshore Inn" },
+        { 1,  -4491.88f,  -775.89f, -39.52f, 0.00f, 400,  3, "Thalanaar" },
+        { 1,  -6221.35f, -3927.64f, -58.75f, 0.76f, 400,  3, "Mirage Raceway Hotel" },
+        { 0,  -9199.12f,  2573.07f,   9.50f, 0.40f, 4022, 1, "Stormbreaker Point (Balor Island)" }
     },
     // Bracket 3: 30-39 (Arathi, Alterac, Desolace, STV, Dustwallow, Swamp of Sorrows, Badlands, Gilneas)
     {
-        { 0,  -1246.61f, -2529.32f,  20.61f, 0.74f }, // Arathi (B) - Refuge Pointe
-        { 0,    370.76f,  -491.36f, 175.36f, 5.38f }, // Alterac (B) - Sofera's Nook / Border
-        { 1,    139.24f,  1325.82f, 193.50f, 0.56f }, // Desolace (B) - Nijel's Point
-        { 0, -11322.40f,  -202.49f,  75.64f, 0.43f }, // STV (B) - Rebel Camp
-        { 0, -14297.20f,   530.99f,   8.78f, 3.99f }, // STV (B) - Booty Bay
-        { 1,  -3641.30f, -4358.93f,   8.35f, 3.82f }, // Dustwallow (B) - Theramore
-        { 0, -10345.40f, -2773.42f,  21.99f, 5.08f }, // Swamp of Sorrows (B) - Misty Reed
-        { 0,  -6779.20f, -3423.64f, 241.67f, 0.65f }, // Badlands (B) - Mirage Flats / Angor
-        { 0,  -2165.31f,   974.40f,   2.22f, 2.72f }, // Gilneas (B) - Ravenshire
-        { 815,-1095.44f,  2234.75f, 182.86f, 2.60f }  // Gilneas (B) - Gilneas City
+        { 0,  -1246.61f, -2529.32f,  20.61f, 0.74f, 45,   6, "Refuge Pointe Outpost" },
+        { 0,    370.76f,  -491.36f, 175.36f, 5.38f, 36,   3, "Sofera's Nook" },
+        { 1,    139.24f,  1325.82f, 193.50f, 0.56f, 405,  3, "Nijel's Point Tavern" },
+        { 0, -11322.40f,  -202.49f,  75.64f, 0.43f, 33,   3, "Rebel Camp" },
+        { 0, -14297.20f,   530.99f,   8.78f, 3.99f, 33,   6, "The Salty Sailor Tavern (Booty Bay)" },
+        { 1,  -3641.30f, -4358.93f,   8.35f, 3.82f, 15,   6, "Theramore Harbor Inn" },
+        { 0, -10345.40f, -2773.42f,  21.99f, 5.08f, 8,    3, "Misty Reed Post" },
+        { 0,  -6779.20f, -3423.64f, 241.67f, 0.65f, 3,    3, "Mirage Flats" },
+        { 0,  -2165.31f,   974.40f,   2.22f, 2.72f, 4021, 1, "Stillward Church (Gilneas)" },
+        { 815,-1095.44f,  2234.75f, 182.86f, 2.60f, 4021, 1, "Gilneas City" }
     },
     // Bracket 4: 40-49 (Hinterlands, Feralas, Tanaris, Searing Gorge, Blasted Lands, Azshara, Lapidis, Icepoint, Maraudon)
     {
-        { 0,    260.37f, -2125.21f, 119.57f, 3.18f }, // Hinterlands (B) - Aerie Peak
-        { 1,  -4317.47f,  3287.35f,  18.29f, 3.13f }, // Feralas (B) - Feathermoon Stronghold
-        { 1,  -7177.15f, -3785.34f,   8.37f, 6.10f }, // Tanaris (B) - Gadgetzan
-        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f }, // Searing Gorge (B) - Thorium Point
-        { 0, -10999.80f, -3380.08f,  62.25f, 4.64f }, // Blasted Lands (B) - Nethergarde Keep
-        { 1,   2735.06f, -3867.44f,  98.65f, 3.56f }, // Azshara (B) - Talrendis Point
-        { 0, -11864.90f,  3188.40f,  20.00f, 0.19f }, // Lapidis Isle (B) - Caelan's Rest
-        { 1,  13675.00f, -6593.94f,   3.04f, 0.88f }, // Icepoint Rock (B)
-        { 1,  -1419.13f,  2908.14f, 137.46f, 1.57f }  // Maraudon (B) - Valley of the Centaur
+        { 0,    260.37f, -2125.21f, 119.57f, 3.18f, 47,   6, "Aerie Peak Inn" },
+        { 1,  -4317.47f,  3287.35f,  18.29f, 3.13f, 357,  6, "Feathermoon Stronghold Inn" },
+        { 1,  -7177.15f, -3785.34f,   8.37f, 6.10f, 440,  6, "Gadgetzan Inn" },
+        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f, 51,   3, "Thorium Point Outpost" },
+        { 0, -10999.80f, -3380.08f,  62.25f, 4.64f, 4,    3, "Nethergarde Keep Inn" },
+        { 1,   2735.06f, -3867.44f,  98.65f, 3.56f, 16,   3, "Talrendis Point Outpost" },
+        { 0, -11864.90f,  3188.40f,  20.00f, 0.19f, 4020, 1, "Caelan's Rest (Lapidis Isle)" },
+        { 1,  13675.00f, -6593.94f,   3.04f, 0.88f, 3425, 1, "Icepoint Rock Outpost" },
+        { 1,  -1419.13f,  2908.14f, 137.46f, 1.57f, 405,  1, "Valley of the Centaur" }
     },
     // Bracket 5: 50-59 (WPL, EPL, Felwood, Burning Steppes, Un'Goro, Winterspring, Silithus, Tel'Abim, Hyjal, Moonglade, Deadwind, BRM)
     {
-        { 0,    931.32f, -1430.11f,  64.67f, 0.00f }, // WPL (B) - Chillwind Camp
-        { 0,   2289.89f, -5281.52f,  82.13f, 4.55f }, // EPL (B) - Light's Hope Chapel
-        { 1,   6205.88f, -1949.63f, 571.29f, 0.00f }, // Felwood (B) - Talonbranch Glade
-        { 1,   3986.71f, -1293.58f, 250.14f, 5.75f }, // Felwood (B) - Emerald Sanctuary
-        { 0,  -8364.61f, -2738.35f, 185.46f, 3.43f }, // Burning Steppes (B) - Morgan's Vigil
-        { 1,  -6113.82f, -1142.70f,-187.63f, 0.71f }, // Un'Goro (B) - Marshal's Refuge
-        { 1,   6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring (B) - Everlook
-        { 1,  -6818.09f,   733.81f,  41.57f, 2.31f }, // Silithus (B) - Cenarion Hold
-        { 1,  -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim (B) - Tel Co. Basecamp
-        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal (B) - Nordanaar
-        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain (B)
-        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade (B) - Nighthaven
-        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass (B)
+        { 0,    931.32f, -1430.11f,  64.67f, 0.00f, 28,   6, "Chillwind Camp Inn" },
+        { 0,   2289.89f, -5281.52f,  82.13f, 4.55f, 139,  6, "Light's Hope Chapel Inn" },
+        { 1,   6205.88f, -1949.63f, 571.29f, 0.00f, 361,  3, "Talonbranch Glade" },
+        { 1,   3986.71f, -1293.58f, 250.14f, 5.75f, 361,  3, "Emerald Sanctuary" },
+        { 0,  -8364.61f, -2738.35f, 185.46f, 3.43f, 46,   3, "Morgan's Vigil Outpost" },
+        { 1,  -6113.82f, -1142.70f,-187.63f, 0.71f, 490,  6, "Marshal's Refuge Camp" },
+        { 1,   6725.69f, -4619.44f, 720.91f, 4.67f, 618,  6, "Everlook Inn" },
+        { 1,  -6818.09f,   733.81f,  41.57f, 2.31f, 1377, 6, "Cenarion Hold Inn" },
+        { 1,  -8892.64f, -6455.32f,   7.80f, 1.53f, 5657, 3, "Tel Co. Basecamp (Tel'Abim)" },
+        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f, 5649, 1, "Nordanaar Sanctuary (Hyjal)" },
+        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f, 46,   1, "Blackrock Mountain" },
+        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f, 493,  1, "Nighthaven (Moonglade)" },
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f, 41,   1, "Deadwind Pass Haven" }
     },
     // Bracket 6: 60 (Endgame Maximum Level Destinations)
     {
-        { 0,    931.32f, -1430.11f,  64.67f, 0.00f }, // WPL - Chillwind Camp
-        { 0,   2289.89f, -5281.52f,  82.13f, 4.55f }, // EPL - Light's Hope Chapel
-        { 0,  -8364.61f, -2738.35f, 185.46f, 3.43f }, // Burning Steppes - Morgan's Vigil
-        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f }, // Searing Gorge - Thorium Point
-        { 1,  -6818.09f,   733.81f,  41.57f, 2.31f }, // Silithus - Cenarion Hold
-        { 1,   6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring - Everlook
-        { 1,  -6113.82f, -1142.70f,-187.63f, 0.71f }, // Un'Goro - Marshal's Refuge
-        { 1,  -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim - Tel Co. Basecamp
-        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal - Nordanaar
-        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain
-        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade - Nighthaven
-        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass
+        { 0,    931.32f, -1430.11f,  64.67f, 0.00f, 28,   6, "Chillwind Camp Inn" },
+        { 0,   2289.89f, -5281.52f,  82.13f, 4.55f, 139,  6, "Light's Hope Chapel Inn" },
+        { 0,  -8364.61f, -2738.35f, 185.46f, 3.43f, 46,   3, "Morgan's Vigil Outpost" },
+        { 0,  -6506.47f, -1149.95f, 307.71f, 4.18f, 51,   3, "Thorium Point Outpost" },
+        { 1,  -6818.09f,   733.81f,  41.57f, 2.31f, 1377, 6, "Cenarion Hold Inn" },
+        { 1,   6725.69f, -4619.44f, 720.91f, 4.67f, 618,  6, "Everlook Inn" },
+        { 1,  -6113.82f, -1142.70f,-187.63f, 0.71f, 490,  6, "Marshal's Refuge Camp" },
+        { 1,  -8892.64f, -6455.32f,   7.80f, 1.53f, 5657, 3, "Tel Co. Basecamp (Tel'Abim)" },
+        { 1,   5497.70f, -3690.70f, 1594.21f, 2.88f, 5649, 1, "Nordanaar Sanctuary (Hyjal)" },
+        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f, 46,   1, "Blackrock Mountain" },
+        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f, 493,  1, "Nighthaven (Moonglade)" },
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f, 41,   1, "Deadwind Pass Haven" }
     }
 };
 
@@ -1122,96 +1151,96 @@ static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
 {
     // Bracket 0: 1-9 (Durotar, Tirisfal Glades, Mulgore, Blackstone Island)
     {
-        { 1,  -601.29f, -4296.76f,  37.81f, 1.65f }, // Valley of Trials
-        { 1,   326.81f, -4706.65f,  15.37f, 4.16f }, // Razor Hill
-        { 1,  -828.00f, -4927.10f,  20.16f, 1.58f }, // Sen'jin Village
-        { 0,  1843.50f,  1590.00f,  93.30f, 3.09f }, // Deathknell
-        { 0,  2259.25f,   290.43f,  34.11f, 0.99f }, // Brill
-        { 1, -2919.35f,  -264.54f,  53.62f, 0.41f }, // Camp Narache
-        { 1, -2240.91f,  -399.17f,  -9.42f, 2.53f }, // Bloodhoof Village
-        { 1,  -275.60f, -7474.59f,  73.19f, 2.51f }, // Blackstone Island - Goblin Pod
-        { 1,  -570.74f, -7849.85f,  52.11f, 2.51f }  // Blackstone Island - Gazzik's Workshop
+        { 1,  -601.29f, -4296.76f,  37.81f, 1.65f, 14,  6, "Valley of Trials Den" },
+        { 1,   326.81f, -4706.65f,  15.37f, 4.16f, 14,  6, "Razor Hill Barracks & Inn" },
+        { 1,  -828.00f, -4927.10f,  20.16f, 1.58f, 14,  3, "Sen'jin Village" },
+        { 0,  1843.50f,  1590.00f,  93.30f, 3.09f, 85,  6, "Deathknell Tavern" },
+        { 0,  2259.25f,   290.43f,  34.11f, 0.99f, 85,  6, "Gallow's End Tavern (Brill)" },
+        { 1, -2919.35f,  -264.54f,  53.62f, 0.41f, 215, 6, "Camp Narache" },
+        { 1, -2240.91f,  -399.17f,  -9.42f, 2.53f, 215, 6, "Bloodhoof Village Inn" },
+        { 1,  -275.60f, -7474.59f,  73.19f, 2.51f, 14,  1, "Blackstone Island Pod" },
+        { 1,  -570.74f, -7849.85f,  52.11f, 2.51f, 14,  3, "Gazzik's Workshop (Goblin)" }
     },
     // Bracket 1: 10-19 (Northern Barrens, Silverpine Forest Villages, Durotar, Ashenvale approach)
     {
-        { 1,  -452.84f, -2650.76f,  95.52f, 0.24f }, // Barrens - The Crossroads
-        { 1, -2363.11f, -1913.78f,  95.78f, 0.17f }, // Barrens - Camp Taurajo
-        { 1,  -956.66f, -3754.71f,   5.33f, 1.00f }, // Barrens - Ratchet
-        { 0,   504.53f,  1539.08f, 129.50f, 1.36f }, // Silverpine - The Sepulcher
-        { 0,  -388.15f,  1543.67f,  18.16f, 3.10f }, // Silverpine - Pyrewood Village Outskirts
-        { 1,   326.81f, -4706.65f,  15.37f, 4.16f }, // Durotar - Razor Hill
-        { 1,  2270.94f, -2538.19f,  93.92f, 0.06f }  // Ashenvale (15-30) - Splintertree Post
+        { 1,  -452.84f, -2650.76f,  95.52f, 0.24f, 17,  6, "The Crossroads Inn" },
+        { 1, -2363.11f, -1913.78f,  95.78f, 0.17f, 17,  3, "Camp Taurajo Post" },
+        { 1,  -956.66f, -3754.71f,   5.33f, 1.00f, 17,  3, "Ratchet Shady Rest Inn" },
+        { 0,   504.53f,  1539.08f, 129.50f, 1.36f, 130, 6, "The Sepulcher Inn" },
+        { 0,  -388.15f,  1543.67f,  18.16f, 3.10f, 130, 1, "Pyrewood Village Outskirts" },
+        { 1,   326.81f, -4706.65f,  15.37f, 4.16f, 14,  3, "Razor Hill Barracks & Inn" },
+        { 1,  2270.94f, -2538.19f,  93.92f, 0.06f, 331, 3, "Splintertree Post" }
     },
     // Bracket 2: 20-29 (Southern Barrens, Ashenvale, Stonetalon, Hillsbrad, Thousand Needles, Balor)
     {
-        { 1, -2363.11f, -1913.78f,  95.78f, 0.17f }, // Barrens - Camp Taurajo
-        { 1,  2270.94f, -2538.19f,  93.92f, 0.06f }, // Ashenvale (B) - Splintertree Post
-        { 1,  3374.71f,   996.97f,   5.19f, 3.82f }, // Ashenvale (B) - Zoram'gar Outpost
-        { 1,   966.15f,   926.50f, 104.65f, 1.27f }, // Stonetalon (B) - Sun Rock Retreat
-        { 1,  1570.92f,  1031.52f, 137.96f, 3.33f }, // Stonetalon (B) - Malaka'jin
-        { 0,   -34.15f,  -923.37f,  54.56f, 0.15f }, // Hillsbrad (B) - Tarren Mill
-        { 0,    32.55f,  -676.68f, 127.35f, 4.29f }, // Hillsbrad (B) - Durnholde Keep
-        { 1, -5431.78f, -2449.38f,  89.28f, 2.33f }, // Thousand Needles (B) - Freewind Post
-        { 1, -6221.35f, -3927.64f, -58.75f, 0.76f }, // Thousand Needles (B) - Mirage Raceway
-        { 0, -9180.10f,  2573.64f,   9.47f, 0.40f }  // Balor (B) - Stormbreaker Point
+        { 1, -2363.11f, -1913.78f,  95.78f, 0.17f, 17,   3, "Camp Taurajo Post" },
+        { 1,  2270.94f, -2538.19f,  93.92f, 0.06f, 331,  6, "Splintertree Post Inn" },
+        { 1,  3374.71f,   996.97f,   5.19f, 3.82f, 331,  3, "Zoram'gar Outpost" },
+        { 1,   966.15f,   926.50f, 104.65f, 1.27f, 406,  6, "Sun Rock Retreat Inn" },
+        { 1,  1570.92f,  1031.52f, 137.96f, 3.33f, 406,  3, "Malaka'jin Camp" },
+        { 0,   -34.15f,  -923.37f,  54.56f, 0.15f, 267,  6, "Tarren Mill Inn" },
+        { 0,    32.55f,  -676.68f, 127.35f, 4.29f, 267,  1, "Durnholde Outskirts" },
+        { 1, -5431.78f, -2449.38f,  89.28f, 2.33f, 400,  6, "Freewind Post Inn" },
+        { 1, -6221.35f, -3927.64f, -58.75f, 0.76f, 400,  3, "Mirage Raceway Hotel" },
+        { 0, -9180.10f,  2573.64f,   9.47f, 0.40f, 4022, 1, "Stormbreaker Point (Balor Island)" }
     },
     // Bracket 3: 30-39 (Arathi, Alterac, Desolace, STV, Dustwallow, Swamp of Sorrows, Badlands, Gilneas)
     {
-        { 0,  -941.01f, -3526.66f,  70.94f, 3.49f }, // Arathi (B) - Hammerfall
-        { 0,   370.76f,  -491.36f, 175.36f, 5.38f }, // Alterac (B) - Strahnbrad / Alterac
-        { 1, -1224.46f,  1728.53f,  90.06f, 0.83f }, // Desolace (B) - Ghost Walker Post
-        { 1, -1664.79f,  3091.67f,  30.56f, 6.08f }, // Desolace (B) - Shadowprey Village
-        { 0, -12414.20f,  146.29f,   3.28f, 1.92f }, // STV (B) - Grom'gol Base Camp
-        { 0, -14297.20f,  530.99f,   8.78f, 3.99f }, // STV (B) - Booty Bay
-        { 1, -3130.67f, -2908.43f,  34.10f, 1.43f }, // Dustwallow (B) - Brackenwall Village
-        { 1, -4569.57f, -3222.49f,  34.92f, 0.00f }, // Dustwallow (B) - Mudsprocket
-        { 0, -10446.90f, -3261.91f,  20.18f, 5.02f }, // Swamp of Sorrows (B) - Stonard
-        { 0, -6692.48f, -2175.31f, 244.15f, 0.43f }, // Badlands (B) - Kargath
-        { 0, -1300.59f,  1160.95f, 126.86f, 2.72f }, // Gilneas (B) - Stillward Church
-        { 815,-1095.44f,  2234.75f, 182.86f, 2.60f }  // Gilneas (B) - Gilneas City
+        { 0,  -941.01f, -3526.66f,  70.94f, 3.49f, 45,   6, "Hammerfall Barracks & Inn" },
+        { 0,   370.76f,  -491.36f, 175.36f, 5.38f, 36,   3, "Strahnbrad" },
+        { 1, -1224.46f,  1728.53f,  90.06f, 0.83f, 405,  3, "Ghost Walker Post" },
+        { 1, -1664.79f,  3091.67f,  30.56f, 6.08f, 405,  6, "Shadowprey Village Inn" },
+        { 0, -12414.20f,  146.29f,   3.28f, 1.92f, 33,   6, "Grom'gol Base Camp Inn" },
+        { 0, -14297.20f,  530.99f,   8.78f, 3.99f, 33,   6, "The Salty Sailor Tavern (Booty Bay)" },
+        { 1, -3130.67f, -2908.43f,  34.10f, 1.43f, 15,   6, "Brackenwall Village Inn" },
+        { 1, -4569.57f, -3222.49f,  34.92f, 0.00f, 15,   3, "Mudsprocket Inn" },
+        { 0, -10446.90f, -3261.91f,  20.18f, 5.02f, 8,    6, "Stonard Wayfarer's Rest" },
+        { 0, -6692.48f, -2175.31f, 244.15f, 0.43f, 3,    6, "Kargath Outpost & Inn" },
+        { 0, -1300.59f,  1160.95f, 126.86f, 2.72f, 4021, 1, "Stillward Church (Gilneas)" },
+        { 815,-1095.44f,  2234.75f, 182.86f, 2.60f, 4021, 1, "Gilneas City" }
     },
     // Bracket 4: 40-49 (Hinterlands, Feralas, Tanaris, Searing Gorge, Blasted Lands, Azshara, Gillijim, Icepoint, Maraudon)
     {
-        { 0,  -557.23f, -4581.27f,   9.59f, 1.02f }, // Hinterlands (B) - Revantusk Village
-        { 1, -4396.70f,   224.84f,  25.41f, 4.94f }, // Feralas (B) - Camp Mojache
-        { 1, -7177.15f, -3785.34f,   8.37f, 6.10f }, // Tanaris (B) - Gadgetzan
-        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f }, // Searing Gorge (B) - Thorium Point
-        { 0, -11182.50f, -3016.67f,   7.42f, 4.00f }, // Blasted Lands (B) - Dreadmaul Hold
-        { 1,  3608.59f, -4414.43f, 113.05f, 1.62f }, // Azshara (B) - Valormok
-        { 0, -14087.20f,  2269.20f,  67.00f, 1.29f }, // Gillijim's Isle (B) - Maul'Ogg Refuge
-        { 1, 13675.00f, -6593.94f,   3.04f, 0.88f }, // Icepoint Rock (B)
-        { 1,  -1419.13f,  2908.14f, 137.46f, 1.57f }  // Maraudon (B) - Valley of the Centaur
+        { 0,  -557.23f, -4581.27f,   9.59f, 1.02f, 47,   6, "Revantusk Village Inn" },
+        { 1, -4396.70f,   224.84f,  25.41f, 4.94f, 357,  6, "Camp Mojache Inn" },
+        { 1, -7177.15f, -3785.34f,   8.37f, 6.10f, 440,  6, "Gadgetzan Inn" },
+        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f, 51,   3, "Thorium Point Outpost" },
+        { 0, -11182.50f, -3016.67f,   7.42f, 4.00f, 4,    3, "Dreadmaul Hold" },
+        { 1,  3608.59f, -4414.43f, 113.05f, 1.62f, 16,   3, "Valormok Outpost" },
+        { 0, -14087.20f,  2269.20f,  67.00f, 1.29f, 4018, 1, "Maul'Ogg Refuge (Gillijim's Isle)" },
+        { 1, 13675.00f, -6593.94f,   3.04f, 0.88f, 3425, 1, "Icepoint Rock Outpost" },
+        { 1,  -1419.13f,  2908.14f, 137.46f, 1.57f, 405,  1, "Valley of the Centaur" }
     },
     // Bracket 5: 50-59 (WPL, EPL, Felwood, Burning Steppes, Un'Goro, Winterspring, Silithus, Tel'Abim, Hyjal, Moonglade, Deadwind, BRM)
     {
-        { 0,  1711.99f,  -719.76f,  54.34f, 4.66f }, // WPL (B) - The Bulwark
-        { 0,  2289.89f, -5281.52f,  82.13f, 4.55f }, // EPL (B) - Light's Hope Chapel
-        { 1,  5128.91f,  -343.51f, 355.04f, 3.39f }, // Felwood (B) - Bloodvenom Post
-        { 1,  3986.71f, -1293.58f, 250.14f, 5.75f }, // Felwood (B) - Emerald Sanctuary
-        { 0, -7501.51f, -2183.08f, 165.93f, 6.07f }, // Burning Steppes (B) - Flame Crest
-        { 1, -6113.82f, -1142.70f,-187.63f, 0.71f }, // Un'Goro (B) - Marshal's Refuge
-        { 1,  6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring (B) - Everlook
-        { 1, -6818.09f,   733.81f,  41.57f, 2.31f }, // Silithus (B) - Cenarion Hold
-        { 1, -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim (B) - Tel Co. Basecamp
-        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal (B) - Nordanaar
-        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain (B)
-        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade (B) - Nighthaven
-        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass (B)
+        { 0,  1711.99f,  -719.76f,  54.34f, 4.66f, 28,   6, "The Bulwark (WPL)" },
+        { 0,  2289.89f, -5281.52f,  82.13f, 4.55f, 139,  6, "Light's Hope Chapel (EPL)" },
+        { 1,  5128.91f,  -343.51f, 355.04f, 3.39f, 361,  6, "Bloodvenom Post Inn" },
+        { 1,  3986.71f, -1293.58f, 250.14f, 5.75f, 361,  3, "Emerald Sanctuary" },
+        { 0, -7501.51f, -2183.08f, 165.93f, 6.07f, 46,   6, "Flame Crest Outpost & Inn" },
+        { 1, -6113.82f, -1142.70f,-187.63f, 0.71f, 490,  6, "Marshal's Refuge Inn" },
+        { 1,  6725.69f, -4619.44f, 720.91f, 4.67f, 618,  6, "Everlook Inn (Winterspring)" },
+        { 1, -6818.09f,   733.81f,  41.57f, 2.31f, 1377, 6, "Cenarion Hold Inn (Silithus)" },
+        { 1, -8892.64f, -6455.32f,   7.80f, 1.53f, 4019, 1, "Tel Co. Basecamp (Tel'Abim)" },
+        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f, 4016, 1, "Nordanaar Sanctuary (Hyjal)" },
+        { 0, -7494.94f, -1123.49f, 265.55f, 3.31f, 25,   1, "Blackrock Mountain Gates" },
+        { 1,  7654.30f, -2232.87f, 462.11f, 5.97f, 493,  1, "Nighthaven (Moonglade)" },
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f, 41,   1, "Deadwind Pass Haven" }
     },
     // Bracket 6: 60 (Endgame Maximum Level Destinations)
     {
-        { 0,  1711.99f,  -719.76f,  54.34f, 4.66f }, // WPL - The Bulwark
-        { 0,  2289.89f, -5281.52f,  82.13f, 4.55f }, // EPL - Light's Hope Chapel
-        { 0, -7501.51f, -2183.08f, 165.93f, 6.07f }, // Burning Steppes - Flame Crest
-        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f }, // Searing Gorge - Thorium Point
-        { 1, -6818.09f,   733.81f,  41.57f, 2.31f }, // Silithus - Cenarion Hold
-        { 1,  6725.69f, -4619.44f, 720.91f, 4.67f }, // Winterspring - Everlook
-        { 1, -6113.82f, -1142.70f,-187.63f, 0.71f }, // Un'Goro - Marshal's Refuge
-        { 1, -8892.64f, -6455.32f,   7.80f, 1.53f }, // Tel'Abim - Tel Co. Basecamp
-        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f }, // Hyjal - Nordanaar
-        { 0,  -7494.94f, -1123.49f, 265.55f, 3.31f }, // Blackrock Mountain
-        { 1,   7654.30f, -2232.87f, 462.11f, 5.97f }, // Moonglade - Nighthaven
-        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f }  // Deadwind Pass
+        { 0,  2289.89f, -5281.52f,  82.13f, 4.55f, 139,  6, "Light's Hope Chapel (EPL)" },
+        { 1, -6818.09f,   733.81f,  41.57f, 2.31f, 1377, 6, "Cenarion Hold Inn (Silithus)" },
+        { 0, -7501.51f, -2183.08f, 165.93f, 6.07f, 46,   6, "Flame Crest Outpost & Inn" },
+        { 0,  1711.99f,  -719.76f,  54.34f, 4.66f, 28,   3, "The Bulwark (WPL)" },
+        { 0, -6506.47f, -1149.95f, 307.71f, 4.18f, 51,   3, "Thorium Point Outpost" },
+        { 1,  6725.69f, -4619.44f, 720.91f, 4.67f, 618,  3, "Everlook Inn (Winterspring)" },
+        { 1, -6113.82f, -1142.70f,-187.63f, 0.71f, 490,  3, "Marshal's Refuge Inn" },
+        { 1, -8892.64f, -6455.32f,   7.80f, 1.53f, 4019, 1, "Tel Co. Basecamp (Tel'Abim)" },
+        { 1,  5497.70f, -3690.70f, 1594.21f, 2.88f, 4016, 1, "Nordanaar Sanctuary (Hyjal)" },
+        { 0, -7494.94f, -1123.49f, 265.55f, 3.31f, 25,   1, "Blackrock Mountain Gates" },
+        { 1,  7654.30f, -2232.87f, 462.11f, 5.97f, 493,  1, "Nighthaven (Moonglade)" },
+        { 0, -10438.80f, -1932.75f, 104.62f, 4.77f, 41,   1, "Deadwind Pass Haven" }
     }
 };
 
@@ -1300,6 +1329,41 @@ bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
 
     ai->UpdateTalentSpec();
     ai->ResetStrategies();
+
+    // If level is demoted or under 10, ensure safety of homebind location
+    if (PopulationPolicy::Instance().IsHomebindSyncEnabled() && newLevel < 10)
+    {
+        uint8_t race = bot->GetRace();
+        uint32_t safeMap = 0;
+        float safeX = 0.0f, safeY = 0.0f, safeZ = 0.0f, safeO = 0.0f;
+        uint32_t safeZone = 0;
+        switch (race)
+        {
+            case RACE_HIGH_ELF: safeMap = 0; safeX = 3322.0f; safeY = -2448.0f; safeZ = 107.2f; safeO = 3.47f; safeZone = 4015; break;
+            case RACE_GOBLIN:   safeMap = 1; safeX = 326.81f; safeY = -4706.65f; safeZ = 15.37f; safeO = 4.16f; safeZone = 14;   break;
+            case RACE_HUMAN:    safeMap = 0; safeX = -8949.9f; safeY = -132.5f; safeZ = 83.5f; safeO = 0.0f; safeZone = 12;   break;
+            case RACE_DWARF:
+            case RACE_GNOME:    safeMap = 0; safeX = -6240.3f; safeY = 331.0f; safeZ = 382.8f; safeO = 6.17f; safeZone = 1;    break;
+            case RACE_NIGHTELF: safeMap = 1; safeX = 10311.3f; safeY = 832.5f; safeZ = 1326.4f; safeO = 5.69f; safeZone = 141;  break;
+            case RACE_ORC:
+            case RACE_TROLL:    safeMap = 1; safeX = -618.0f; safeY = -4251.0f; safeZ = 38.0f; safeO = 0.0f; safeZone = 14;   break;
+            case RACE_TAUREN:   safeMap = 1; safeX = -2917.6f; safeY = -258.0f; safeZ = 52.9f; safeO = 0.0f; safeZone = 215;  break;
+            case RACE_UNDEAD:   safeMap = 0; safeX = 1676.7f; safeY = 1678.3f; safeZ = 121.7f; safeO = 2.71f; safeZone = 85;   break;
+            default: break;
+        }
+        if (safeZone != 0)
+        {
+            uint16 currentBindZone = bot->GetHomeBindAreaId();
+            if (currentBindZone == 0 || currentBindZone == 2268 || currentBindZone == 1377 || currentBindZone == 139 ||
+                currentBindZone == 46 || currentBindZone == 28 || currentBindZone == 618 || currentBindZone == 490 ||
+                currentBindZone == 361 || currentBindZone == 4016 || currentBindZone == 4019 || currentBindZone == 41 ||
+                currentBindZone == 25 || currentBindZone == 51)
+            {
+                bot->SetHomebindToLocation(WorldLocation(safeMap, safeX, safeY, safeZ, safeO), safeZone);
+            }
+        }
+    }
+
     bot->SaveToDB();
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
     PlayerbotFactory factory(bot, newLevel);
@@ -1484,6 +1548,7 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
     float landingY = 0.0f;
     float landingZ = 0.0f;
     float landingO = 0.0f;
+    uint32_t targetZoneId = 0;
     bool destFound = false;
 
     // Racial starter zone awareness for level 1-9 (bracket 0)
@@ -1503,36 +1568,36 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
         }
         else
         {
-            TeleportZoneDestination racialDest{0, 0.0f, 0.0f, 0.0f, 0.0f};
+            TeleportZoneDestination racialDest{0, 0.0f, 0.0f, 0.0f, 0.0f, 0, 1, ""};
             bool hasRacialDest = true;
 
             switch (race)
             {
-                case RACE_HIGH_ELF: // High Elf (Turtle WoW) - Thalassian Highlands
-                    racialDest = { 0, 3322.0f, -2448.0f, 107.2f, 3.47f };
+                case RACE_HIGH_ELF: // High Elf (Turtle WoW) - Thalassian Highlands / Alah'Thalas
+                    racialDest = { 0, 3322.0f, -2448.0f, 107.2f, 3.47f, 4015, 6, "Alah'Thalas (Thalassian Highlands)" };
                     break;
-                case RACE_GOBLIN: // Goblin (Turtle WoW) - Blackstone Island
-                    racialDest = { 1, -275.6f, -7474.6f, 73.2f, 2.51f };
+                case RACE_GOBLIN: // Goblin (Turtle WoW) - Razor Hill (mainland safe destination to prevent Blackstone Island bot-trap)
+                    racialDest = { 1, 326.81f, -4706.65f, 15.37f, 4.16f, 14, 6, "Razor Hill Barracks & Inn" };
                     break;
                 case RACE_HUMAN: // Human - Northshire Valley
-                    racialDest = { 0, -8949.9f, -132.5f, 83.5f, 0.0f };
+                    racialDest = { 0, -8949.9f, -132.5f, 83.5f, 0.0f, 12, 6, "Northshire Valley Abbey" };
                     break;
                 case RACE_DWARF: // Dwarf / Gnome - Coldridge Valley
                 case RACE_GNOME:
-                    racialDest = { 0, -6240.3f, 331.0f, 382.8f, 6.17f };
+                    racialDest = { 0, -6240.3f, 331.0f, 382.8f, 6.17f, 1, 6, "Coldridge Valley Anvilmar" };
                     break;
                 case RACE_NIGHTELF: // Night Elf - Shadowglen
-                    racialDest = { 1, 10311.3f, 832.5f, 1326.4f, 5.69f };
+                    racialDest = { 1, 10311.3f, 832.5f, 1326.4f, 5.69f, 141, 6, "Shadowglen Aldrassil" };
                     break;
                 case RACE_ORC: // Orc / Troll - Valley of Trials
                 case RACE_TROLL:
-                    racialDest = { 1, -618.0f, -4251.0f, 38.0f, 0.0f };
+                    racialDest = { 1, -618.0f, -4251.0f, 38.0f, 0.0f, 14, 6, "Valley of Trials Den" };
                     break;
                 case RACE_TAUREN: // Tauren - Red Cloud Mesa
-                    racialDest = { 1, -2917.6f, -258.0f, 52.9f, 0.0f };
+                    racialDest = { 1, -2917.6f, -258.0f, 52.9f, 0.0f, 215, 6, "Camp Narache" };
                     break;
                 case RACE_UNDEAD: // Undead - Deathknell
-                    racialDest = { 0, 1676.7f, 1678.3f, 121.7f, 2.71f };
+                    racialDest = { 0, 1676.7f, 1678.3f, 121.7f, 2.71f, 85, 6, "Deathknell Tavern" };
                     break;
                 default:
                     hasRacialDest = false;
@@ -1546,6 +1611,7 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
                 landingY = racialDest.y;
                 landingZ = racialDest.z;
                 landingO = racialDest.o;
+                targetZoneId = racialDest.zoneId;
                 destFound = true;
             }
         }
@@ -1570,12 +1636,23 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
             const auto& hardcodedPool = (teamId == 0) ? s_AllianceBracketZones[zoneIndex] : s_HordeBracketZones[zoneIndex];
             if (!hardcodedPool.empty())
             {
-                const auto& dest = hardcodedPool[rand() % hardcodedPool.size()];
+                TeleportZoneDestination dest;
+                if (PopulationPolicy::Instance().IsUseWeightedPriorities())
+                {
+                    const auto* pDest = PickWeightedDestination(hardcodedPool);
+                    dest = pDest ? *pDest : hardcodedPool[rand() % hardcodedPool.size()];
+                }
+                else
+                {
+                    dest = hardcodedPool[rand() % hardcodedPool.size()];
+                }
+
                 targetMapId = dest.mapId;
                 landingX = dest.x;
                 landingY = dest.y;
                 landingZ = dest.z;
                 landingO = dest.o;
+                targetZoneId = dest.zoneId;
                 destFound = true;
             }
         }
@@ -1587,6 +1664,16 @@ bool NativeTaskAdapter::TeleportBotToLevelZone(Player* bot, uint8_t newLevel, ui
         bot->TeleportTo(targetMapId, landingX, landingY, floorZ, landingO);
         RegisterArrivalFloor(bot, targetMapId, landingX, landingY, floorZ,
                              PopulationPolicy::Instance().GetArrivalHoldDurationMs());
+
+        // Dynamic homebind synchronization to ensure bots hearth/respawn in level-appropriate inns
+        if (PopulationPolicy::Instance().IsHomebindSyncEnabled())
+        {
+            if (targetZoneId == 0)
+                targetZoneId = sTerrainMgr.GetZoneId(targetMapId, landingX, landingY, floorZ);
+
+            bot->SetHomebindToLocation(WorldLocation(targetMapId, landingX, landingY, floorZ, landingO), targetZoneId);
+        }
+
         RecordRelocation(bot);
         return true;
     }

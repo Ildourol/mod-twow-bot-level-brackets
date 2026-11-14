@@ -118,6 +118,18 @@ BotLevelBrackets.World.Enabled = 1
 # Default: 70%.
 BotLevelBrackets.World.FieldReservePct = 70
 
+# Automatically update bot homebind (hearthstone location) upon bracket teleport or level adjustment.
+# Ensures bots respawn and hearthstone to level-appropriate inns rather than out-of-bracket hubs.
+# 1 = Enabled (Default), 0 = Disabled.
+BotLevelBrackets.SyncHomebindOnLevelChange = 1
+
+# Use weighted multi-inn priority distribution when choosing bracket teleport destinations.
+# Tier 3 (Major hubs): 50% probability
+# Tier 2 (Regional outposts): 35% probability
+# Tier 1 (Custom Turtle WoW / Remote flavor inns): 15% probability
+# 1 = Enabled (Default), 0 = Disabled (Uniform random choice).
+BotLevelBrackets.UseWeightedDestinationPriorities = 1
+
 ###################################################################################################
 # SOCIAL & IDENTITY PROTECTIONS
 ###################################################################################################

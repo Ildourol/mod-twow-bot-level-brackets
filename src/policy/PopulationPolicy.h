@@ -256,6 +256,12 @@ public:
         return emptyPool;
     }
 
+    bool IsHomebindSyncEnabled() const { return m_homebindSyncEnabled; }
+    void SetHomebindSyncEnabled(bool val) { m_homebindSyncEnabled = val; }
+
+    bool IsUseWeightedPriorities() const { return m_useWeightedPriorities; }
+    void SetUseWeightedPriorities(bool val) { m_useWeightedPriorities = val; }
+
 private:
     PopulationPolicy();
 
@@ -305,6 +311,8 @@ private:
     uint32_t m_maxPendingQueueSize = 0;
     uint32_t m_pendingQueueTTL = 0;
     bool m_teleportOnLevelChange = true;
+    bool m_homebindSyncEnabled = true;
+    bool m_useWeightedPriorities = true;
     bool m_arrivalFloorHoldEnabled = true;
     uint32_t m_arrivalHoldDurationMs = 5000;
     uint32_t m_maxFloorLifts = 6;
