@@ -86,6 +86,7 @@ public:
 
     // Level Adjustment & Complete Provisioning
     static bool AdjustBotLevel(Player* bot, uint8_t newLevel);
+    static bool ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLevel, uint8_t newLevel);
     static bool TeleportBotToLevelZone(Player* bot, uint8_t newLevel, uint8_t teamId);
     static bool TeleportBotToCity(Player* bot, CityId cityId);
 

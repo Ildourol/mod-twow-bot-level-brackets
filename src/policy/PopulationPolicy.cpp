@@ -89,6 +89,8 @@ void PopulationPolicy::LoadDefaults()
     m_teleportOnLevelChange = true;
     m_homebindSyncEnabled = true;
     m_useWeightedPriorities = true;
+    m_reconcileEquipment = true;
+    m_reconcileSkillsSpellsMounts = true;
     m_arrivalFloorHoldEnabled = true;
     m_arrivalHoldDurationMs = 5000;
     m_maxFloorLifts = 6;

@@ -20,6 +20,20 @@ BotLevelBrackets.LevelDistribution.Enabled = 1
 # Default: 300 (5 minutes).
 BotLevelBrackets.LevelDistribution.CheckFrequency = 300
 
+# Authoritative equipment reconciliation upon bot bracket/level transitions.
+# Strips illegal, out-of-bracket, and obsolete items, removes 2H-conflicting offhands,
+# deduplicates unique-equipped rings and trinkets, leaves unavailable low-level slots (e.g. head/shoulders)
+# safely empty, and triggers authoritative auto-gearing.
+# 1 = Enabled (Default), 0 = Disabled.
+BotLevelBrackets.LevelDistribution.ReconcileEquipment = 1
+
+# Authoritative skills, spells, talents, and mount reconciliation upon bot bracket/level transitions.
+# Caps weapon and defense skills down to new level, handles armor proficiencies (Plate/Mail at 40),
+# resets talents and prunes over-level spell ranks on downscale, trains spells on upscale,
+# and enforces level-gated riding/mount rules (dismount, 18 turtle, 40 normal, 60 epic).
+# 1 = Enabled (Default), 0 = Disabled.
+BotLevelBrackets.LevelDistribution.ReconcileSkillsSpellsMounts = 1
+
 # Teleport on level adjustment:
 # When enabled, bots are safely dismounted and teleported to their leveling zone
 # or native racial starter valley after their level is adjusted.

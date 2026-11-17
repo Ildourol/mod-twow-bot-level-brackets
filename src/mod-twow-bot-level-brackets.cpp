@@ -176,6 +176,8 @@ void LoadModuleConfiguration()
     policy.SetMaxFloorLifts(static_cast<uint32_t>(GetInternalInt("BotLevelBrackets.Teleport.MaxFloorLifts", 6)));
     policy.SetHomebindSyncEnabled(sConfig.GetBoolDefault("BotLevelBrackets.SyncHomebindOnLevelChange", true));
     policy.SetUseWeightedPriorities(sConfig.GetBoolDefault("BotLevelBrackets.UseWeightedDestinationPriorities", true));
+    policy.SetEquipmentReconciliationEnabled(sConfig.GetBoolDefault("BotLevelBrackets.LevelDistribution.ReconcileEquipment", true));
+    policy.SetSkillsSpellsMountsReconciliationEnabled(sConfig.GetBoolDefault("BotLevelBrackets.LevelDistribution.ReconcileSkillsSpellsMounts", true));
 
     // Starting-Zone and Wrong-Map Dispersal Settings
     policy.SetStartingZoneDisperseEnabled(sConfig.GetBoolDefault("BotLevelBrackets.StartingZoneDisperse.Enabled", true));

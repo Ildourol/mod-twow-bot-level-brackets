@@ -21,6 +21,11 @@
 #include "ai/playerbot/PlayerbotFactory.h"
 #include "ai/playerbot/TravelMgr.h"
 #include "ai/playerbot/strategy/AiObjectContext.h"
+#include "ai/playerbot/policy/travel/MountShopPolicy.h"
+#include "ai/playerbot/strategy/values/MountValues.h"
+#include "runtime/GearItemLevelCapPolicy.h"
+#include "runtime/policy/provision/GearBlacklistPolicy.h"
+#include "Objects/Bag.h"
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
 #include "Common.h"
 #include "Player.h"
@@ -1259,9 +1264,404 @@ static const std::vector<TeleportZoneDestination> s_HordeBracketZones[7] =
     }
 };
 
+bool NativeTaskAdapter::ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLevel, uint8_t newLevel)
+{
+    if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
+        return false;
+
+#if defined(HAVE_TORTOISEBOTS)
+    PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
+    if (!ai)
+        return false;
+
+    bool const isFree = sRandomBotFacade.IsFreeBot(bot);
+    bool const isOwned = ai->IsOwnedBot() || !isFree;
+
+    PlayerbotFactory factory(bot, newLevel);
+
+    // -------------------------------------------------------------------------
+    // 1. Talents & Spells Reconciliation
+    // -------------------------------------------------------------------------
+    if (PopulationPolicy::Instance().IsSkillsSpellsMountsReconciliationEnabled())
+    {
+        if (newLevel < oldLevel)
+        {
+            // Reset spent talents on downscaling to prevent high-tier talents at low levels
+            bot->ResetTalents(true);
+            if (newLevel >= 10 && !isOwned)
+            {
+                ai->DoSpecificAction("auto talents");
+                PlayerbotFactory::EnsureTalentSpellsSaved(bot);
+            }
+            // Prune over-level spell ranks
+            factory.PruneOverLevelSpellRanks();
+        }
+        else
+        {
+            if (newLevel >= 10 && !isOwned)
+            {
+                ai->DoSpecificAction("auto talents");
+                PlayerbotFactory::EnsureTalentSpellsSaved(bot);
+            }
+            ai->DoSpecificAction("auto learn spell");
+            PlayerbotFactory::EnsureSkillRewardedSpells(bot);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Defense, Weapon Skills & Armor Proficiencies Reconciliation
+    // -------------------------------------------------------------------------
+    if (PopulationPolicy::Instance().IsSkillsSpellsMountsReconciliationEnabled())
+    {
+        if (newLevel < oldLevel)
+        {
+            // Downscaling: cap defense and weapon skills down to (newLevel * 5)
+            uint32 maxSkillVal = static_cast<uint32>(newLevel) * 5;
+            if (bot->GetSkillValue(SKILL_DEFENSE) > maxSkillVal)
+                bot->SetSkill(SKILL_DEFENSE, maxSkillVal, maxSkillVal);
+
+            static const uint16 weaponSkills[] = {
+                SKILL_SWORDS, SKILL_AXES, SKILL_BOWS, SKILL_GUNS, SKILL_MACES,
+                SKILL_2H_SWORDS, SKILL_STAVES, SKILL_2H_MACES, SKILL_2H_AXES,
+                SKILL_DAGGERS, SKILL_CROSSBOWS, SKILL_WANDS, SKILL_FIST_WEAPONS,
+                SKILL_POLEARMS, SKILL_THROWN
+            };
+            for (uint16 wSkill : weaponSkills)
+            {
+                if (bot->GetSkillValue(wSkill) > maxSkillVal)
+                    bot->SetSkill(wSkill, maxSkillVal, maxSkillVal);
+            }
+
+            // Downscale armor proficiencies: below 40 warriors/paladins lose plate, hunters/shamans lose mail
+            uint32 skillLevel = newLevel < 40 ? 0 : 1;
+            switch (bot->GetClass())
+            {
+                case CLASS_WARRIOR:
+                case CLASS_PALADIN:
+                    bot->SetSkill(SKILL_PLATE_MAIL, skillLevel, skillLevel);
+                    break;
+                case CLASS_SHAMAN:
+                case CLASS_HUNTER:
+                    bot->SetSkill(SKILL_MAIL, skillLevel, skillLevel);
+                    break;
+                default:
+                    break;
+            }
+        }
+        else
+        {
+            // Upscaling: authoritative skill progression
+            factory.InitSkills();
+            factory.InitAllSkills();
+            factory.EnsurePrimaryProfessions();
+            factory.EnsureSpecializations();
+            if (sPlayerbotAIConfig.professionsGrowWithLevel)
+                factory.LearnSpecializationRecipes();
+            factory.AddTools();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Riding Skills & Mount Reconciliation (Turtle WoW Canonical Rules)
+    // -------------------------------------------------------------------------
+    if (PopulationPolicy::Instance().IsSkillsSpellsMountsReconciliationEnabled())
+    {
+        if (newLevel < oldLevel)
+        {
+            // If currently mounted, safely dismount
+            if (bot->IsMounted())
+                bot->Unmount();
+
+            // Downscaling below 60: remove epic mount spells and cap riding skill to 75 (if >= 40) or 0 (if < 40)
+            if (newLevel < 60)
+            {
+                for (uint32 itemId : MountShopPolicy::GetRacialMounts(bot->GetRace(), MountShopPolicy::MountTier::Epic))
+                {
+                    if (uint32 spellId = ai::MountValue::GetMountSpell(itemId))
+                    {
+                        if (bot->HasSpell(spellId))
+                            bot->removeSpell(spellId, false, false);
+                    }
+                }
+                for (auto const& [itemId, spellId] : ai::CollectionMounts())
+                {
+                    if (ai::MountValue::GetSpeed(spellId) >= 100 && bot->HasSpell(spellId))
+                        bot->removeSpell(spellId, false, false);
+                }
+                if (bot->GetSkillValue(SKILL_RIDING) > 75)
+                    bot->SetSkill(SKILL_RIDING, (newLevel >= 40 ? 75 : 0), (newLevel >= 40 ? 75 : 0));
+            }
+
+            // Downscaling below 40: remove normal mount spells and clear riding skill to 0
+            if (newLevel < 40)
+            {
+                for (uint32 itemId : MountShopPolicy::GetRacialMounts(bot->GetRace(), MountShopPolicy::MountTier::Normal))
+                {
+                    if (uint32 spellId = ai::MountValue::GetMountSpell(itemId))
+                    {
+                        if (bot->HasSpell(spellId))
+                            bot->removeSpell(spellId, false, false);
+                    }
+                }
+                for (auto const& [itemId, spellId] : ai::CollectionMounts())
+                {
+                    if (bot->HasSpell(spellId))
+                        bot->removeSpell(spellId, false, false);
+                }
+                bot->SetSkill(SKILL_RIDING, 0, 0);
+            }
+
+            // Downscaling below 18: remove Turtle Mount (30174)
+            if (newLevel < 18)
+            {
+                if (bot->HasSpell(30174))
+                    bot->removeSpell(30174, false, false);
+            }
+
+            // Purge unusable mount items from inventory bags for free bots
+            if (!isOwned)
+            {
+                for (uint8 bag = INVENTORY_SLOT_BAG_START; bag < INVENTORY_SLOT_BAG_END; ++bag)
+                {
+                    Bag* bagObj = (Bag*)bot->GetItemByPos(INVENTORY_SLOT_BAG_0, bag);
+                    if (bagObj)
+                    {
+                        for (uint8 s = 0; s < bagObj->GetBagSize(); ++s)
+                        {
+                            Item* it = bagObj->GetItemByPos(s);
+                            if (it && it->GetProto())
+                            {
+                                if (ai::MountValue::GetMountSpell(it->GetProto()->ItemId) > 0)
+                                {
+                                    if (it->GetProto()->RequiredLevel > newLevel ||
+                                        (it->GetProto()->RequiredSkill == SKILL_RIDING && it->GetProto()->RequiredSkillRank > bot->GetSkillValue(SKILL_RIDING)))
+                                    {
+                                        bot->DestroyItem(bag, s, true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                for (uint8 s = INVENTORY_SLOT_ITEM_START; s < INVENTORY_SLOT_ITEM_END; ++s)
+                {
+                    Item* it = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, s);
+                    if (it && it->GetProto())
+                    {
+                        if (ai::MountValue::GetMountSpell(it->GetProto()->ItemId) > 0)
+                        {
+                            if (it->GetProto()->RequiredLevel > newLevel ||
+                                (it->GetProto()->RequiredSkill == SKILL_RIDING && it->GetProto()->RequiredSkillRank > bot->GetSkillValue(SKILL_RIDING)))
+                            {
+                                bot->DestroyItem(INVENTORY_SLOT_BAG_0, s, true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Upscaling: ensure appropriate riding skill and mounts
+            if (newLevel >= 60)
+                bot->SetSkill(SKILL_RIDING, 150, 150);
+            else if (newLevel >= 40)
+                bot->SetSkill(SKILL_RIDING, 75, 75);
+            factory.InitMounts();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Authoritative Equipment Reconciliation (All Slots)
+    // -------------------------------------------------------------------------
+    if (PopulationPolicy::Instance().IsEquipmentReconciliationEnabled())
+    {
+        uint32 maxItemLevel = TortoiseBots::GearItemLevelCap(newLevel,
+            sPlayerbotAIConfig.randomGearMaxItemLevelAboveLevel,
+            sPlayerbotAIConfig.randomGearMaxLevel);
+
+        // Phase 1: Scan and strip illegal / out-of-bracket worn items across all equipment slots
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+        {
+            if (slot == EQUIPMENT_SLOT_BODY || slot == EQUIPMENT_SLOT_TABARD)
+                continue;
+
+            Item* worn = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+            if (!worn || !worn->GetProto())
+                continue;
+
+            ItemPrototype const* proto = worn->GetProto();
+            bool illegal = false;
+
+            if (proto->RequiredLevel > newLevel)
+                illegal = true;
+            else if (proto->ItemLevel > maxItemLevel)
+                illegal = true;
+            else if (bot->CanUseItem(worn) != EQUIP_ERR_OK)
+                illegal = true;
+            else if (TortoiseBots::GearBlacklistBlocks(sPlayerbotAIConfig.randomGearBlacklist, proto->ItemId))
+                illegal = true;
+            else if (newLevel < oldLevel)
+            {
+                // Head & Shoulders downscale: low levels (1-19) have no canonical shoulder/head items
+                if ((slot == EQUIPMENT_SLOT_HEAD || slot == EQUIPMENT_SLOT_SHOULDERS) && newLevel < 20)
+                    illegal = true;
+                // Trinkets downscale: sub-30 characters rarely have valid trinkets in candidate pool
+                else if ((slot == EQUIPMENT_SLOT_TRINKET1 || slot == EQUIPMENT_SLOT_TRINKET2) && newLevel < 30)
+                    illegal = true;
+                // Neck downscale: sub-20 characters have virtually no neck items
+                else if (slot == EQUIPMENT_SLOT_NECK && newLevel < 20)
+                    illegal = true;
+            }
+
+            if (illegal)
+            {
+                if (isOwned)
+                {
+                    ItemPosCountVec dest;
+                    if (bot->CanStoreItem(NULL_BAG, NULL_SLOT, dest, worn, false) == EQUIP_ERR_OK)
+                    {
+                        uint8 bag = worn->GetBagSlot();
+                        uint8 wornSlot = worn->GetSlot();
+                        bot->RemoveItem(bag, wornSlot, true);
+                        bot->StoreItem(dest, worn, true);
+                    }
+                    else
+                    {
+                        // Bags full: auto-unequip safely
+                        bot->AutoUnequipItemFromSlot(slot, false);
+                    }
+                }
+                else
+                {
+                    // Free bot: destroy to prevent lingering illegal items
+                    bot->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+                }
+            }
+        }
+
+        // Phase 2: Reconcile Main-Hand 2H weapon vs Off-Hand
+        Item* mhItem = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
+        Item* ohItem = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
+        if (mhItem && mhItem->GetProto() && mhItem->GetProto()->InventoryType == INVTYPE_2HWEAPON && ohItem)
+        {
+            if (isOwned)
+            {
+                ItemPosCountVec dest;
+                if (bot->CanStoreItem(NULL_BAG, NULL_SLOT, dest, ohItem, false) == EQUIP_ERR_OK)
+                {
+                    uint8 bag = ohItem->GetBagSlot();
+                    uint8 wornSlot = ohItem->GetSlot();
+                    bot->RemoveItem(bag, wornSlot, true);
+                    bot->StoreItem(dest, ohItem, true);
+                }
+                else
+                {
+                    bot->AutoUnequipItemFromSlot(EQUIPMENT_SLOT_OFFHAND, false);
+                }
+            }
+            else
+            {
+                bot->DestroyItem(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND, true);
+            }
+        }
+
+        // Phase 3: Invoke Authoritative Gearing
+        if (isOwned)
+        {
+            factory.AutogearOwned(sPlayerbotAIConfig.ownedBotAutogearQualityCap, sPlayerbotAIConfig.ownedBotAutogearIlvlCap);
+        }
+        else
+        {
+            factory.UsePoolGearCap();
+            factory.MakeComplete(false);
+        }
+
+        // Phase 4: Unique-Equipped Deduplication (Finger1/Finger2, Trinket1/Trinket2)
+        Item* r1 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER1);
+        Item* r2 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER2);
+        if (r1 && r2 && r1->GetProto() && r2->GetProto())
+        {
+            if (r1->GetProto()->ItemId == r2->GetProto()->ItemId && (r1->GetProto()->Flags & 0x80000 /* ITEM_FLAG_UNIQUE_EQUIPPED */))
+            {
+                if (isOwned)
+                    bot->AutoUnequipItemFromSlot(EQUIPMENT_SLOT_FINGER2, false);
+                else
+                    bot->DestroyItem(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER2, true);
+            }
+        }
+
+        Item* t1 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_TRINKET1);
+        Item* t2 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_TRINKET2);
+        if (t1 && t2 && t1->GetProto() && t2->GetProto())
+        {
+            if (t1->GetProto()->ItemId == t2->GetProto()->ItemId && (t1->GetProto()->Flags & 0x80000 /* ITEM_FLAG_UNIQUE_EQUIPPED */))
+            {
+                if (isOwned)
+                    bot->AutoUnequipItemFromSlot(EQUIPMENT_SLOT_TRINKET2, false);
+                else
+                    bot->DestroyItem(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_TRINKET2, true);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Consumables, Projectiles, Repair & Vitals
+    // -------------------------------------------------------------------------
+    if (!isOwned)
+    {
+        factory.EnsureStarterKit();
+        factory.InitAmmo();
+        factory.InitThrown();
+        factory.AddFood();
+        factory.AddConsumes();
+        factory.AddBandages();
+    }
+
+    if (!bot->HasItemCount(6948, 1, true))
+    {
+        bot->StoreNewItemInBestSlots(6948, 1);
+    }
+
+    bot->DurabilityRepairAll(false, 0.0f);
+    bot->SetHealth(bot->GetMaxHealth());
+    if (bot->GetMaxPower(POWER_MANA) > 0)
+        bot->SetPower(POWER_MANA, bot->GetMaxPower(POWER_MANA));
+    else if (bot->GetMaxPower(POWER_ENERGY) > 0)
+        bot->SetPower(POWER_ENERGY, bot->GetMaxPower(POWER_ENERGY));
+
+    // -------------------------------------------------------------------------
+    // 6. AI State Reset & Database Persistence
+    // -------------------------------------------------------------------------
+    if (ai->GetAiObjectContext())
+    {
+        TravelTarget* travelTarget = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+        if (travelTarget)
+        {
+            sTravelMgr.SetNullTravelTarget(travelTarget);
+            travelTarget->SetStatus(TravelStatus::TRAVEL_STATUS_EXPIRED);
+            travelTarget->SetExpireIn(1000);
+        }
+    }
+
+    ai->UpdateTalentSpec();
+    ai->ResetStrategies();
+    bot->SaveToDB();
+#elif defined(HAVE_LEGACY_PLAYERBOTS)
+    PlayerbotFactory factory(bot, newLevel);
+    factory.Randomize(false, false);
+#endif
+
+    return true;
+}
+
 bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
 {
     if (!bot || !bot->IsInWorld() || !bot->GetSession() || bot->GetSession()->isLogingOut())
+        return false;
+
+    // Check if bot is alive and in safe state
+    if (!bot->IsAlive() || bot->IsInCombat() || bot->IsTaxiFlying() || bot->IsBeingTeleported() || bot->m_duel != nullptr)
         return false;
 
     uint8_t oldLevel = bot->GetLevel();
@@ -1281,83 +1681,17 @@ bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
         bot->SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr.GetXPForLevel(newLevel));
     }
 
-#if defined(HAVE_TORTOISEBOTS)
-    PlayerbotAI* ai = PlayerbotAIStorage::Instance().GetAI(bot);
-    if (!ai)
+    // Authoritative equipment, skills, talents, spells, mounts reconciliation
+    if (!ReconcileBotEquipmentAndState(bot, oldLevel, newLevel))
         return false;
-
-    PlayerbotFactory factory(bot, newLevel);
-
-    // 1. Spec, Talents, Spells
-    ai->DoSpecificAction("auto talents");
-    ai->DoSpecificAction("auto learn spell");
-
-    if (newLevel < oldLevel)
-        factory.PruneOverLevelSpellRanks();
-
-    PlayerbotFactory::EnsureSkillRewardedSpells(bot);
-    PlayerbotFactory::EnsureTalentSpellsSaved(bot);
-
-    // 2. Defense, Armor proficiencies, Weapon skills
-    factory.InitSkills();
-
-    // 3. Professions, Specializations, Recipes & Tools
-    factory.InitAllSkills();
-    factory.EnsurePrimaryProfessions();
-    factory.EnsureSpecializations();
-    factory.LearnSpecializationRecipes();
-    factory.AddTools();
-
-    // 4. Riding Skills & Mounts
-    factory.InitMounts();
-
-    // 5. Autogear Equipment Pass (based on server configuration caps, not Best/epic gear)
-    factory.UsePoolGearCap();
-    factory.AutogearOwned(sPlayerbotAIConfig.ownedBotAutogearQualityCap, sPlayerbotAIConfig.ownedBotAutogearIlvlCap);
-    factory.EnchantEquipment();
-
-    // 6. Starter Kit, Projectiles & Consumables
-    factory.EnsureStarterKit();
-    factory.AddFood();
-    factory.AddConsumes();
-    factory.AddBandages();
-
-    // Ensure bot has a Hearthstone in bags for homebind usage
-    if (!bot->HasItemCount(6948, 1, true))
-    {
-        bot->StoreNewItemInBestSlots(6948, 1);
-    }
-
-    // 7. Full Item Durability Maintenance & Vital Stat Recovery
-    bot->DurabilityRepairAll(false, 0.0f);
-    bot->SetHealth(bot->GetMaxHealth());
-    if (bot->GetMaxPower(POWER_MANA) > 0)
-        bot->SetPower(POWER_MANA, bot->GetMaxPower(POWER_MANA));
-    else if (bot->GetMaxPower(POWER_ENERGY) > 0)
-        bot->SetPower(POWER_ENERGY, bot->GetMaxPower(POWER_ENERGY));
-
-    // 8. AI Travel Target Expiration & State Reset
-    if (ai->GetAiObjectContext())
-    {
-        TravelTarget* travelTarget = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-        if (travelTarget)
-        {
-            sTravelMgr.SetNullTravelTarget(travelTarget);
-            travelTarget->SetStatus(TravelStatus::TRAVEL_STATUS_EXPIRED);
-            travelTarget->SetExpireIn(1000);
-        }
-    }
-
-    ai->UpdateTalentSpec();
-    ai->ResetStrategies();
 
     // If level is demoted or under 10, ensure safety of homebind location
     if (PopulationPolicy::Instance().IsHomebindSyncEnabled() && newLevel < 10)
     {
         uint8_t race = bot->GetRace();
-        uint32_t safeMap = 0;
+        uint32 safeMap = 0;
         float safeX = 0.0f, safeY = 0.0f, safeZ = 0.0f, safeO = 0.0f;
-        uint32_t safeZone = 0;
+        uint32 safeZone = 0;
         switch (race)
         {
             case RACE_HIGH_ELF: safeMap = 0; safeX = 3322.0f; safeY = -2448.0f; safeZ = 107.2f; safeO = 3.47f; safeZone = 5225; break;
@@ -1381,12 +1715,6 @@ bool NativeTaskAdapter::AdjustBotLevel(Player* bot, uint8_t newLevel)
             }
         }
     }
-
-    bot->SaveToDB();
-#elif defined(HAVE_LEGACY_PLAYERBOTS)
-    PlayerbotFactory factory(bot, newLevel);
-    factory.Randomize(false, false);
-#endif
 
     return true;
 }

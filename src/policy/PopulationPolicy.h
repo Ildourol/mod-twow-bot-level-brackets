@@ -262,6 +262,12 @@ public:
     bool IsUseWeightedPriorities() const { return m_useWeightedPriorities; }
     void SetUseWeightedPriorities(bool val) { m_useWeightedPriorities = val; }
 
+    bool IsEquipmentReconciliationEnabled() const { return m_reconcileEquipment; }
+    void SetEquipmentReconciliationEnabled(bool val) { m_reconcileEquipment = val; }
+
+    bool IsSkillsSpellsMountsReconciliationEnabled() const { return m_reconcileSkillsSpellsMounts; }
+    void SetSkillsSpellsMountsReconciliationEnabled(bool val) { m_reconcileSkillsSpellsMounts = val; }
+
 private:
     PopulationPolicy();
 
@@ -313,6 +319,8 @@ private:
     bool m_teleportOnLevelChange = true;
     bool m_homebindSyncEnabled = true;
     bool m_useWeightedPriorities = true;
+    bool m_reconcileEquipment = true;
+    bool m_reconcileSkillsSpellsMounts = true;
     bool m_arrivalFloorHoldEnabled = true;
     uint32_t m_arrivalHoldDurationMs = 5000;
     uint32_t m_maxFloorLifts = 6;
