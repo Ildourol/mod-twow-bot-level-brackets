@@ -1380,13 +1380,13 @@ bool NativeTaskAdapter::ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLe
                     if (uint32 spellId = ai::MountValue::GetMountSpell(itemId))
                     {
                         if (bot->HasSpell(spellId))
-                            bot->removeSpell(spellId, false, false);
+                            bot->RemoveSpell(spellId, false, false);
                     }
                 }
                 for (auto const& [itemId, spellId] : ai::CollectionMounts())
                 {
                     if (ai::MountValue::GetSpeed(spellId) >= 100 && bot->HasSpell(spellId))
-                        bot->removeSpell(spellId, false, false);
+                        bot->RemoveSpell(spellId, false, false);
                 }
                 if (bot->GetSkillValue(SKILL_RIDING) > 75)
                     bot->SetSkill(SKILL_RIDING, (newLevel >= 40 ? 75 : 0), (newLevel >= 40 ? 75 : 0));
@@ -1400,13 +1400,13 @@ bool NativeTaskAdapter::ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLe
                     if (uint32 spellId = ai::MountValue::GetMountSpell(itemId))
                     {
                         if (bot->HasSpell(spellId))
-                            bot->removeSpell(spellId, false, false);
+                            bot->RemoveSpell(spellId, false, false);
                     }
                 }
                 for (auto const& [itemId, spellId] : ai::CollectionMounts())
                 {
                     if (bot->HasSpell(spellId))
-                        bot->removeSpell(spellId, false, false);
+                        bot->RemoveSpell(spellId, false, false);
                 }
                 bot->SetSkill(SKILL_RIDING, 0, 0);
             }
@@ -1415,7 +1415,7 @@ bool NativeTaskAdapter::ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLe
             if (newLevel < 18)
             {
                 if (bot->HasSpell(30174))
-                    bot->removeSpell(30174, false, false);
+                    bot->RemoveSpell(30174, false, false);
             }
 
             // Purge unusable mount items from inventory bags for free bots
