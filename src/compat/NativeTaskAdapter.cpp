@@ -25,6 +25,7 @@
 #include "ai/playerbot/strategy/values/MountValues.h"
 #include "runtime/GearItemLevelCapPolicy.h"
 #include "runtime/policy/provision/GearBlacklistPolicy.h"
+#include "ai/playerbot/RandomItemMgr.h"
 #include "Objects/Bag.h"
 #elif defined(HAVE_LEGACY_PLAYERBOTS)
 #include "Common.h"
@@ -1566,7 +1567,55 @@ bool NativeTaskAdapter::ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLe
             }
         }
 
-        // Phase 3: Invoke Authoritative Gearing
+        // Phase 3: Purge unusable and out-of-bracket bag items for free bots
+        if (!isOwned)
+        {
+            for (uint8 bag = INVENTORY_SLOT_BAG_START; bag < INVENTORY_SLOT_BAG_END; ++bag)
+            {
+                Bag* bagObj = (Bag*)bot->GetItemByPos(INVENTORY_SLOT_BAG_0, bag);
+                if (bagObj)
+                {
+                    for (uint8 s = 0; s < bagObj->GetBagSize(); ++s)
+                    {
+                        Item* it = bagObj->GetItemByPos(s);
+                        if (it && it->GetProto())
+                        {
+                            uint32 itemId = it->GetProto()->ItemId;
+                            if (it->GetProto()->Class == ITEM_CLASS_CONTAINER || it->GetProto()->Class == ITEM_CLASS_KEY ||
+                                itemId == 6948 || itemId == 5060)
+                                continue;
+
+                            if (it->GetProto()->RequiredLevel > newLevel ||
+                                it->GetProto()->ItemLevel > maxItemLevel ||
+                                bot->CanUseItem(it) != EQUIP_ERR_OK)
+                            {
+                                bot->DestroyItem(bag, s, true);
+                            }
+                        }
+                    }
+                }
+            }
+            for (uint8 s = INVENTORY_SLOT_ITEM_START; s < INVENTORY_SLOT_ITEM_END; ++s)
+            {
+                Item* it = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, s);
+                if (it && it->GetProto())
+                {
+                    uint32 itemId = it->GetProto()->ItemId;
+                    if (it->GetProto()->Class == ITEM_CLASS_CONTAINER || it->GetProto()->Class == ITEM_CLASS_KEY ||
+                        itemId == 6948 || itemId == 5060)
+                        continue;
+
+                    if (it->GetProto()->RequiredLevel > newLevel ||
+                        it->GetProto()->ItemLevel > maxItemLevel ||
+                        bot->CanUseItem(it) != EQUIP_ERR_OK)
+                    {
+                        bot->DestroyItem(INVENTORY_SLOT_BAG_0, s, true);
+                    }
+                }
+            }
+        }
+
+        // Phase 4: Invoke Authoritative Gearing
         if (isOwned)
         {
             factory.AutogearOwned(sPlayerbotAIConfig.ownedBotAutogearQualityCap, sPlayerbotAIConfig.ownedBotAutogearIlvlCap);
@@ -1574,10 +1623,153 @@ bool NativeTaskAdapter::ReconcileBotEquipmentAndState(Player* bot, uint8_t oldLe
         else
         {
             factory.UsePoolGearCap();
-            factory.MakeComplete(false);
+            factory.MakeComplete(true);
         }
 
-        // Phase 4: Unique-Equipped Deduplication (Finger1/Finger2, Trinket1/Trinket2)
+        // Phase 5: Ensure gear in each eligible gear slot of the current level (Universal Backstop)
+        uint32 specId = sRandomItemMgr.GetPlayerSpecId(bot);
+        if (!specId)
+            specId = sRandomItemMgr.GetFallbackSpecId(bot->GetClass());
+
+        PlayerInfo const* pInfo = sObjectMgr.GetPlayerInfo(bot->GetRace(), bot->GetClass());
+
+        auto TryEquipCandidate = [&](uint8 sSlot, uint32 candId) -> bool
+        {
+            if (!candId)
+                return false;
+
+            if (sRandomItemMgr.IsForbiddenBotGear(candId))
+                return false;
+
+            ItemPrototype const* proto = sObjectMgr.GetItemPrototype(candId);
+            if (!proto)
+                return false;
+
+            if (proto->RequiredLevel > newLevel || proto->ItemLevel > maxItemLevel)
+                return false;
+
+            if (proto->Class == ITEM_CLASS_ARMOR && !sRandomItemMgr.ShouldEquipArmorForSpec(bot->GetClass(), uint8(specId), proto))
+                return false;
+
+            if (bot->CanUseItem(proto) != EQUIP_ERR_OK)
+                return false;
+
+            if (sSlot == EQUIPMENT_SLOT_FINGER2)
+            {
+                Item* f1 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER1);
+                if (f1 && f1->GetEntry() == candId && (proto->Flags & 0x80000 /* ITEM_FLAG_UNIQUE_EQUIPPED */))
+                    return false;
+            }
+            else if (sSlot == EQUIPMENT_SLOT_TRINKET2)
+            {
+                Item* t1 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_TRINKET1);
+                if (t1 && t1->GetEntry() == candId && (proto->Flags & 0x80000 /* ITEM_FLAG_UNIQUE_EQUIPPED */))
+                    return false;
+            }
+
+            uint16 eDest = 0;
+            if (RandomBotFacade::CanEquipUnseenItem(bot, sSlot, eDest, candId) == EQUIP_ERR_OK)
+            {
+                Item* pItem = bot->EquipNewItem(eDest, candId, true);
+                if (pItem)
+                {
+                    pItem->SetOwnerGuid(bot->GetObjectGuid());
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+        {
+            if (slot == EQUIPMENT_SLOT_BODY || slot == EQUIPMENT_SLOT_TABARD)
+                continue;
+
+            // Slot already equipped
+            if (bot->GetItemByPos(INVENTORY_SLOT_BAG_0, slot) != nullptr)
+                continue;
+
+            // Level gates for specific slots
+            if ((slot == EQUIPMENT_SLOT_HEAD || slot == EQUIPMENT_SLOT_SHOULDERS || slot == EQUIPMENT_SLOT_NECK) && newLevel < 20)
+                continue;
+            if ((slot == EQUIPMENT_SLOT_TRINKET1 || slot == EQUIPMENT_SLOT_TRINKET2) && newLevel < 30)
+                continue;
+            if ((slot == EQUIPMENT_SLOT_FINGER1 || slot == EQUIPMENT_SLOT_FINGER2) && newLevel < 10)
+                continue;
+            if ((slot == EQUIPMENT_SLOT_WAIST || slot == EQUIPMENT_SLOT_HANDS || slot == EQUIPMENT_SLOT_WRISTS || slot == EQUIPMENT_SLOT_BACK) && newLevel < 5)
+                continue;
+
+            if (slot == EQUIPMENT_SLOT_OFFHAND)
+            {
+                Item* mh = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
+                if (mh && mh->GetProto() && mh->GetProto()->InventoryType == INVTYPE_2HWEAPON)
+                    continue;
+                if (bot->GetClass() != CLASS_ROGUE && bot->GetClass() != CLASS_WARRIOR &&
+                    bot->GetClass() != CLASS_PALADIN && bot->GetClass() != CLASS_SHAMAN &&
+                    bot->GetClass() != CLASS_HUNTER && bot->GetClass() != CLASS_MAGE &&
+                    bot->GetClass() != CLASS_PRIEST && bot->GetClass() != CLASS_WARLOCK &&
+                    bot->GetClass() != CLASS_DRUID)
+                    continue;
+            }
+
+            if (slot == EQUIPMENT_SLOT_RANGED)
+            {
+                if (bot->GetClass() != CLASS_HUNTER && bot->GetClass() != CLASS_ROGUE &&
+                    bot->GetClass() != CLASS_WARRIOR && bot->GetClass() != CLASS_MAGE &&
+                    bot->GetClass() != CLASS_PRIEST && bot->GetClass() != CLASS_WARLOCK)
+                    continue;
+                if ((bot->GetClass() == CLASS_MAGE || bot->GetClass() == CLASS_PRIEST || bot->GetClass() == CLASS_WARLOCK) && newLevel < 10)
+                    continue;
+            }
+
+            bool slotFilled = false;
+
+            // Tier 1: Canonical starter items from playercreateinfo_item
+            if (pInfo)
+            {
+                for (auto const& cItem : pInfo->item)
+                {
+                    if (TryEquipCandidate(slot, cItem.item_id))
+                    {
+                        slotFilled = true;
+                        break;
+                    }
+                }
+            }
+
+            // Tier 2: Search candidate pool for spec and level
+            if (!slotFilled)
+            {
+                for (uint32 q = ITEM_QUALITY_POOR; q <= ITEM_QUALITY_RARE && !slotFilled; ++q)
+                {
+                    RandomItemList qList = sRandomItemMgr.Query(newLevel, bot->GetClass(), uint8(specId), slot, q);
+                    for (uint32 candId : qList)
+                    {
+                        if (TryEquipCandidate(slot, candId))
+                        {
+                            slotFilled = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Tier 3: Universal slot item catalog backstop
+            if (!slotFilled)
+            {
+                RandomItemList const& slotItems = sRandomItemMgr.GetSlotItemIds(slot);
+                for (uint32 candId : slotItems)
+                {
+                    if (TryEquipCandidate(slot, candId))
+                    {
+                        slotFilled = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Phase 6: Unique-Equipped Deduplication (Finger1/Finger2, Trinket1/Trinket2)
         Item* r1 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER1);
         Item* r2 = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER2);
         if (r1 && r2 && r1->GetProto() && r2->GetProto())
